@@ -32,11 +32,13 @@ package connectors.aws
  * limitations under the License.
  */
 
+import java.io.{ByteArrayInputStream, InputStream}
 import java.util
 import java.util.{List => JList}
+import javassist.bytecode.ByteArray
 
 import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.{CopyObjectResult, DeleteObjectsResult}
+import com.amazonaws.services.s3.model.{CopyObjectResult, DeleteObjectsResult, S3Object, S3ObjectInputStream}
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{Message => SqsMessage, _}
 import config.ServiceConfiguration
@@ -118,5 +120,42 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       }
     }
 
+    "return bytes of a successfully retrieved file" in {
+      val fileLocation = S3ObjectLocation("inboundBucket", "file")
+      val byteArray: Array[Byte] = "Hello World".getBytes
+
+      val s3Object = new S3Object()
+      s3Object.setObjectContent(new ByteArrayInputStream(byteArray))
+
+      val s3client: AmazonS3 = mock[AmazonS3]
+      Mockito.when(s3client.getObject(fileLocation.bucket, fileLocation.objectKey)).thenReturn(s3Object)
+
+      Given("a valid file location")
+      val fileManager = new S3FileManager(s3client, configuration)
+
+      When("the bytes are requested")
+      val result = Await.result(fileManager.getBytes(fileLocation), 2.seconds)
+
+      Then("expected byte array is returned")
+      result shouldBe byteArray
+    }
+
+    "return error if file retrieval fails" in {
+      val fileLocation = S3ObjectLocation("inboundBucket", "file")
+
+      val s3client: AmazonS3 = mock[AmazonS3]
+      Mockito.doThrow(new RuntimeException("exception")).when(s3client).getObject(fileLocation.bucket, fileLocation.objectKey)
+
+      Given("a call to the S3 client errors")
+      val fileManager = new S3FileManager(s3client, configuration)
+
+      When("the bytes are requested")
+      val result = Await.ready(fileManager.getBytes(fileLocation), 2.seconds)
+
+      Then("error is returned")
+      ScalaFutures.whenReady(result.failed) { error =>
+        error shouldBe a[RuntimeException]
+      }
+    }
   }
 }

@@ -19,6 +19,8 @@ package connectors.aws
 import javax.inject.Inject
 
 import com.amazonaws.services.s3.AmazonS3
+import com.amazonaws.services.s3.model.S3Object
+import com.amazonaws.util.IOUtils
 import config.ServiceConfiguration
 import model.S3ObjectLocation
 import services.FileManager
@@ -36,4 +38,11 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)(
     Future(
       s3Client.deleteObject(file.bucket, file.objectKey)
     )
+
+  override def getBytes(file: S3ObjectLocation): Future[Array[Byte]] = {
+    Future {
+      val fileFromLocation: S3Object = s3Client.getObject(file.bucket, file.objectKey)
+      IOUtils.toByteArray(fileFromLocation.getObjectContent)
+    }
+  }
 }

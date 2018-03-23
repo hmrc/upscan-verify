@@ -29,7 +29,7 @@ class ScannerModule extends Module {
       bind[QueueConsumer].to[SqsQueueConsumer],
       bind[PollingJob].to[ScanUploadedFilesFlow],
       bind[ContinousPoller].toSelf.eagerly(),
-      bind[ScanningService].to[MockScanningService],
+      bind[ScanningService].to[ClamAvScanningService],
       bind[FileManager].to[S3FileManager],
       bind[VirusNotifier].toInstance(LoggingVirusNotifier)
     )

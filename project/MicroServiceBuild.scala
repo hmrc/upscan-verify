@@ -24,7 +24,8 @@ private object AppDependencies {
     "uk.gov.hmrc"       %% "bootstrap-play-25" % "1.4.0",
     "com.amazonaws"     % "aws-java-sdk-s3"    % "1.11.261",
     "com.amazonaws"     % "aws-java-sdk-sqs"   % "1.11.285",
-    "com.typesafe.akka" %% "akka-stream"       % "2.5.6"
+    "com.typesafe.akka" %% "akka-stream"       % "2.5.6",
+    "uk.gov.hmrc"       %% "clamav-client"     % "4.0.0"
   )
 
   trait TestDependencies {

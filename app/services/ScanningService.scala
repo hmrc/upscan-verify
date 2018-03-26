@@ -16,21 +16,39 @@
 
 package services
 
-import model.{S3ObjectLocation, UploadedFile}
+import javax.inject.Inject
 
-import scala.concurrent.Future
+import model.{S3ObjectLocation, UploadedFile}
+import uk.gov.hmrc.clamav._
+
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 sealed trait ScanningResult {
   def location: S3ObjectLocation
 }
+
 case class FileIsClean(location: S3ObjectLocation) extends ScanningResult
+
 case class FileIsInfected(location: S3ObjectLocation, details: String) extends ScanningResult
 
 trait ScanningService {
   def scan(notification: UploadedFile): Future[ScanningResult]
 }
 
-class MockScanningService extends ScanningService {
-  override def scan(notification: UploadedFile): Future[FileIsClean] =
-    Future.successful(FileIsClean(notification.location))
+class ClamAvScanningService @Inject()(clamClientFactory: ClamAntiVirusFactory, fileManager: FileManager)
+                                     (implicit ec: ExecutionContext) extends ScanningService {
+
+  override def scan(notification: UploadedFile): Future[ScanningResult] = {
+    for {
+      fileBytes       <- fileManager.getBytes(notification.location)
+      antivirusClient =  clamClientFactory.getClient()
+      scanResult      <- antivirusClient.sendAndCheck(fileBytes) map {
+        case Success(_)     => FileIsClean(notification.location)
+        case Failure(error) => FileIsInfected(notification.location, error.getMessage)
+      }
+    } yield {
+      scanResult
+    }
+  }
 }

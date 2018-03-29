@@ -20,6 +20,7 @@ import java.io.ByteArrayInputStream
 import javax.inject.Inject
 
 import com.amazonaws.services.s3.AmazonS3
+import com.amazonaws.services.s3.model.ObjectMetadata
 import com.amazonaws.util.IOUtils
 import config.ServiceConfiguration
 import model.S3ObjectLocation
@@ -36,12 +37,19 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)(
 
   override def writeToQuarantineBucket(file: S3ObjectLocation, details: String): Future[Unit] =
     for {
-      metadata <- Future(s3Client.getObjectMetadata(file.bucket, file.objectKey))
-      contents = new ByteArrayInputStream(details.getBytes)
-      _ <- Future(s3Client.putObject(config.quarantineBucket, file.objectKey, contents, metadata))
+      inboundObjectMetadata <- Future(s3Client.getObjectMetadata(file.bucket, file.objectKey))
+      quarantineObjectMetadata = buildQuarantineObjectMetadata(inboundObjectMetadata)
+      contents                 = new ByteArrayInputStream(details.getBytes)
+      _ <- Future(s3Client.putObject(config.quarantineBucket, file.objectKey, contents, quarantineObjectMetadata))
     } yield {
       ()
     }
+
+  private def buildQuarantineObjectMetadata(inboundObjectMetadata: ObjectMetadata) = {
+    val result = new ObjectMetadata()
+    result.setUserMetadata(inboundObjectMetadata.getUserMetadata)
+    result
+  }
 
   override def delete(file: S3ObjectLocation) =
     Future(

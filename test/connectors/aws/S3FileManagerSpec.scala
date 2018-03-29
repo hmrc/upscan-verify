@@ -41,13 +41,14 @@ import com.amazonaws.services.s3.model.{CopyObjectResult, ObjectMetadata, S3Obje
 import config.ServiceConfiguration
 import model.S3ObjectLocation
 import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito
+import org.mockito.{ArgumentCaptor, Mockito}
 import org.mockito.Mockito.{doThrow, verify, verifyNoMoreInteractions, when}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Assertions, GivenWhenThen, Matchers}
 import sun.security.util.PropertyExpander.ExpandException
 import uk.gov.hmrc.play.test.UnitSpec
+import collection.JavaConverters._
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -218,6 +219,7 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       userMetadata.put("callbackUrl", "http://some.callback.url")
       val fileMetadata = new ObjectMetadata()
       fileMetadata.setUserMetadata(userMetadata)
+      fileMetadata.setContentType("application/xml")
 
       val s3client: AmazonS3 = mock[AmazonS3]
       when(s3client.getObjectMetadata(any(), any())).thenReturn(fileMetadata)
@@ -232,7 +234,16 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       verify(s3client).getObjectMetadata(fileLocation.bucket, fileLocation.objectKey)
 
       And("a new S3 object with details set as contents and object metadata set should be created")
-      verify(s3client).putObject(any(), any(), any(), any())
+      val metadataCaptor: ArgumentCaptor[ObjectMetadata] = ArgumentCaptor.forClass(classOf[ObjectMetadata])
+      verify(s3client).putObject(any(), any(), any(), metadataCaptor.capture())
+
+      And("the new object should contain metadata copied from inbound object")
+      metadataCaptor.getValue.getUserMetadata.asScala shouldBe userMetadata.asScala
+
+      And("the new object shouldn't contain any other metatada of the inbound object")
+      metadataCaptor.getValue.getContentType shouldBe null
+
+      And("only users metadata have been copied")
 
       And("error is returned")
       ScalaFutures.whenReady(result.failed) { error =>

@@ -16,11 +16,10 @@
 
 package connectors.aws
 
-import javax.inject.Inject
-
 import com.amazonaws.services.ec2.AmazonEC2
-import com.amazonaws.services.ec2.model.StopInstancesRequest
+import com.amazonaws.services.ec2.model.TerminateInstancesRequest
 import com.amazonaws.util.EC2MetadataUtils
+import javax.inject.Inject
 import play.api.Logger
 import services.InstanceTerminator
 
@@ -33,7 +32,7 @@ class Ec2InstanceTerminator @Inject()(amazonEC2: AmazonEC2) extends InstanceTerm
 
     maybeInstanceId match {
       case Some(instanceId) =>
-        amazonEC2.stopInstances(new StopInstancesRequest(List(instanceId).asJava))
+        amazonEC2.terminateInstances(new TerminateInstancesRequest(List(instanceId).asJava))
       case None =>
         Logger.warn("Not running on AWS. Not terminating the instance")
     }

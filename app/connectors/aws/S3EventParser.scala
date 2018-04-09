@@ -62,11 +62,13 @@ class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessagePars
       errors => Future.failed(new Exception(s"Cannot parse the message ${errors.toString()}")),
       result => Future.successful(result))
 
+  private val ObjectCreatedEventPattern = "ObjectCreated\\:.*".r
+
   private def interpretS3EventMessage(result: S3EventNotification): Future[FileUploadEvent] =
     result.records match {
-      case S3EventNotificationRecord(_, "aws:s3", _, _, "ObjectCreated:Post", s3Details) :: Nil =>
+      case S3EventNotificationRecord(_, "aws:s3", _, _, ObjectCreatedEventPattern(), s3Details) :: Nil =>
         Future.successful(FileUploadEvent(S3ObjectLocation(s3Details.bucketName, s3Details.objectKey)))
-      case _ => Future.failed(new Exception(s"Unexpected number of records in event ${result.records.toString}"))
+      case _ => Future.failed(new Exception(s"Unexpected records in event ${result.records.toString}"))
     }
 
 }

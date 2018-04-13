@@ -39,9 +39,8 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)(
     content: InputStream,
     metadata: ObjectMetadata): Future[Unit] = {
     val quarantineObjectMetadata = buildQuarantineObjectMetadata(metadata)
-    val contents                 = content
     Future {
-      s3Client.putObject(config.quarantineBucket, file.objectKey, contents, quarantineObjectMetadata)
+      s3Client.putObject(config.quarantineBucket, file.objectKey, content, quarantineObjectMetadata)
     }
   }
 

@@ -16,6 +16,8 @@
 
 package services
 
+import java.io.{ByteArrayInputStream, InputStream}
+
 import model.S3ObjectLocation
 import org.mockito.Mockito
 import org.scalatest.{Assertions, GivenWhenThen, Matchers}
@@ -39,17 +41,24 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
 
       override def copyToOutboundBucket(file: S3ObjectLocation): Future[Unit] = ???
 
-      override def getBytes(file: S3ObjectLocation): Future[Array[Byte]] = file.objectKey match {
+      override def getObjectContent(file: S3ObjectLocation): Future[ObjectContent] = file.objectKey match {
         case "bad-file" => Future.failed(new RuntimeException("File not retrieved"))
-        case _          => Future.successful("Hello World".getBytes)
+        case _ =>
+          val content = "Hello World".getBytes
+          Future.successful(ObjectContent(new ByteArrayInputStream(content), content.length))
       }
 
-      override def writeToQuarantineBucket(file: S3ObjectLocation, details: String): Future[Unit] = ???
+      override def writeToQuarantineBucket(
+        file: S3ObjectLocation,
+        content: InputStream,
+        metadata: ObjectMetadata): Future[Unit] = ???
+
+      override def getObjectMetadata(file: S3ObjectLocation): Future[ObjectMetadata] = ???
     }
 
     "return success if file can be retrieved and scan result clean" in {
       val client = mock[ClamAntiVirus]
-      Mockito.when(client.sendAndCheck(any())(any())).thenReturn(Future.successful(Clean))
+      Mockito.when(client.sendAndCheck(any(), any())(any())).thenReturn(Future.successful(Clean))
 
       val factory = mock[ClamAntiVirusFactory]
       Mockito.when(factory.getClient()).thenReturn(client)
@@ -68,7 +77,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
 
     "return infected if file can be retrieved and scan result infected" in {
       val client = mock[ClamAntiVirus]
-      Mockito.when(client.sendAndCheck(any())(any())).thenReturn(Future.successful(Infected("File dirty")))
+      Mockito.when(client.sendAndCheck(any(), any())(any())).thenReturn(Future.successful(Infected("File dirty")))
 
       val factory = mock[ClamAntiVirusFactory]
       Mockito.when(factory.getClient()).thenReturn(client)

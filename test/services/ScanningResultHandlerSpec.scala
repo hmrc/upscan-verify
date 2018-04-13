@@ -16,7 +16,11 @@
 
 package services
 
+import java.io.InputStream
+
 import model.S3ObjectLocation
+import org.apache.commons.io.IOUtils
+import org.mockito.{ArgumentCaptor, ArgumentMatchers}
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito._
 import org.scalatest.GivenWhenThen
@@ -112,8 +116,12 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       val file    = S3ObjectLocation("bucket", "file")
       val details = "There is a virus"
 
+      val objectMetadata = ObjectMetadata(Map("callbackUrl" -> "url"))
+
       when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
-      when(fileManager.writeToQuarantineBucket(file, details)).thenReturn(Future.successful(()))
+      when(fileManager.getObjectMetadata(file)).thenReturn(Future.successful(objectMetadata))
+      when(fileManager.writeToQuarantineBucket(ArgumentMatchers.eq(file), any(), any()))
+        .thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
       When("scanning infected file")
@@ -122,8 +130,14 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       Then("notification is created")
       verify(virusNotifier).notifyFileInfected(file, details)
 
+      And("metadata have been requested")
+      verify(fileManager).getObjectMetadata(file)
+
       And("file metadata and error details are stored in the quarantine bucket")
-      verify(fileManager).writeToQuarantineBucket(file, details)
+      val captor: ArgumentCaptor[InputStream] = ArgumentCaptor.forClass(classOf[InputStream])
+      verify(fileManager)
+        .writeToQuarantineBucket(ArgumentMatchers.eq(file), captor.capture(), ArgumentMatchers.eq(objectMetadata))
+      IOUtils.toString(captor.getValue) shouldBe "There is a virus"
 
       And("infected file is deleted")
       verify(fileManager).delete(file)

@@ -16,8 +16,9 @@
 
 package services
 
-import javax.inject.Inject
+import java.io.ByteArrayInputStream
 
+import javax.inject.Inject
 import model.S3ObjectLocation
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -37,8 +38,10 @@ class ScanningResultHandler @Inject()(fileManager: FileManager, virusNotifier: V
 
   private def handleInfected(file: S3ObjectLocation, details: String) =
     for {
-      _ <- virusNotifier.notifyFileInfected(file, details)
-      _ <- fileManager.writeToQuarantineBucket(file, details)
+      _        <- virusNotifier.notifyFileInfected(file, details)
+      metadata <- fileManager.getObjectMetadata(file)
+      quarantineObjectContent = new ByteArrayInputStream(details.getBytes)
+      _ <- fileManager.writeToQuarantineBucket(file, quarantineObjectContent, metadata)
       _ <- fileManager.delete(file)
     } yield ShouldTerminate
 

@@ -42,9 +42,9 @@ class ClamAvScanningService @Inject()(clamClientFactory: ClamAntiVirusFactory, f
 
   override def scan(location: S3ObjectLocation): Future[ScanningResult] =
     for {
-      fileBytes <- fileManager.getBytes(location)
+      fileContent <- fileManager.getObjectContent(location)
       antivirusClient = clamClientFactory.getClient()
-      scanResult <- antivirusClient.sendAndCheck(fileBytes) map {
+      scanResult <- antivirusClient.sendAndCheck(fileContent.inputStream, fileContent.length.toInt) map {
                      case Clean             => FileIsClean(location)
                      case Infected(message) => FileIsInfected(location, message)
                    }

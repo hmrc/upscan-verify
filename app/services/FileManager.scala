@@ -16,13 +16,20 @@
 
 package services
 
+import java.io.InputStream
+
 import model.S3ObjectLocation
 
 import scala.concurrent.Future
 
+case class ObjectMetadata(items: Map[String, String])
+
+case class ObjectContent(inputStream: InputStream, length: Long)
+
 trait FileManager {
   def copyToOutboundBucket(file: S3ObjectLocation): Future[Unit]
-  def writeToQuarantineBucket(file: S3ObjectLocation, details: String): Future[Unit]
+  def writeToQuarantineBucket(file: S3ObjectLocation, content: InputStream, metadata: ObjectMetadata): Future[Unit]
   def delete(file: S3ObjectLocation): Future[Unit]
-  def getBytes(file: S3ObjectLocation): Future[Array[Byte]]
+  def getObjectContent(file: S3ObjectLocation): Future[ObjectContent]
+  def getObjectMetadata(file: S3ObjectLocation): Future[ObjectMetadata]
 }

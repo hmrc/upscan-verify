@@ -16,38 +16,37 @@
 
 package connectors.aws
 
-import java.io.ByteArrayInputStream
-import javax.inject.Inject
+import java.io.InputStream
 
 import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.ObjectMetadata
-import com.amazonaws.util.IOUtils
 import config.ServiceConfiguration
+import javax.inject.Inject
 import model.S3ObjectLocation
-import services.FileManager
+import services.{FileManager, ObjectContent, ObjectMetadata}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 
 class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)(implicit ec: ExecutionContext)
     extends FileManager {
   override def copyToOutboundBucket(file: S3ObjectLocation) =
-    Future(
+    Future {
       s3Client.copyObject(file.bucket, file.objectKey, config.outboundBucket, file.objectKey)
-    )
-
-  override def writeToQuarantineBucket(file: S3ObjectLocation, details: String): Future[Unit] =
-    for {
-      inboundObjectMetadata <- Future(s3Client.getObjectMetadata(file.bucket, file.objectKey))
-      quarantineObjectMetadata = buildQuarantineObjectMetadata(inboundObjectMetadata)
-      contents                 = new ByteArrayInputStream(details.getBytes)
-      _ <- Future(s3Client.putObject(config.quarantineBucket, file.objectKey, contents, quarantineObjectMetadata))
-    } yield {
-      ()
     }
 
+  override def writeToQuarantineBucket(
+    file: S3ObjectLocation,
+    content: InputStream,
+    metadata: ObjectMetadata): Future[Unit] = {
+    val quarantineObjectMetadata = buildQuarantineObjectMetadata(metadata)
+    Future {
+      s3Client.putObject(config.quarantineBucket, file.objectKey, content, quarantineObjectMetadata)
+    }
+  }
+
   private def buildQuarantineObjectMetadata(inboundObjectMetadata: ObjectMetadata) = {
-    val result = new ObjectMetadata()
-    result.setUserMetadata(inboundObjectMetadata.getUserMetadata)
+    val result = new com.amazonaws.services.s3.model.ObjectMetadata()
+    result.setUserMetadata(inboundObjectMetadata.items.asJava)
     result
   }
 
@@ -56,9 +55,16 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)(
       s3Client.deleteObject(file.bucket, file.objectKey)
     )
 
-  override def getBytes(file: S3ObjectLocation): Future[Array[Byte]] =
+  override def getObjectContent(file: S3ObjectLocation): Future[ObjectContent] =
     Future {
       val fileFromLocation = s3Client.getObject(file.bucket, file.objectKey)
-      IOUtils.toByteArray(fileFromLocation.getObjectContent)
+      ObjectContent(fileFromLocation.getObjectContent, fileFromLocation.getObjectMetadata.getContentLength)
+    }
+
+  override def getObjectMetadata(file: S3ObjectLocation): Future[services.ObjectMetadata] =
+    for {
+      metadata <- Future(s3Client.getObjectMetadata(file.bucket, file.objectKey))
+    } yield {
+      ObjectMetadata(metadata.getUserMetadata.asScala.toMap)
     }
 }

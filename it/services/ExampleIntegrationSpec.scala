@@ -7,7 +7,7 @@ import com.amazonaws.services.s3.model.{PutObjectResult, S3Object, S3ObjectInput
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.util.StringInputStream
 import connectors.aws.{Ec2ClientProvider, ProviderOfAWSCredentials, S3ClientProvider, SqsClientProvider}
-import modules.{LocalAWSClientModule, MockAWSClientModule}
+import modules.{MockAWSClientModule}
 import org.apache.commons.io.IOUtils
 import org.mockito.ArgumentMatchers.{eq => eql}
 import org.mockito.{ArgumentMatchers, Mockito}

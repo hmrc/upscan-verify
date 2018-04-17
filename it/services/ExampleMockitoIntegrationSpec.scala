@@ -3,7 +3,7 @@ package services
 import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.{PutObjectResult, S3Object, S3ObjectInputStream}
+import com.amazonaws.services.s3.model.{PutObjectResult, S3Object}
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.util.StringInputStream
 import connectors.aws.{Ec2ClientProvider, ProviderOfAWSCredentials, S3ClientProvider, SqsClientProvider}
@@ -19,8 +19,8 @@ import play.api.inject.bind
 import play.api.inject.guice.{GuiceApplicationBuilder, GuiceableModuleConversions}
 import uk.gov.hmrc.play.test.UnitSpec
 
-class ExampleIntegrationSpec extends UnitSpec
-                             with GuiceOneServerPerSuite with GuiceableModuleConversions with BeforeAndAfterEach with BeforeAndAfterAll {
+class ExampleMockitoIntegrationSpec extends UnitSpec
+                                    with GuiceOneServerPerSuite with GuiceableModuleConversions with BeforeAndAfterEach with BeforeAndAfterAll {
 
   override lazy val app: Application = new GuiceApplicationBuilder()
     .disable(classOf[connectors.aws.AWSClientModule])
@@ -34,7 +34,7 @@ class ExampleIntegrationSpec extends UnitSpec
 
   lazy val s3 = app.injector.instanceOf[AmazonS3]
 
-  "ExampleIntegrationSpec" should {
+  "ExampleMockitoIntegrationSpec" should {
     "Put and Get to an S3 bucket" in {
       new S3TestMockup {
         val putActualResult: PutObjectResult = s3.putObject("myBucket", "myKey", "myContent")

@@ -57,13 +57,14 @@ class ContinousPollingActor(job: PollingJob, retryInterval: FiniteDuration) exte
 
     case Poll =>
       log.debug("Polling")
+      /*
       job.run() andThen {
         case Success(r) =>
           self ! Poll
         case Failure(f) =>
           log.error(f, "Polling failed")
           context.system.scheduler.scheduleOnce(retryInterval, self, Poll)
-      }
+      }*/
   }
 
 }

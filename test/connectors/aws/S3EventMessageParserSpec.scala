@@ -121,7 +121,7 @@ class S3EventMessageParserSpec extends UnitSpec with Matchers {
       |        "principalId": "AWS:AROAI3II5VHGEMGMCYKJ2:botocore-session-1521558860"
       |      },
       |      "requestParameters": {
-      |        "sourceIPAddress": "163.171.33.130"
+      |        "sourceIPAddress": "someIP"
       |      },
       |      "responseElements": {
       |        "x-amz-request-id": "0320AA5D161796DD",

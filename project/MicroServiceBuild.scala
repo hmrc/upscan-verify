@@ -60,7 +60,10 @@ private object AppDependencies {
 
         override lazy val scope: String = "it"
 
-        override lazy val test = commonTestDependencies(scope)
+        override lazy val test = commonTestDependencies(scope) ++
+        Seq (
+          "com.github.tomakehurst" % "wiremock" % "1.58" % scope
+        )
       }.test
   }
 

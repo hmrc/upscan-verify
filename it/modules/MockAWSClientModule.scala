@@ -8,28 +8,17 @@ import org.scalatest.mockito.MockitoSugar.mock
 import play.api.{Configuration, Environment}
 import play.api.inject.{Binding, Module}
 
+import scala.reflect.ClassTag
+
 class MockAWSClientModule extends Module {
   override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
     Seq(
-      bind[AmazonSQS].toProvider[MockAmazonSQSProvider],
-      bind[AmazonS3].toProvider[MockAmazonS3Provider],
-      bind[AmazonEC2].toProvider[MockAmazonEC2Provider]
+      bind[AmazonSQS].to(new MockProvider[AmazonSQS]()),
+      bind[AmazonS3].to(new MockProvider[AmazonS3]()),
+      bind[AmazonEC2].to(new MockProvider[AmazonEC2]())
     )
 }
 
-class MockAmazonSQSProvider extends Provider[AmazonSQS] {
-  override def get(): AmazonSQS = mock[AmazonSQS]
-}
-
-class MockAmazonS3Provider extends Provider[AmazonS3] {
-  override def get(): AmazonS3 = mock[AmazonS3]
-}
-
-class MockAmazonEC2Provider extends Provider[AmazonEC2] {
-  override def get(): AmazonEC2 = mock[AmazonEC2]
-}
-/*
-class MockProvider[T] extends Provider[T] {
+class MockProvider[T <: AnyRef](implicit classTag: ClassTag[T]) extends Provider[T] {
   override def get(): T = mock[T]
 }
-*/

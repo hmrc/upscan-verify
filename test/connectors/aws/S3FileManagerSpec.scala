@@ -34,22 +34,23 @@ package connectors.aws
 
 import java.io.ByteArrayInputStream
 import java.util
+import java.util.{Calendar, GregorianCalendar}
 
 import com.amazonaws.SdkClientException
 import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.{CopyObjectResult, ObjectMetadata, S3Object}
+import com.amazonaws.services.s3.model.{CopyObjectRequest, CopyObjectResult, ObjectMetadata, S3Object}
 import config.ServiceConfiguration
 import model.S3ObjectLocation
 import org.apache.commons.io.IOUtils
 import org.mockito.ArgumentMatchers.any
-import org.mockito.{ArgumentCaptor, Mockito}
 import org.mockito.Mockito.{doThrow, verify, verifyNoMoreInteractions, when}
+import org.mockito.{ArgumentCaptor, Mockito}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Assertions, GivenWhenThen, Matchers}
 import uk.gov.hmrc.play.test.UnitSpec
 
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -61,18 +62,25 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
 
   "S3FileManager" should {
     "allow to copy file from inbound bucket to outbound bucket" in {
+      val lastModified = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
+      val s3Metadata   = mock[ObjectMetadata]
+      when(s3Metadata.getLastModified).thenReturn(lastModified)
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      when(s3client.copyObject(any(), any(), any(), any())).thenReturn(new CopyObjectResult())
+      when(s3client.copyObject(any(): CopyObjectRequest)).thenReturn(new CopyObjectResult())
+      when(s3client.getObjectMetadata(any(), any())).thenReturn(s3Metadata)
+
       val fileManager = new S3FileManager(s3client, configuration)
 
       When("copying the file is requested")
       Await.result(fileManager.copyToOutboundBucket(S3ObjectLocation("inboundBucket", "file")), 2.seconds)
 
-      Then("the S3 copy method of AWS client should be called")
-      verify(s3client).copyObject("inboundBucket", "file", "outboundBucket", "file")
-      verifyNoMoreInteractions(s3client)
+      Then("the S3 object metadata should be retrieved for copying")
+      verify(s3client).getObjectMetadata("inboundBucket", "file")
 
+      And("the S3 copy method of AWS client should be called")
+      verify(s3client).copyObject(any(): CopyObjectRequest)
+      verifyNoMoreInteractions(s3client)
     }
 
     "return error if copying the file failed" in {
@@ -198,7 +206,7 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       val metadata = services.ObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"))
       Await.result(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
 
-      And("a new S3 object with details set as contents and object metadata set should be created")
+      Then("a new S3 object with details set as contents and object metadata set should be created")
       verify(s3client).putObject(any(), any(), any(), any())
 
     }

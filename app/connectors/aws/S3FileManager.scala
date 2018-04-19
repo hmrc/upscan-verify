@@ -17,11 +17,15 @@
 package connectors.aws
 
 import java.io.InputStream
+import java.time.format.DateTimeFormatter
+import javax.inject.Inject
 
 import com.amazonaws.services.s3.AmazonS3
+import com.amazonaws.services.s3.model.{CopyObjectRequest, ObjectMetadata => S3ObjectMetadata}
 import config.ServiceConfiguration
-import javax.inject.Inject
 import model.S3ObjectLocation
+import org.joda.time.DateTime
+import org.joda.time.format.ISODateTimeFormat
 import services.{FileManager, ObjectContent, ObjectMetadata}
 
 import scala.collection.JavaConverters._
@@ -29,9 +33,11 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)(implicit ec: ExecutionContext)
     extends FileManager {
-  override def copyToOutboundBucket(file: S3ObjectLocation) =
-    Future {
-      s3Client.copyObject(file.bucket, file.objectKey, config.outboundBucket, file.objectKey)
+  override def copyToOutboundBucket(file: S3ObjectLocation): Future[Unit] =
+    buildOutboundObjectMetadata(file) flatMap { updatedMetadata =>
+      val request = new CopyObjectRequest(file.bucket, file.objectKey, config.outboundBucket, file.objectKey)
+      request.setNewObjectMetadata(updatedMetadata)
+      Future(s3Client.copyObject(request))
     }
 
   override def writeToQuarantineBucket(
@@ -49,6 +55,16 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)(
     result.setUserMetadata(inboundObjectMetadata.items.asJava)
     result
   }
+
+  private def buildOutboundObjectMetadata(file: S3ObjectLocation): Future[S3ObjectMetadata] =
+    for {
+      inboundMetadata <- Future(s3Client.getObjectMetadata(file.bucket, file.objectKey))
+    } yield {
+      val lastModified          = inboundMetadata.getLastModified
+      val lastModifiedFormatted = DateTimeFormatter.ISO_INSTANT.format(lastModified.toInstant)
+      inboundMetadata.addUserMetadata("initiate-date", lastModifiedFormatted)
+      inboundMetadata
+    }
 
   override def delete(file: S3ObjectLocation) =
     Future(

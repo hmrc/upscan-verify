@@ -24,8 +24,6 @@ import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.{CopyObjectRequest, ObjectMetadata => S3ObjectMetadata}
 import config.ServiceConfiguration
 import model.S3ObjectLocation
-import org.joda.time.DateTime
-import org.joda.time.format.ISODateTimeFormat
 import services.{FileManager, ObjectContent, ObjectMetadata}
 
 import scala.collection.JavaConverters._

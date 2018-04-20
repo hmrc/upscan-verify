@@ -17,6 +17,7 @@
 package services
 
 import java.io.InputStream
+import java.util.{Calendar, GregorianCalendar}
 
 import model.S3ObjectLocation
 import org.apache.commons.io.IOUtils
@@ -116,7 +117,8 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       val file    = S3ObjectLocation("bucket", "file")
       val details = "There is a virus"
 
-      val objectMetadata = ObjectMetadata(Map("callbackUrl" -> "url"))
+      val lastModified   = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
+      val objectMetadata = ObjectMetadata(Map("callbackUrl" -> "url"), lastModified)
 
       when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
       when(fileManager.getObjectMetadata(file)).thenReturn(Future.successful(objectMetadata))

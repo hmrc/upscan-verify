@@ -17,12 +17,13 @@
 package services
 
 import java.io.InputStream
+import java.util.Date
 
 import model.S3ObjectLocation
 
 import scala.concurrent.Future
 
-case class ObjectMetadata(items: Map[String, String])
+case class ObjectMetadata(items: Map[String, String], uploadedTimestamp: Date)
 
 case class ObjectContent(inputStream: InputStream, length: Long)
 

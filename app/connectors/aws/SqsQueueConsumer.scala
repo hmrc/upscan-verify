@@ -33,11 +33,11 @@ package connectors.aws
  */
 
 import javax.inject.Inject
-
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest, ReceiveMessageResult}
 import config.ServiceConfiguration
 import model.Message
+import play.api.Logger
 import services.QueueConsumer
 
 import scala.collection.JavaConverters._
@@ -56,13 +56,18 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS, configuration: ServiceCon
       Future(sqsClient.receiveMessage(receiveMessageRequest))
 
     receiveMessageResult map { result =>
-      result.getMessages.asScala.toList.map(sqsMessage =>
-        Message(sqsMessage.getMessageId, sqsMessage.getBody, sqsMessage.getReceiptHandle))
+      result.getMessages.asScala.toList.map { sqsMessage =>
+        Logger.debug(s"Received message with id: [${sqsMessage.getMessageId}] and receiptHandle: [${sqsMessage.getReceiptHandle}].")
+        Message(sqsMessage.getMessageId, sqsMessage.getBody, sqsMessage.getReceiptHandle)
+      }
     }
   }
 
   override def confirm(message: Message): Future[Unit] = {
     val deleteMessageRequest = new DeleteMessageRequest(configuration.inboundQueueUrl, message.receiptHandle)
-    Future(sqsClient.deleteMessage(deleteMessageRequest))
+    Future {
+      sqsClient.deleteMessage(deleteMessageRequest)
+      Logger.debug(s"Deleted message from Queue: [${configuration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}].")
+    }
   }
 }

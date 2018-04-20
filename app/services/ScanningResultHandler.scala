@@ -20,6 +20,8 @@ import java.io.ByteArrayInputStream
 
 import javax.inject.Inject
 import model.S3ObjectLocation
+import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetails
+import util.logging.LoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -27,27 +29,31 @@ sealed trait InstanceSafety extends Product with Serializable
 case object SafeToContinue extends InstanceSafety
 case object ShouldTerminate extends InstanceSafety
 
-class ScanningResultHandler @Inject()(fileManager: FileManager, virusNotifier: VirusNotifier)(
-  implicit ec: ExecutionContext) {
+class ScanningResultHandler @Inject()(fileManager: FileManager, virusNotifier: VirusNotifier) {
 
-  def handleScanningResult(result: ScanningResult): Future[InstanceSafety] =
+  def handleScanningResult(result: ScanningResult): Future[InstanceSafety] = {
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(result.location)
+
     result match {
-      case FileIsClean(file)             => handleClean(file)
+      case FileIsClean(file) => handleClean(file)
       case FileIsInfected(file, details) => handleInfected(file, details)
     }
+  }
 
-  private def handleInfected(file: S3ObjectLocation, details: String) =
+  private def handleInfected(objectLocation: S3ObjectLocation, details: String)(implicit ec: ExecutionContext) = {
     for {
-      _        <- virusNotifier.notifyFileInfected(file, details)
-      metadata <- fileManager.getObjectMetadata(file)
+      _ <- virusNotifier.notifyFileInfected(objectLocation, details)
+      metadata <- fileManager.getObjectMetadata(objectLocation)
       quarantineObjectContent = new ByteArrayInputStream(details.getBytes)
-      _ <- fileManager.writeToQuarantineBucket(file, quarantineObjectContent, metadata)
-      _ <- fileManager.delete(file)
+      _ <- fileManager.writeToQuarantineBucket(objectLocation, quarantineObjectContent, metadata)
+      _ <- fileManager.delete(objectLocation)
     } yield ShouldTerminate
+  }
 
-  private def handleClean(file: S3ObjectLocation) =
+  private def handleClean(objectLocation: S3ObjectLocation)(implicit ec: ExecutionContext) = {
     for {
-      _ <- fileManager.copyToOutboundBucket(file)
-      _ <- fileManager.delete(file)
+      _ <- fileManager.copyToOutboundBucket(objectLocation)
+      _ <- fileManager.delete(objectLocation)
     } yield SafeToContinue
+  }
 }

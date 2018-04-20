@@ -30,7 +30,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.concurrent.duration.FiniteDuration
 
-class ContinousPollerSpec extends UnitSpec with MockitoSugar with Eventually {
+class ContinuousPollerSpec extends UnitSpec with MockitoSugar with Eventually {
 
   implicit def actorSystem = ActorSystem()
 
@@ -65,7 +65,7 @@ class ContinousPollerSpec extends UnitSpec with MockitoSugar with Eventually {
 
       val serviceLifecycle = new DefaultApplicationLifecycle()
 
-      val queuePollingJob = new ContinousPoller(orchestrator, serviceConfiguration)(actorSystem, serviceLifecycle)
+      val queuePollingJob = new ContinuousPoller(orchestrator, serviceConfiguration)(actorSystem, serviceLifecycle)
 
       eventually {
         callCount.get() > 5
@@ -89,7 +89,7 @@ class ContinousPollerSpec extends UnitSpec with MockitoSugar with Eventually {
 
       val serviceLifecycle = new DefaultApplicationLifecycle()
 
-      val queuePollingJob = new ContinousPoller(orchestrator, serviceConfiguration)(actorSystem, serviceLifecycle)
+      val queuePollingJob = new ContinuousPoller(orchestrator, serviceConfiguration)(actorSystem, serviceLifecycle)
 
       eventually {
         callCount.get() > 5

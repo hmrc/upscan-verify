@@ -18,33 +18,48 @@ package connectors.aws
 
 import java.io.InputStream
 import java.time.format.DateTimeFormatter
-import javax.inject.Inject
 
+import javax.inject.Inject
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.{CopyObjectRequest, ObjectMetadata => S3ObjectMetadata}
 import config.ServiceConfiguration
 import model.S3ObjectLocation
+import play.api.Logger
 import services.{FileManager, ObjectContent, ObjectMetadata}
+import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetails
+import util.logging.LoggingDetails
 
 import scala.collection.JavaConverters._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
-class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)(implicit ec: ExecutionContext)
+class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)
     extends FileManager {
-  override def copyToOutboundBucket(file: S3ObjectLocation): Future[Unit] =
-    buildOutboundObjectMetadata(file) flatMap { updatedMetadata =>
-      val request = new CopyObjectRequest(file.bucket, file.objectKey, config.outboundBucket, file.objectKey)
+
+  override def copyToOutboundBucket(objectLocation: S3ObjectLocation): Future[Unit] = {
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
+
+    buildOutboundObjectMetadata(objectLocation) flatMap { updatedMetadata =>
+      val request = new CopyObjectRequest(objectLocation.bucket, objectLocation.objectKey, config.outboundBucket, objectLocation.objectKey)
       request.setNewObjectMetadata(updatedMetadata)
-      Future(s3Client.copyObject(request))
+
+      Future {
+        s3Client.copyObject(request)
+        Logger.debug(s"Copied object with objectKey: [${objectLocation.objectKey}], to outbound bucket.")
+      }
     }
+  }
 
   override def writeToQuarantineBucket(
-    file: S3ObjectLocation,
+    objectLocation: S3ObjectLocation,
     content: InputStream,
     metadata: ObjectMetadata): Future[Unit] = {
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
+
     val quarantineObjectMetadata = buildQuarantineObjectMetadata(metadata)
+
     Future {
-      s3Client.putObject(config.quarantineBucket, file.objectKey, content, quarantineObjectMetadata)
+      s3Client.putObject(config.quarantineBucket, objectLocation.objectKey, content, quarantineObjectMetadata)
+      Logger.debug(s"Wrote object with objectKey: [${objectLocation.objectKey}], to quarantine bucket.")
     }
   }
 
@@ -54,31 +69,46 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)(
     result
   }
 
-  private def buildOutboundObjectMetadata(file: S3ObjectLocation): Future[S3ObjectMetadata] =
+  private def buildOutboundObjectMetadata(objectLocation: S3ObjectLocation): Future[S3ObjectMetadata] = {
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
+
     for {
-      inboundMetadata <- Future(s3Client.getObjectMetadata(file.bucket, file.objectKey))
+      inboundMetadata <- Future(s3Client.getObjectMetadata(objectLocation.bucket, objectLocation.objectKey))
     } yield {
-      val lastModified          = inboundMetadata.getLastModified
+      val lastModified = inboundMetadata.getLastModified
       val lastModifiedFormatted = DateTimeFormatter.ISO_INSTANT.format(lastModified.toInstant)
       inboundMetadata.addUserMetadata("initiate-date", lastModifiedFormatted)
       inboundMetadata
     }
+  }
 
-  override def delete(file: S3ObjectLocation) =
-    Future(
-      s3Client.deleteObject(file.bucket, file.objectKey)
-    )
+  override def delete(objectLocation: S3ObjectLocation) = {
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
 
-  override def getObjectContent(file: S3ObjectLocation): Future[ObjectContent] =
     Future {
-      val fileFromLocation = s3Client.getObject(file.bucket, file.objectKey)
+      s3Client.deleteObject(objectLocation.bucket, objectLocation.objectKey)
+    }
+  }
+
+  override def getObjectContent(objectLocation: S3ObjectLocation): Future[ObjectContent] = {
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
+
+    Future {
+      val fileFromLocation = s3Client.getObject(objectLocation.bucket, objectLocation.objectKey)
+      Logger.debug(s"Fetched content for objectKey: [${objectLocation.objectKey}].")
       ObjectContent(fileFromLocation.getObjectContent, fileFromLocation.getObjectMetadata.getContentLength)
     }
+  }
 
-  override def getObjectMetadata(file: S3ObjectLocation): Future[services.ObjectMetadata] =
+  override def getObjectMetadata(objectLocation: S3ObjectLocation): Future[services.ObjectMetadata] = {
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
+
     for {
-      metadata <- Future(s3Client.getObjectMetadata(file.bucket, file.objectKey))
+      metadata <- Future(s3Client.getObjectMetadata(objectLocation.bucket, objectLocation.objectKey))
     } yield {
+      Logger.debug(s"Fetched metadata for objectKey: [${objectLocation.objectKey}].")
+
       ObjectMetadata(metadata.getUserMetadata.asScala.toMap)
     }
+  }
 }

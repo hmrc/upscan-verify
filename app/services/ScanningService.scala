@@ -17,12 +17,14 @@
 package services
 
 import javax.inject.Inject
-
 import model.S3ObjectLocation
+import play.api.Logger
 import uk.gov.hmrc.clamav._
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
+import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetails
+import util.logging.LoggingDetails
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 sealed trait ScanningResult extends Product with Serializable {
   def location: S3ObjectLocation
@@ -36,19 +38,29 @@ trait ScanningService {
   def scan(location: S3ObjectLocation): Future[ScanningResult]
 }
 
-class ClamAvScanningService @Inject()(clamClientFactory: ClamAntiVirusFactory, fileManager: FileManager)(
-  implicit ec: ExecutionContext)
+class ClamAvScanningService @Inject()(clamClientFactory: ClamAntiVirusFactory, fileManager: FileManager)
     extends ScanningService {
 
-  override def scan(location: S3ObjectLocation): Future[ScanningResult] =
+  override def scan(location: S3ObjectLocation): Future[ScanningResult] = {
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(location)
+
     for {
       fileContent <- fileManager.getObjectContent(location)
       antivirusClient = clamClientFactory.getClient()
       scanResult <- antivirusClient.sendAndCheck(fileContent.inputStream, fileContent.length.toInt) map {
-                     case Clean             => FileIsClean(location)
-                     case Infected(message) => FileIsInfected(location, message)
-                   }
+        case Clean => {
+          val clean = FileIsClean(location)
+          Logger.debug(s"File is clean: [$clean].")
+          clean
+        }
+        case Infected(message) => {
+          val infected = FileIsInfected(location, message)
+          Logger.warn(s"File is infected: [$infected].")
+          infected
+        }
+      }
     } yield {
       scanResult
     }
+  }
 }

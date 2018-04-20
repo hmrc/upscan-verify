@@ -17,12 +17,12 @@
 package services
 
 import javax.inject.Inject
-
 import akka.actor.{Actor, ActorSystem, PoisonPill, Props}
 import akka.event.Logging
 import config.ServiceConfiguration
+import play.api.Logger
 import play.api.inject.ApplicationLifecycle
-import services.ContinousPollingActor.Poll
+import services.ContinuousPollingActor.Poll
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -30,24 +30,32 @@ import scala.util.{Failure, Success}
 
 trait PollingJob {
   def run(): Future[Unit]
+
+  def jobName(): String = this.getClass.getName
 }
 
-class ContinousPoller @Inject()(job: PollingJob, serviceConfiguration: ServiceConfiguration)(
+class ContinuousPoller @Inject()(job: PollingJob, serviceConfiguration: ServiceConfiguration)(
   implicit actorSystem: ActorSystem,
   applicationLifecycle: ApplicationLifecycle) {
 
+  Logger.info(s"Creating ContinuousPollingActor for PollingJob: [${job.jobName}].")
+
   private val pollingActor =
-    actorSystem.actorOf(ContinousPollingActor(job, serviceConfiguration.retryInterval), "Poller")
+    actorSystem.actorOf(ContinuousPollingActor(job, serviceConfiguration.retryInterval), "Poller")
+
+  Logger.info(s"Sending initial Poll message to Actor: [${pollingActor.toString}].")
   pollingActor ! Poll
 
+
   applicationLifecycle.addStopHook { () =>
+    Logger.info(s"Sending PoisonPill message to Actor: [${pollingActor.toString}].")
     pollingActor ! PoisonPill
     Future.successful(())
   }
 
 }
 
-class ContinousPollingActor(job: PollingJob, retryInterval: FiniteDuration) extends Actor {
+class ContinuousPollingActor(job: PollingJob, retryInterval: FiniteDuration) extends Actor {
 
   import context.dispatcher
 
@@ -56,22 +64,23 @@ class ContinousPollingActor(job: PollingJob, retryInterval: FiniteDuration) exte
   override def receive: Receive = {
 
     case Poll =>
-      log.debug("Polling")
+      log.debug(s"Polling for job: [${job.jobName}].")
       job.run() andThen {
         case Success(r) =>
+          log.debug(s"Polling succeeded for job: [${job.jobName}].")
           self ! Poll
         case Failure(f) =>
-          log.error(f, "Polling failed")
+          log.error(f, s"Polling failed for job: [${job.jobName}].")
           context.system.scheduler.scheduleOnce(retryInterval, self, Poll)
       }
   }
 
 }
 
-object ContinousPollingActor {
+object ContinuousPollingActor {
 
   def apply(orchestrator: PollingJob, retryInterval: FiniteDuration): Props =
-    Props(new ContinousPollingActor(orchestrator, retryInterval))
+    Props(new ContinuousPollingActor(orchestrator, retryInterval))
 
   case object Poll
 }

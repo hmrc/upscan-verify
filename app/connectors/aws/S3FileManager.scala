@@ -32,19 +32,22 @@ import util.logging.LoggingDetails
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 
-class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)
-    extends FileManager {
+class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) extends FileManager {
 
   override def copyToOutboundBucket(objectLocation: S3ObjectLocation): Future[Unit] = {
     implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
 
-    buildOutboundObjectMetadata(objectLocation) flatMap { updatedMetadata =>
-      val request = new CopyObjectRequest(objectLocation.bucket, objectLocation.objectKey, config.outboundBucket, objectLocation.objectKey)
-      request.setNewObjectMetadata(updatedMetadata)
-
+    buildOutboundObjectMetadata(objectLocation) flatMap { metadata =>
+      val request = new CopyObjectRequest(
+        objectLocation.bucket,
+        objectLocation.objectKey,
+        config.outboundBucket,
+        objectLocation.objectKey)
+      request.setNewObjectMetadata(metadata)
       Future {
         s3Client.copyObject(request)
         Logger.debug(s"Copied object with objectKey: [${objectLocation.objectKey}], to outbound bucket.")
+
       }
     }
   }
@@ -63,22 +66,24 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)
     }
   }
 
-  private def buildQuarantineObjectMetadata(inboundObjectMetadata: ObjectMetadata) = {
-    val result = new com.amazonaws.services.s3.model.ObjectMetadata()
-    result.setUserMetadata(inboundObjectMetadata.items.asJava)
-    result
+  private def buildQuarantineObjectMetadata(inboundObjectMetadata: ObjectMetadata): S3ObjectMetadata = {
+    val quarantineMetadata = new com.amazonaws.services.s3.model.ObjectMetadata()
+    quarantineMetadata.setUserMetadata(inboundObjectMetadata.items.asJava)
+    quarantineMetadata
   }
 
   private def buildOutboundObjectMetadata(objectLocation: S3ObjectLocation): Future[S3ObjectMetadata] = {
     implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
 
     for {
-      inboundMetadata <- Future(s3Client.getObjectMetadata(objectLocation.bucket, objectLocation.objectKey))
+      inboundMetadata <- getObjectMetadata(objectLocation)
     } yield {
-      val lastModified = inboundMetadata.getLastModified
-      val lastModifiedFormatted = DateTimeFormatter.ISO_INSTANT.format(lastModified.toInstant)
-      inboundMetadata.addUserMetadata("initiate-date", lastModifiedFormatted)
-      inboundMetadata
+      val lastModified =
+        DateTimeFormatter.ISO_INSTANT.format(inboundMetadata.uploadedTimestamp)
+      val outboundMetadataItems = inboundMetadata.items + ("initiate-date" -> lastModified)
+      val outboundMetadata      = new com.amazonaws.services.s3.model.ObjectMetadata()
+      outboundMetadata.setUserMetadata(outboundMetadataItems.asJava)
+      outboundMetadata
     }
   }
 
@@ -107,8 +112,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration)
       metadata <- Future(s3Client.getObjectMetadata(objectLocation.bucket, objectLocation.objectKey))
     } yield {
       Logger.debug(s"Fetched metadata for objectKey: [${objectLocation.objectKey}].")
-
-      ObjectMetadata(metadata.getUserMetadata.asScala.toMap)
+      ObjectMetadata(metadata.getUserMetadata.asScala.toMap, metadata.getLastModified.toInstant)
     }
   }
 }

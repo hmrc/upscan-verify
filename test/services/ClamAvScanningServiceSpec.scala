@@ -17,7 +17,11 @@
 package services
 
 import java.io.{ByteArrayInputStream, InputStream}
+import java.time.{LocalDateTime, ZoneOffset}
+import java.util.{Calendar, GregorianCalendar}
 
+import com.codahale.metrics.MetricRegistry
+import com.kenshoo.play.metrics.Metrics
 import model.S3ObjectLocation
 import org.mockito.Mockito
 import org.scalatest.{Assertions, GivenWhenThen, Matchers}
@@ -53,7 +57,16 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
         content: InputStream,
         metadata: ObjectMetadata): Future[Unit] = ???
 
-      override def getObjectMetadata(file: S3ObjectLocation): Future[ObjectMetadata] = ???
+      override def getObjectMetadata(file: S3ObjectLocation): Future[ObjectMetadata] = {
+        val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
+        Future(ObjectMetadata(Map.empty, lastModified))
+      }
+    }
+
+    def metricsStub() = new Metrics {
+      override val defaultRegistry: MetricRegistry = new MetricRegistry
+
+      override def toJson: String = ???
     }
 
     "return success if file can be retrieved and scan result clean" in {
@@ -63,7 +76,8 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val factory = mock[ClamAntiVirusFactory]
       Mockito.when(factory.getClient()).thenReturn(client)
 
-      val scanningService = new ClamAvScanningService(factory, fileManager)
+      val metrics         = metricsStub()
+      val scanningService = new ClamAvScanningService(factory, fileManager, metrics)
 
       Given("a file location pointing to a clean file")
       val fileLocation = S3ObjectLocation("inboundBucket", "file")
@@ -73,6 +87,12 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
 
       Then("a scanning clean result should be returned")
       result shouldBe FileIsClean(fileLocation)
+
+      And("the metrics should be successfully updated")
+      metrics.defaultRegistry.counter("cleanFileUpload").getCount              shouldBe 1
+      metrics.defaultRegistry.counter("quarantineFileUpload").getCount         shouldBe 0
+      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 1
+      metrics.defaultRegistry.timer("scanningTime").getSnapshot.size()         shouldBe 1
     }
 
     "return infected if file can be retrieved and scan result infected" in {
@@ -82,7 +102,8 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val factory = mock[ClamAntiVirusFactory]
       Mockito.when(factory.getClient()).thenReturn(client)
 
-      val scanningService = new ClamAvScanningService(factory, fileManager)
+      val metrics         = metricsStub()
+      val scanningService = new ClamAvScanningService(factory, fileManager, metrics)
 
       Given("a file location pointing to a clean file")
       val fileLocation = S3ObjectLocation("inboundBucket", "file")
@@ -90,8 +111,14 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       When("scanning service is called")
       val result = Await.result(scanningService.scan(fileLocation), 2.seconds)
 
-      Then("a scanning clean result should be returned")
+      Then("a scanning infected result should be returned")
       result shouldBe FileIsInfected(fileLocation, "File dirty")
+
+      And("the metrics should be successfully updated")
+      metrics.defaultRegistry.counter("cleanFileUpload").getCount              shouldBe 0
+      metrics.defaultRegistry.counter("quarantineFileUpload").getCount         shouldBe 1
+      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 1
+      metrics.defaultRegistry.timer("scanningTime").getSnapshot.size()         shouldBe 1
     }
 
     "return failure if file cannot be retrieved" in {
@@ -100,7 +127,8 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val factory = mock[ClamAntiVirusFactory]
       Mockito.when(factory.getClient()).thenReturn(client)
 
-      val scanningService = new ClamAvScanningService(factory, fileManager)
+      val metrics         = metricsStub()
+      val scanningService = new ClamAvScanningService(factory, fileManager, metrics)
 
       Given("a file location that cannot be retrieved from the file manager")
       val fileLocation = S3ObjectLocation("inboundBucket", "bad-file")
@@ -112,6 +140,12 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       ScalaFutures.whenReady(result.failed) { error =>
         error            shouldBe a[RuntimeException]
         error.getMessage shouldBe "File not retrieved"
+
+        And("the metrics should NOT be updated")
+        metrics.defaultRegistry.counter("cleanFileUpload").getCount              shouldBe 0
+        metrics.defaultRegistry.counter("quarantineFileUpload").getCount         shouldBe 0
+        metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 0
+        metrics.defaultRegistry.timer("scanningTime").getSnapshot.size()         shouldBe 0
       }
     }
   }

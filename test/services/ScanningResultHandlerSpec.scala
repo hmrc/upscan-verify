@@ -17,13 +17,13 @@
 package services
 
 import java.io.InputStream
-import java.util.{Calendar, GregorianCalendar}
+import java.time.{LocalDateTime, ZoneOffset}
 
 import model.S3ObjectLocation
 import org.apache.commons.io.IOUtils
-import org.mockito.{ArgumentCaptor, ArgumentMatchers}
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito._
+import org.mockito.{ArgumentCaptor, ArgumentMatchers}
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.mockito.MockitoSugar
@@ -117,7 +117,7 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       val file    = S3ObjectLocation("bucket", "file")
       val details = "There is a virus"
 
-      val lastModified   = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
+      val lastModified   = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
       val objectMetadata = ObjectMetadata(Map("callbackUrl" -> "url"), lastModified)
 
       when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))

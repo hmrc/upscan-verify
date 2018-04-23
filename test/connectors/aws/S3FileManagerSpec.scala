@@ -60,12 +60,13 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
   when(configuration.outboundBucket).thenReturn("outboundBucket")
   when(configuration.quarantineBucket).thenReturn("quarantineBucket")
 
-  private val lastModified = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
+  private val awsLastModified      = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
+  private val metadataLastModified = awsLastModified.toInstant
 
   "S3FileManager" should {
     "allow to copy file from inbound bucket to outbound bucket" in {
       val s3Metadata = mock[ObjectMetadata]
-      when(s3Metadata.getLastModified).thenReturn(lastModified)
+      when(s3Metadata.getLastModified).thenReturn(awsLastModified)
 
       val s3client: AmazonS3 = mock[AmazonS3]
       when(s3client.copyObject(any(): CopyObjectRequest)).thenReturn(new CopyObjectResult())
@@ -122,7 +123,7 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       userMetadata.put("callbackUrl", "http://some.callback.url")
       val fileMetadata = new ObjectMetadata()
       fileMetadata.setUserMetadata(userMetadata)
-      fileMetadata.setLastModified(lastModified)
+      fileMetadata.setLastModified(awsLastModified)
 
       when(s3client.getObjectMetadata("inboundBucket", "file")).thenReturn(fileMetadata)
 
@@ -130,7 +131,7 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       val metadata = Await.result(fileManager.getObjectMetadata(S3ObjectLocation("inboundBucket", "file")), 2.seconds)
 
       Then("metadata is properly returned")
-      metadata shouldBe services.ObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), lastModified)
+      metadata shouldBe services.ObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified)
     }
 
     "return error if retrieving metadata fails" in {}
@@ -205,7 +206,7 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
 
       When("a call to copy to quarantine is made")
       val content  = new ByteArrayInputStream("This is a dirty file".getBytes)
-      val metadata = services.ObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), lastModified)
+      val metadata = services.ObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified)
       Await.result(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
 
       Then("a new S3 object with details set as contents and object metadata set should be created")
@@ -231,7 +232,7 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
 
       When("a call to copy to quarantine is made")
       val content  = new ByteArrayInputStream("This is a dirty file".getBytes)
-      val metadata = services.ObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), lastModified)
+      val metadata = services.ObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified)
       val result   = Await.ready(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
 
       And("a new S3 object with details set as contents and object metadata set should be created")

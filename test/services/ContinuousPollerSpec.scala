@@ -20,7 +20,6 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.ActorSystem
 import config.ServiceConfiguration
-import org.mockito.Mockito
 import org.scalatest.concurrent.Eventually
 import org.scalatest.mockito.MockitoSugar
 import play.api.inject.DefaultApplicationLifecycle

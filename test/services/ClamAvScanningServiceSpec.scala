@@ -17,6 +17,7 @@
 package services
 
 import java.io.{ByteArrayInputStream, InputStream}
+import java.time.{LocalDateTime, ZoneOffset}
 import java.util.{Calendar, GregorianCalendar}
 
 import com.codahale.metrics.MetricRegistry
@@ -57,7 +58,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
         metadata: ObjectMetadata): Future[Unit] = ???
 
       override def getObjectMetadata(file: S3ObjectLocation): Future[ObjectMetadata] = {
-        val lastModified = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
+        val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
         Future(ObjectMetadata(Map.empty, lastModified))
       }
     }

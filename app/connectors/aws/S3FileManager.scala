@@ -78,7 +78,8 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) 
     for {
       inboundMetadata <- getObjectMetadata(objectLocation)
     } yield {
-      val lastModified          = DateTimeFormatter.ISO_INSTANT.format(inboundMetadata.uploadedTimestamp.toInstant)
+      val lastModified =
+        DateTimeFormatter.ISO_INSTANT.format(inboundMetadata.uploadedTimestamp)
       val outboundMetadataItems = inboundMetadata.items + ("initiate-date" -> lastModified)
       val outboundMetadata      = new com.amazonaws.services.s3.model.ObjectMetadata()
       outboundMetadata.setUserMetadata(outboundMetadataItems.asJava)
@@ -111,7 +112,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) 
       metadata <- Future(s3Client.getObjectMetadata(objectLocation.bucket, objectLocation.objectKey))
     } yield {
       Logger.debug(s"Fetched metadata for objectKey: [${objectLocation.objectKey}].")
-      ObjectMetadata(metadata.getUserMetadata.asScala.toMap, metadata.getLastModified)
+      ObjectMetadata(metadata.getUserMetadata.asScala.toMap, metadata.getLastModified.toInstant)
     }
   }
 }

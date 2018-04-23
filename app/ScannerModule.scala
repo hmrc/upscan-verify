@@ -27,7 +27,7 @@ class ScannerModule extends Module {
       bind[MessageParser].to[S3EventParser],
       bind[QueueConsumer].to[SqsQueueConsumer],
       bind[PollingJob].to[ScanUploadedFilesFlow],
-      bind[ContinousPoller].toSelf.eagerly(),
+      bind[ContinuousPoller].toSelf.eagerly(),
       bind[ScanningService].to[ClamAvScanningService],
       bind[FileManager].to[S3FileManager],
       bind[InstanceTerminator].to[Ec2InstanceTerminator],

@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-package services
+package util.logging
 
 import model.S3ObjectLocation
-import play.api.Logger
+import uk.gov.hmrc.http.HeaderCarrier
 
-import scala.concurrent.Future
+/**
+  * Convenience methods to create a [[uk.gov.hmrc.http.logging.LoggingDetails]] instance, required by [[uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext]].
+  */
+object LoggingDetails {
+  def fromS3ObjectLocation(s3ObjectLocation: S3ObjectLocation): HeaderCarrier =
+    fromString(s3ObjectLocation.objectKey)
 
-trait VirusNotifier {
-  def notifyFileInfected(file: S3ObjectLocation, details: String): Future[Unit]
-}
-
-object LoggingVirusNotifier extends VirusNotifier {
-  override def notifyFileInfected(file: S3ObjectLocation, details: String) = {
-    Logger.warn(s"Virus detected in file: [$file]. Details: [$details].")
-    Future.successful(())
-  }
+  private def fromString(reference: String): HeaderCarrier =
+    new HeaderCarrier() {
+      override lazy val mdcData: Map[String, String] = super.mdcData + ("file-reference" -> reference)
+    }
 }

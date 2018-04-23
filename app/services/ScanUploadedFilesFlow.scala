@@ -52,11 +52,10 @@ class ScanUploadedFilesFlow @Inject()(
 
     outcome.onFailure {
       case error: Exception =>
-        Logger.warn(s"Failed to process message '${message.id}', cause ${error.getMessage}", error)
+        Logger.warn(s"Failed to process message: [${message.id}], cause: [${error.getMessage}].", error)
     }
 
     outcome.recover { case _ => () }
-
   }
 
   private def terminateIfInstanceNotSafe(instanceSafety: InstanceSafety) =

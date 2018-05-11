@@ -53,6 +53,7 @@ import scala.concurrent.duration._
 class SqsQueueConsumerSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen with MockitoSugar {
   private val configuration = mock[ServiceConfiguration]
   Mockito.when(configuration.inboundQueueUrl).thenReturn("Test.aws.sqs.queue")
+  Mockito.when(configuration.processingBatchSize).thenReturn(1)
 
   private def sqsMessages(messageCount: Int): JList[SqsMessage] = {
     val messages: JList[SqsMessage] = new util.ArrayList[SqsMessage]()

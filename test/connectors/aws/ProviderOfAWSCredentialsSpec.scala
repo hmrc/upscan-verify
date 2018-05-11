@@ -45,6 +45,8 @@ class ProviderOfAWSCredentialsSpec extends UnitSpec with Matchers {
         override def quarantineBucket = ???
 
         override def useContainerCredentials = false
+
+        override def processingBatchSize: Int = ???
       }
 
       val credentials: AWSCredentialsProvider = new ProviderOfAWSCredentials(configuration).get()
@@ -75,6 +77,8 @@ class ProviderOfAWSCredentialsSpec extends UnitSpec with Matchers {
         override def quarantineBucket = ???
 
         override def useContainerCredentials = false
+
+        override def processingBatchSize: Int = ???
       }
 
       val credentials: AWSCredentialsProvider = new ProviderOfAWSCredentials(configuration).get()
@@ -104,6 +108,8 @@ class ProviderOfAWSCredentialsSpec extends UnitSpec with Matchers {
         override def quarantineBucket = ???
 
         override def useContainerCredentials = true
+
+        override def processingBatchSize: Int = ???
       }
 
       val credentials: AWSCredentialsProvider = new ProviderOfAWSCredentials(configuration).get()

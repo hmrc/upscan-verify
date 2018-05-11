@@ -49,7 +49,7 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS, configuration: ServiceCon
 
   override def poll(): Future[List[Message]] = {
     val receiveMessageRequest = new ReceiveMessageRequest(configuration.inboundQueueUrl)
-      .withMaxNumberOfMessages(1)
+      .withMaxNumberOfMessages(configuration.processingBatchSize)
       .withWaitTimeSeconds(20)
 
     val receiveMessageResult: Future[ReceiveMessageResult] =
@@ -57,7 +57,8 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS, configuration: ServiceCon
 
     receiveMessageResult map { result =>
       result.getMessages.asScala.toList.map { sqsMessage =>
-        Logger.debug(s"Received message with id: [${sqsMessage.getMessageId}] and receiptHandle: [${sqsMessage.getReceiptHandle}].")
+        Logger.debug(
+          s"Received message with id: [${sqsMessage.getMessageId}] and receiptHandle: [${sqsMessage.getReceiptHandle}].")
         Message(sqsMessage.getMessageId, sqsMessage.getBody, sqsMessage.getReceiptHandle)
       }
     }
@@ -67,7 +68,8 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS, configuration: ServiceCon
     val deleteMessageRequest = new DeleteMessageRequest(configuration.inboundQueueUrl, message.receiptHandle)
     Future {
       sqsClient.deleteMessage(deleteMessageRequest)
-      Logger.debug(s"Deleted message from Queue: [${configuration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}].")
+      Logger.debug(
+        s"Deleted message from Queue: [${configuration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}].")
     }
   }
 }

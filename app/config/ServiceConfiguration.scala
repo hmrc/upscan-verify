@@ -39,6 +39,8 @@ trait ServiceConfiguration {
 
   def useContainerCredentials: Boolean
 
+  def processingBatchSize: Int
+
 }
 
 class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) extends ServiceConfiguration {
@@ -64,4 +66,6 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
   override def outboundBucket = getRequired(configuration.getString(_), "aws.s3.bucket.outbound")
 
   override def quarantineBucket: String = getRequired(configuration.getString(_), "aws.s3.bucket.quarantine")
+
+  override def processingBatchSize: Int = getRequired(configuration.getInt, "processingBatchSize")
 }

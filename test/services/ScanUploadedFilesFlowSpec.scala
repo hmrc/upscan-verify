@@ -54,7 +54,6 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       when(scanningResultHandler.handleScanningResult(any())).thenReturn(Future.successful(SafeToContinue))
 
       val instanceTerminator = mock[InstanceTerminator]
-
       val queueOrchestrator =
         new ScanUploadedFilesFlow(queueConsumer, parser, scanningService, scanningResultHandler, instanceTerminator)
 
@@ -138,6 +137,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
         .thenReturn(Future.successful(ShouldTerminate))
 
       val instanceTerminator = mock[InstanceTerminator]
+      when(instanceTerminator.terminate()).thenReturn(Future(()))
 
       val queueOrchestrator =
         new ScanUploadedFilesFlow(queueConsumer, parser, scanningService, scanningResultHandler, instanceTerminator)

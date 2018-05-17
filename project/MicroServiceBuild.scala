@@ -22,6 +22,7 @@ private object AppDependencies {
 
   val compile = Seq(
     "uk.gov.hmrc"       %% "bootstrap-play-25" % "1.4.0",
+    "org.typelevel"     %% "cats-core"         % "1.0.1",
     "com.amazonaws"     % "aws-java-sdk-s3"    % "1.11.261",
     "com.amazonaws"     % "aws-java-sdk-sqs"   % "1.11.285",
     "com.amazonaws"     % "aws-java-sdk-ec2"   % "1.11.285",

@@ -16,12 +16,20 @@
 
 package services
 
+import cats.implicits._
+import cats.data.EitherT
 import javax.inject.Inject
-
 import model.Message
 import play.api.Logger
+import uk.gov.hmrc.http.logging.LoggingDetails
+import util.logging.LoggingDetails
+import util.logging.WithLoggingDetails.withLoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
+
+case class MessageContext(ld: LoggingDetails)
+
+case class ExceptionWithContext(e: Exception, context: Option[MessageContext])
 
 class ScanUploadedFilesFlow @Inject()(
   consumer: QueueConsumer,
@@ -41,21 +49,35 @@ class ScanUploadedFilesFlow @Inject()(
   }
 
   private def processMessage(message: Message): Future[Unit] = {
-    val outcome =
-      for {
-        parsedMessage  <- parser.parse(message)
-        scanningResult <- scanningService.scan(parsedMessage.location)
-        instanceSafety <- scanningResultHandler.handleScanningResult(scanningResult)
-        _              <- consumer.confirm(message)
-        _              <- terminateIfInstanceNotSafe(instanceSafety)
-      } yield ()
 
-    outcome.onFailure {
-      case error: Exception =>
-        Logger.warn(s"Failed to process message: [${message.id}], cause: [${error.getMessage}].", error)
+    val outcome = for {
+      parsedMessage <- toEitherT(parser.parse(message))(context = None)
+      _ <- {
+        implicit val context = Some(MessageContext(LoggingDetails.fromS3ObjectLocation(parsedMessage.location)))
+        for {
+          scanningResult <- toEitherT(scanningService.scan(parsedMessage.location))
+          instanceSafety <- toEitherT(scanningResultHandler.handleScanningResult(scanningResult))
+          _              <- toEitherT(consumer.confirm(message))
+          _              <- toEitherT(terminateIfInstanceNotSafe(instanceSafety))
+        } yield ()
+      }
+    } yield ()
+
+    outcome.value.map {
+      case Right(_) =>
+        ()
+      case Left(ExceptionWithContext(exception, Some(context))) =>
+        withLoggingDetails(context.ld) {
+          Logger.warn(
+            s"Failed to process message '${message.id}' for file '${context.ld.mdcData
+              .getOrElse("file-reference", "???")}', cause ${exception.getMessage}",
+            exception
+          )
+        }
+      case Left(ExceptionWithContext(exception, None)) =>
+        Logger.warn(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)
     }
 
-    outcome.recover { case _ => () }
   }
 
   private def terminateIfInstanceNotSafe(instanceSafety: InstanceSafety) =
@@ -63,4 +85,13 @@ class ScanUploadedFilesFlow @Inject()(
       case ShouldTerminate => ec2InstanceTerminator.terminate()
       case _               => Future.successful(())
     }
+
+  private def toEitherT[T](f: Future[T])(
+    implicit
+    context: Option[MessageContext] = None): EitherT[Future, ExceptionWithContext, T] = {
+    val futureEither: Future[Either[ExceptionWithContext, T]] =
+      f.map(Right(_))
+        .recover { case error: Exception => Left(ExceptionWithContext(error, context)) }
+    EitherT(futureEither)
+  }
 }

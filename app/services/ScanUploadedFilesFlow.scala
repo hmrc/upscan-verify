@@ -49,17 +49,23 @@ class ScanUploadedFilesFlow @Inject()(
   }
 
   private def processMessage(message: Message): Future[Unit] = {
-    val outcome =
-      for {
-        parsedMessage <- toEitherT(parser.parse(message))
-        context = MessageContext(LoggingDetails.fromS3ObjectLocation(parsedMessage.location))
-        scanningResult <- toEitherT(scanningService.scan(parsedMessage.location), Some(context))
-        instanceSafety <- toEitherT(scanningResultHandler.handleScanningResult(scanningResult), Some(context))
-        _              <- toEitherT(consumer.confirm(message), Some(context))
-        _              <- toEitherT(terminateIfInstanceNotSafe(instanceSafety), Some(context))
-      } yield ()
+
+    val outcome = for {
+      parsedMessage <- toEitherT(parser.parse(message))(context = None)
+      _ <- {
+        implicit val context = Some(MessageContext(LoggingDetails.fromS3ObjectLocation(parsedMessage.location)))
+        for {
+          scanningResult <- toEitherT(scanningService.scan(parsedMessage.location))
+          instanceSafety <- toEitherT(scanningResultHandler.handleScanningResult(scanningResult))
+          _              <- toEitherT(consumer.confirm(message))
+          _              <- toEitherT(terminateIfInstanceNotSafe(instanceSafety))
+        } yield ()
+      }
+    } yield ()
 
     outcome.value.map {
+      case Right(_) =>
+        ()
       case Left(ExceptionWithContext(exception, Some(context))) =>
         withLoggingDetails(context.ld) {
           Logger.warn(
@@ -70,8 +76,6 @@ class ScanUploadedFilesFlow @Inject()(
         }
       case Left(ExceptionWithContext(exception, None)) =>
         Logger.warn(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)
-      case Right(_) =>
-        ()
     }
 
   }
@@ -82,10 +86,9 @@ class ScanUploadedFilesFlow @Inject()(
       case _               => Future.successful(())
     }
 
-  private def toEitherT[T](
-    f: Future[T],
+  private def toEitherT[T](f: Future[T])(
+    implicit
     context: Option[MessageContext] = None): EitherT[Future, ExceptionWithContext, T] = {
-    println(f)
     val futureEither: Future[Either[ExceptionWithContext, T]] =
       f.map(Right(_))
         .recover { case error: Exception => Left(ExceptionWithContext(error, context)) }

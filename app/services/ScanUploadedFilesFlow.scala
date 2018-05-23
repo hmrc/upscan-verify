@@ -34,6 +34,7 @@ case class ExceptionWithContext(e: Exception, context: Option[MessageContext])
 class ScanUploadedFilesFlow @Inject()(
   consumer: QueueConsumer,
   parser: MessageParser,
+  fileManager: FileManager,
   scanningService: ScanningService,
   scanningResultHandler: ScanningResultHandler,
   ec2InstanceTerminator: InstanceTerminator)(implicit ec: ExecutionContext)
@@ -52,10 +53,17 @@ class ScanUploadedFilesFlow @Inject()(
 
     val outcome = for {
       parsedMessage <- toEitherT(parser.parse(message))(context = None)
+
       _ <- {
         implicit val context = Some(MessageContext(LoggingDetails.fromS3ObjectLocation(parsedMessage.location)))
+
         for {
-          scanningResult <- toEitherT(scanningService.scan(parsedMessage.location))
+          metadata       <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))
+          _               = checkMetadata(metadata)
+
+          objectContent  <- toEitherT(fileManager.getObjectContent(parsedMessage.location))
+
+          scanningResult <- toEitherT(scanningService.scan(parsedMessage.location, objectContent, metadata))
           instanceSafety <- toEitherT(scanningResultHandler.handleScanningResult(scanningResult))
           _              <- toEitherT(consumer.confirm(message))
           _              <- toEitherT(terminateIfInstanceNotSafe(instanceSafety))
@@ -80,6 +88,11 @@ class ScanUploadedFilesFlow @Inject()(
 
   }
 
+  private def checkMetadata(metadata: ObjectMetadata): Unit = {
+    val consumingService = metadata.items.get("consuming-service")
+    Logger.debug(s"x-amz-meta-consuming-service: [${consumingService}].")
+  }
+
   private def terminateIfInstanceNotSafe(instanceSafety: InstanceSafety) =
     instanceSafety match {
       case ShouldTerminate => ec2InstanceTerminator.terminate()
@@ -87,8 +100,7 @@ class ScanUploadedFilesFlow @Inject()(
     }
 
   private def toEitherT[T](f: Future[T])(
-    implicit
-    context: Option[MessageContext] = None): EitherT[Future, ExceptionWithContext, T] = {
+    implicit context: Option[MessageContext]): EitherT[Future, ExceptionWithContext, T] = {
     val futureEither: Future[Either[ExceptionWithContext, T]] =
       f.map(Right(_))
         .recover { case error: Exception => Left(ExceptionWithContext(error, context)) }

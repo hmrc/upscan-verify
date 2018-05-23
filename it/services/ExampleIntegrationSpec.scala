@@ -34,7 +34,7 @@ class ExampleIntegrationSpec extends UnitSpec
 
   lazy val s3 = app.injector.instanceOf[AmazonS3]
 
-  "ExampleIntegrationSpec" should {
+  "ExampleIntegrationSpec" ignore {
     "Put and Get to an S3 bucket" in {
       new S3TestMockup {
         val putActualResult: PutObjectResult = s3.putObject("myBucket", "myKey", "myContent")

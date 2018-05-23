@@ -38,7 +38,7 @@ case class FileIsClean(location: S3ObjectLocation) extends ScanningResult
 case class FileIsInfected(location: S3ObjectLocation, details: String) extends ScanningResult
 
 trait ScanningService {
-  def scan(location: S3ObjectLocation): Future[ScanningResult]
+  def scan(location: S3ObjectLocation, objectContent: ObjectContent, objectMetadata: ObjectMetadata): Future[ScanningResult]
 }
 
 class ClamAvScanningService @Inject()(
@@ -47,14 +47,13 @@ class ClamAvScanningService @Inject()(
   metrics: Metrics)
     extends ScanningService {
 
-  override def scan(location: S3ObjectLocation): Future[ScanningResult] = {
+  override def scan(location: S3ObjectLocation, fileContent: ObjectContent, metadata: ObjectMetadata): Future[ScanningResult] = {
     implicit val ld = LoggingDetails.fromS3ObjectLocation(location)
 
+    val antivirusClient       = clamClientFactory.getClient()
+    val startTimeMilliseconds = System.currentTimeMillis()
+
     for {
-      metadata    <- fileManager.getObjectMetadata(location)
-      fileContent <- fileManager.getObjectContent(location)
-      antivirusClient       = clamClientFactory.getClient()
-      startTimeMilliseconds = System.currentTimeMillis()
       scanResult <- antivirusClient.sendAndCheck(fileContent.inputStream, fileContent.length.toInt) map {
                      case Clean =>
                        val clean = FileIsClean(location)

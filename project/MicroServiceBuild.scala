@@ -27,7 +27,9 @@ private object AppDependencies {
     "com.amazonaws"     % "aws-java-sdk-sqs"   % "1.11.285",
     "com.amazonaws"     % "aws-java-sdk-ec2"   % "1.11.285",
     "com.typesafe.akka" %% "akka-stream"       % "2.5.6",
-    "uk.gov.hmrc"       %% "clamav-client"     % "6.0.0"
+    "uk.gov.hmrc"       %% "clamav-client"     % "6.0.0",
+    "org.apache.tika"   % "tika-core"          % "1.17",
+    "org.apache.tika"   % "tika-parsers"       % "1.17"
   )
 
   trait TestDependencies {

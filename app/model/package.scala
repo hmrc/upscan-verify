@@ -16,7 +16,33 @@
 
 package model
 
+import uk.gov.hmrc.clamav.model.{Clean, Infected, ScanningResult}
+
+import scala.concurrent.Future
+
 case class Message(id: String, body: String, receiptHandle: String)
 
 case class S3ObjectLocation(bucket: String, objectKey: String)
 case class FileUploadEvent(location: S3ObjectLocation)
+
+sealed trait FileCheckingResult {
+  val location: S3ObjectLocation
+
+  def andThen(f: (S3ObjectLocation) => Future[FileCheckingResult]): Future[FileCheckingResult] =
+    this match {
+      case v: ValidFileCheckingResult   => f(v.location)
+      case i: InvalidFileCheckingResult => Future.successful(i)
+    }
+}
+
+object FileCheckingResult {
+  def apply(virusResult: ScanningResult, location: S3ObjectLocation): FileCheckingResult =
+    virusResult match {
+      case Clean             => ValidFileCheckingResult(location)
+      case Infected(message) => InvalidFileCheckingResult(location, message)
+    }
+}
+
+case class ValidFileCheckingResult(location: S3ObjectLocation) extends FileCheckingResult
+
+case class InvalidFileCheckingResult(location: S3ObjectLocation, details: String) extends FileCheckingResult

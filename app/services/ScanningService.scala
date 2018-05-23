@@ -18,27 +18,23 @@ package services
 
 import java.time.Instant
 import java.util.concurrent.TimeUnit
+
 import javax.inject.Inject
 import com.kenshoo.play.metrics.Metrics
-import model.S3ObjectLocation
+import model._
 import play.api.Logger
-import uk.gov.hmrc.clamav._
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
+import uk.gov.hmrc.clamav.ClamAntiVirusFactory
 import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetails
 import util.logging.LoggingDetails
 
 import scala.concurrent.Future
 
-sealed trait ScanningResult extends Product with Serializable {
-  def location: S3ObjectLocation
-}
-
-case class FileIsClean(location: S3ObjectLocation) extends ScanningResult
-
-case class FileIsInfected(location: S3ObjectLocation, details: String) extends ScanningResult
-
 trait ScanningService {
-  def scan(location: S3ObjectLocation, objectContent: ObjectContent, objectMetadata: ObjectMetadata): Future[ScanningResult]
+  def scan(
+    location: S3ObjectLocation,
+    objectContent: ObjectContent,
+    objectMetadata: ObjectMetadata): Future[FileCheckingResult]
 }
 
 class ClamAvScanningService @Inject()(
@@ -47,7 +43,10 @@ class ClamAvScanningService @Inject()(
   metrics: Metrics)
     extends ScanningService {
 
-  override def scan(location: S3ObjectLocation, fileContent: ObjectContent, metadata: ObjectMetadata): Future[ScanningResult] = {
+  override def scan(
+    location: S3ObjectLocation,
+    fileContent: ObjectContent,
+    metadata: ObjectMetadata): Future[FileCheckingResult] = {
     implicit val ld = LoggingDetails.fromS3ObjectLocation(location)
 
     val antivirusClient       = clamClientFactory.getClient()
@@ -55,16 +54,13 @@ class ClamAvScanningService @Inject()(
 
     for {
       scanResult <- antivirusClient.sendAndCheck(fileContent.inputStream, fileContent.length.toInt) map {
-                     case Clean =>
-                       val clean = FileIsClean(location)
-                       Logger.debug(s"File is clean: [$clean].")
+                     case result if result == Clean =>
                        metrics.defaultRegistry.counter("cleanFileUpload").inc()
-                       clean
-                     case Infected(message) =>
-                       val infected = FileIsInfected(location, message)
-                       Logger.warn(s"File is infected: [$infected].")
+                       FileCheckingResult(result, location)
+                     case result @ Infected(message) =>
+                       Logger.warn(s"File is infected: [$message].")
                        metrics.defaultRegistry.counter("quarantineFileUpload").inc()
-                       infected
+                       FileCheckingResult(result, location)
                    }
 
     } yield {

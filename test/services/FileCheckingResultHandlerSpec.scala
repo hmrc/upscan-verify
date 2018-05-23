@@ -19,7 +19,7 @@ package services
 import java.io.InputStream
 import java.time.{LocalDateTime, ZoneOffset}
 
-import model.S3ObjectLocation
+import model.{FileCheckingResult, InvalidFileCheckingResult, S3ObjectLocation, ValidFileCheckingResult}
 import org.apache.commons.io.IOUtils
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito._
@@ -33,7 +33,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventually with GivenWhenThen {
+class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Eventually with GivenWhenThen {
 
   "ScanningResultHandler" should {
     "Move clean file from inbound bucket to outbound bucket" in {
@@ -41,7 +41,7 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new ScanningResultHandler(fileManager, virusNotifier)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is a clean file")
       val file = S3ObjectLocation("bucket", "file")
@@ -50,7 +50,7 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
       When("when processing scanning result")
-      Await.result(handler.handleScanningResult(FileIsClean(file)), 10 seconds)
+      Await.result(handler.handleCheckingResult(ValidFileCheckingResult(file)), 10 seconds)
 
       Then("file should be copied from inbound bucket to outbound bucket")
       verify(fileManager).copyToOutboundBucket(file)
@@ -65,7 +65,7 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new ScanningResultHandler(fileManager, virusNotifier)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is a clean file")
       val file = S3ObjectLocation("bucket", "file")
@@ -74,7 +74,7 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       when(fileManager.copyToOutboundBucket(file)).thenReturn(Future.failed(new Exception("Copy failed")))
 
       When("when processing scanning result")
-      val result = Await.ready(handler.handleScanningResult(FileIsClean(file)), 10 seconds)
+      val result = Await.ready(handler.handleCheckingResult(ValidFileCheckingResult(file)), 10 seconds)
 
       Then("original file shoudln't be deleted from inbound bucket")
       verify(fileManager).copyToOutboundBucket(file)
@@ -90,7 +90,7 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new ScanningResultHandler(fileManager, virusNotifier)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is a clean file")
       val file = S3ObjectLocation("bucket", "file")
@@ -99,7 +99,7 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       when(fileManager.delete(file)).thenReturn(Future.failed(new RuntimeException("Expected failure")))
 
       When("when processing scanning result")
-      val result = Await.ready(handler.handleScanningResult(FileIsClean(file)), 10 seconds)
+      val result = Await.ready(handler.handleCheckingResult(ValidFileCheckingResult(file)), 10 seconds)
 
       Then("the process fails")
       result.value.get.isFailure shouldBe true
@@ -111,7 +111,7 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new ScanningResultHandler(fileManager, virusNotifier)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is an infected file")
       val file    = S3ObjectLocation("bucket", "file")
@@ -127,7 +127,7 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
       When("scanning infected file")
-      Await.result(handler.handleScanningResult(FileIsInfected(file, details)), 10 seconds)
+      Await.result(handler.handleCheckingResult(InvalidFileCheckingResult(file, details)), 10 seconds)
 
       Then("notification is created")
       verify(virusNotifier).notifyFileInfected(file, details)
@@ -150,7 +150,7 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new ScanningResultHandler(fileManager, virusNotifier)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is an infected file")
       val file = S3ObjectLocation("bucket", "file")
@@ -161,7 +161,8 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
       When("scanning infected file")
-      val result = Await.ready(handler.handleScanningResult(FileIsInfected(file, "There is a virus")), 10 seconds)
+      val result =
+        Await.ready(handler.handleCheckingResult(InvalidFileCheckingResult(file, "There is a virus")), 10 seconds)
 
       Then("file is not deleted")
       verifyZeroInteractions(fileManager)
@@ -176,16 +177,17 @@ class ScanningResultHandlerSpec extends UnitSpec with MockitoSugar with Eventual
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new ScanningResultHandler(fileManager, virusNotifier)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is an infected file")
       val file = S3ObjectLocation("bucket", "file")
 
-      when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful())
+      when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.failed(new RuntimeException("Expected failure")))
 
       When("when processing scanning result")
-      val result = Await.ready(handler.handleScanningResult(FileIsInfected(file, "There is a virus")), 10 seconds)
+      val result =
+        Await.ready(handler.handleCheckingResult(InvalidFileCheckingResult(file, "There is a virus")), 10 seconds)
 
       Then("the process fails")
       result.value.get.isFailure shouldBe true

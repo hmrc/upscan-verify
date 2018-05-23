@@ -21,18 +21,18 @@ import java.time.{LocalDateTime, ZoneOffset}
 
 import com.codahale.metrics.MetricRegistry
 import com.kenshoo.play.metrics.Metrics
-import model.S3ObjectLocation
+import model.{InvalidFileCheckingResult, S3ObjectLocation, ValidFileCheckingResult}
+import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
-import org.scalatest.{Assertions, GivenWhenThen, Matchers}
 import org.scalatest.mockito.MockitoSugar
+import org.scalatest.{Assertions, GivenWhenThen, Matchers}
+import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
 import uk.gov.hmrc.play.test.UnitSpec
-import org.mockito.ArgumentMatchers.any
-import uk.gov.hmrc.clamav.model.{Clean, Infected}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen with MockitoSugar {
 
@@ -87,7 +87,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val result = Await.result(scanningService.scan(fileLocation, fileContent, fileMetadata), 2.seconds)
 
       Then("a scanning clean result should be returned")
-      result shouldBe FileIsClean(fileLocation)
+      result shouldBe ValidFileCheckingResult(fileLocation)
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("cleanFileUpload").getCount              shouldBe 1
@@ -116,7 +116,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val result = Await.result(scanningService.scan(fileLocation, fileContent, fileMetadata), 2.seconds)
 
       Then("a scanning infected result should be returned")
-      result shouldBe FileIsInfected(fileLocation, "File dirty")
+      result shouldBe InvalidFileCheckingResult(fileLocation, "File dirty")
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("cleanFileUpload").getCount              shouldBe 0
@@ -126,10 +126,9 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
     }
   }
 
-  private def fetchObject(fileLocation: S3ObjectLocation): (ObjectContent,ObjectMetadata) = {
+  private def fetchObject(fileLocation: S3ObjectLocation): (ObjectContent, ObjectMetadata) =
     for {
-      content <- fileManager.getObjectContent(fileLocation)
+      content  <- fileManager.getObjectContent(fileLocation)
       metadata <- fileManager.getObjectMetadata(fileLocation)
-    } yield (content,metadata)
-  }
+    } yield (content, metadata)
 }

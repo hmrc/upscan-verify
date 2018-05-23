@@ -35,8 +35,8 @@ class ScanUploadedFilesFlow @Inject()(
   consumer: QueueConsumer,
   parser: MessageParser,
   fileManager: FileManager,
-  scanningService: ScanningService,
-  scanningResultHandler: ScanningResultHandler,
+  fileCheckingService: FileCheckingService,
+  scanningResultHandler: FileCheckingResultHandler,
   ec2InstanceTerminator: InstanceTerminator)(implicit ec: ExecutionContext)
     extends PollingJob {
 
@@ -58,13 +58,11 @@ class ScanUploadedFilesFlow @Inject()(
         implicit val context = Some(MessageContext(LoggingDetails.fromS3ObjectLocation(parsedMessage.location)))
 
         for {
-          metadata       <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))
-          _               = checkMetadata(metadata)
-
+          metadata <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))
+          _ = checkMetadata(metadata)
           objectContent  <- toEitherT(fileManager.getObjectContent(parsedMessage.location))
-
-          scanningResult <- toEitherT(scanningService.scan(parsedMessage.location, objectContent, metadata))
-          instanceSafety <- toEitherT(scanningResultHandler.handleScanningResult(scanningResult))
+          scanningResult <- toEitherT(fileCheckingService.check(parsedMessage.location, objectContent, metadata))
+          instanceSafety <- toEitherT(scanningResultHandler.handleCheckingResult(scanningResult))
           _              <- toEitherT(consumer.confirm(message))
           _              <- toEitherT(terminateIfInstanceNotSafe(instanceSafety))
         } yield ()
@@ -90,7 +88,7 @@ class ScanUploadedFilesFlow @Inject()(
 
   private def checkMetadata(metadata: ObjectMetadata): Unit = {
     val consumingService = metadata.items.get("consuming-service")
-    Logger.debug(s"x-amz-meta-consuming-service: [${consumingService}].")
+    Logger.debug(s"x-amz-meta-consuming-service: [$consumingService].")
   }
 
   private def terminateIfInstanceNotSafe(instanceSafety: InstanceSafety) =

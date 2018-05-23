@@ -53,18 +53,26 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       when(queueConsumer.confirm(any())).thenReturn(Future.successful(()))
 
       val fileManager = mock[FileManager]
-      when(fileManager.getObjectContent(s3object)).thenReturn(Future.successful(ObjectContent(mock[InputStream],0)))
-      when(fileManager.getObjectMetadata(s3object)).thenReturn(Future.successful(ObjectMetadata(Map("consuming-service"->"ScanUploadedFilesFlowSpec"),Instant.now)))
+      when(fileManager.getObjectContent(s3object)).thenReturn(Future.successful(ObjectContent(mock[InputStream], 0)))
+      when(fileManager.getObjectMetadata(s3object)).thenReturn(
+        Future.successful(ObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)))
 
-      val scanningService = mock[ScanningService]
-      when(scanningService.scan(any(), any(), any())).thenReturn(Future.successful(FileIsClean(s3object)))
+      val fileCheckingService = mock[FileCheckingService]
+      when(fileCheckingService.check(any(), any(), any()))
+        .thenReturn(Future.successful(ValidFileCheckingResult(s3object)))
 
-      val scanningResultHandler = mock[ScanningResultHandler]
-      when(scanningResultHandler.handleScanningResult(any())).thenReturn(Future.successful(SafeToContinue))
+      val scanningResultHandler = mock[FileCheckingResultHandler]
+      when(scanningResultHandler.handleCheckingResult(any())).thenReturn(Future.successful(SafeToContinue))
 
       val instanceTerminator = mock[InstanceTerminator]
       val queueOrchestrator =
-        new ScanUploadedFilesFlow(queueConsumer, parser, fileManager, scanningService, scanningResultHandler, instanceTerminator)
+        new ScanUploadedFilesFlow(
+          queueConsumer,
+          parser,
+          fileManager,
+          fileCheckingService,
+          scanningResultHandler,
+          instanceTerminator)
 
       When("the orchestrator is called")
       Await.result(queueOrchestrator.run(), 30 seconds)
@@ -73,7 +81,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).poll()
 
       And("scanning result handler is called")
-      verify(scanningResultHandler).handleScanningResult(FileIsClean(s3object))
+      verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object))
 
       And("successfully processed messages are confirmed")
       verify(queueConsumer).confirm(validMessage)
@@ -89,20 +97,28 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       when(queueConsumer.confirm(any())).thenReturn(Future.successful(()))
 
       val fileManager = mock[FileManager]
-      when(fileManager.getObjectContent(s3object)).thenReturn(Future.successful(ObjectContent(mock[InputStream],0)))
-      when(fileManager.getObjectMetadata(s3object)).thenReturn(Future.successful(ObjectMetadata(Map.empty,Instant.now)))
+      when(fileManager.getObjectContent(s3object)).thenReturn(Future.successful(ObjectContent(mock[InputStream], 0)))
+      when(fileManager.getObjectMetadata(s3object))
+        .thenReturn(Future.successful(ObjectMetadata(Map.empty, Instant.now)))
 
-      val scanningService = mock[ScanningService]
-      when(scanningService.scan(any(), any(), any())).thenReturn(Future.successful(FileIsInfected(s3object, "Virus name")))
+      val fileCheckingService = mock[FileCheckingService]
+      when(fileCheckingService.check(any(), any(), any()))
+        .thenReturn(Future.successful(InvalidFileCheckingResult(s3object, "Virus name")))
 
-      val scanningResultHandler = mock[ScanningResultHandler]
-      when(scanningResultHandler.handleScanningResult(any())).thenReturn(Future.successful(ShouldTerminate))
+      val scanningResultHandler = mock[FileCheckingResultHandler]
+      when(scanningResultHandler.handleCheckingResult(any())).thenReturn(Future.successful(ShouldTerminate))
 
       val instanceTerminator = mock[InstanceTerminator]
       when(instanceTerminator.terminate()).thenReturn(Future(()))
 
       val queueOrchestrator =
-        new ScanUploadedFilesFlow(queueConsumer, parser, fileManager, scanningService, scanningResultHandler, instanceTerminator)
+        new ScanUploadedFilesFlow(
+          queueConsumer,
+          parser,
+          fileManager,
+          fileCheckingService,
+          scanningResultHandler,
+          instanceTerminator)
 
       When("the orchestrator is called")
       Await.result(queueOrchestrator.run(), 30 seconds)
@@ -112,7 +128,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
       And("scanning result handler is called")
       verify(scanningResultHandler)
-        .handleScanningResult(FileIsInfected(s3object, "Virus name"))
+        .handleCheckingResult(InvalidFileCheckingResult(s3object, "Virus name"))
 
       And("successfully processed messages are confirmed")
       And("instance is terminated")
@@ -139,25 +155,33 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
         .thenReturn(Future.successful(()))
 
       val fileManager = mock[FileManager]
-      when(fileManager.getObjectContent(any())).thenReturn(Future.successful(ObjectContent(mock[InputStream],0)))
-      when(fileManager.getObjectMetadata(any())).thenReturn(Future.successful(ObjectMetadata(Map.empty,Instant.now)))
+      when(fileManager.getObjectContent(any())).thenReturn(Future.successful(ObjectContent(mock[InputStream], 0)))
+      when(fileManager.getObjectMetadata(any())).thenReturn(Future.successful(ObjectMetadata(Map.empty, Instant.now)))
 
-      val scanningService = mock[ScanningService]
-      when(scanningService.scan(meq(s3object1), any(), any())).thenReturn(Future.successful(FileIsClean(s3object1)))
-      when(scanningService.scan(meq(s3object3), any(), any())).thenReturn(Future.successful(FileIsInfected(s3object3, "infection")))
+      val fileCheckingService = mock[FileCheckingService]
+      when(fileCheckingService.check(meq(s3object1), any(), any()))
+        .thenReturn(Future.successful(ValidFileCheckingResult(s3object1)))
+      when(fileCheckingService.check(meq(s3object3), any(), any()))
+        .thenReturn(Future.successful(InvalidFileCheckingResult(s3object3, "infection")))
 
-      val scanningResultHandler = mock[ScanningResultHandler]
-      when(scanningResultHandler.handleScanningResult(FileIsClean(s3object1)))
+      val scanningResultHandler = mock[FileCheckingResultHandler]
+      when(scanningResultHandler.handleCheckingResult(ValidFileCheckingResult(s3object1)))
         .thenReturn(Future.successful(SafeToContinue))
 
-      when(scanningResultHandler.handleScanningResult(FileIsInfected(s3object3, "infection")))
+      when(scanningResultHandler.handleCheckingResult(InvalidFileCheckingResult(s3object3, "infection")))
         .thenReturn(Future.successful(ShouldTerminate))
 
       val instanceTerminator = mock[InstanceTerminator]
       when(instanceTerminator.terminate()).thenReturn(Future(()))
 
       val queueOrchestrator =
-        new ScanUploadedFilesFlow(queueConsumer, parser, fileManager, scanningService, scanningResultHandler, instanceTerminator)
+        new ScanUploadedFilesFlow(
+          queueConsumer,
+          parser,
+          fileManager,
+          fileCheckingService,
+          scanningResultHandler,
+          instanceTerminator)
 
       When("the orchestrator is called")
       Await.result(queueOrchestrator.run(), 30 seconds)
@@ -166,8 +190,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).poll()
 
       And("notification service is called only for valid messages")
-      verify(scanningResultHandler).handleScanningResult(FileIsClean(s3object1))
-      verify(scanningResultHandler).handleScanningResult(FileIsInfected(s3object3, "infection"))
+      verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object1))
+      verify(scanningResultHandler).handleCheckingResult(InvalidFileCheckingResult(s3object3, "infection"))
       verifyNoMoreInteractions(scanningResultHandler)
 
       And("successfully processed messages are confirmed")
@@ -197,23 +221,31 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
         .thenReturn(Future.successful(()))
 
       val fileManager = mock[FileManager]
-      when(fileManager.getObjectContent(any())).thenReturn(Future.successful(ObjectContent(mock[InputStream],0)))
-      when(fileManager.getObjectMetadata(any())).thenReturn(Future.successful(ObjectMetadata(Map.empty,Instant.now)))
+      when(fileManager.getObjectContent(any())).thenReturn(Future.successful(ObjectContent(mock[InputStream], 0)))
+      when(fileManager.getObjectMetadata(any())).thenReturn(Future.successful(ObjectMetadata(Map.empty, Instant.now)))
 
-      val scanningService = mock[ScanningService]
-      when(scanningService.scan(meq(s3object1), any(), any())).thenReturn(Future.successful(FileIsClean(s3object1)))
+      val fileCheckingService = mock[FileCheckingService]
+      when(fileCheckingService.check(meq(s3object1), any(), any()))
+        .thenReturn(Future.successful(ValidFileCheckingResult(s3object1)))
+      when(fileCheckingService.check(meq(s3object2), any(), any()))
+        .thenReturn(Future.failed(new Exception("Planned exception")))
 
-      when(scanningService.scan(meq(s3object2), any(), any())).thenReturn(Future.failed(new Exception("Planned exception")))
+      when(fileCheckingService.check(meq(s3object3), any(), any()))
+        .thenReturn(Future.successful(InvalidFileCheckingResult(s3object3, "infection")))
 
-      when(scanningService.scan(meq(s3object3), any(), any())).thenReturn(Future.successful(FileIsInfected(s3object3, "infection")))
-
-      val scanningResultHandler = mock[ScanningResultHandler]
-      when(scanningResultHandler.handleScanningResult(any())).thenReturn(Future.successful(SafeToContinue))
+      val scanningResultHandler = mock[FileCheckingResultHandler]
+      when(scanningResultHandler.handleCheckingResult(any())).thenReturn(Future.successful(SafeToContinue))
 
       val instanceTerminator = mock[InstanceTerminator]
 
       val queueOrchestrator =
-        new ScanUploadedFilesFlow(queueConsumer, parser, fileManager, scanningService, scanningResultHandler, instanceTerminator)
+        new ScanUploadedFilesFlow(
+          queueConsumer,
+          parser,
+          fileManager,
+          fileCheckingService,
+          scanningResultHandler,
+          instanceTerminator)
 
       When("the orchestrator is called")
       Await.result(queueOrchestrator.run(), 30 seconds)
@@ -222,8 +254,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).poll()
 
       And("scanning handler is called only for successfully scanned messages")
-      verify(scanningResultHandler).handleScanningResult(FileIsClean(s3object1))
-      verify(scanningResultHandler).handleScanningResult(FileIsInfected(s3object3, "infection"))
+      verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object1))
+      verify(scanningResultHandler).handleCheckingResult(InvalidFileCheckingResult(s3object3, "infection"))
       verifyNoMoreInteractions(scanningResultHandler)
 
       And("successfully processed messages are confirmed")
@@ -251,31 +283,45 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       val validMessage3 = Message("ID3", "VALID-BODY", "RECEIPT-3")
 
       val queueConsumer = mock[QueueConsumer]
-      when(queueConsumer.poll()).thenReturn(List(validMessage1,validMessage2,validMessage3))
+      when(queueConsumer.poll()).thenReturn(List(validMessage1, validMessage2, validMessage3))
       when(queueConsumer.confirm(any())).thenReturn(Future.successful(()))
 
       val fileContentsAsBytes = "FileContents".getBytes
-      val stringInputStream = new ByteArrayInputStream(fileContentsAsBytes)
+      val stringInputStream   = new ByteArrayInputStream(fileContentsAsBytes)
 
       And("the fileManager fails to return file metadata for the 2nd message")
       val fileManager = mock[FileManager]
-      when(fileManager.getObjectMetadata(s3object1)).thenReturn(Future.successful(ObjectMetadata(Map.empty,Instant.now)))
-      when(fileManager.getObjectMetadata(s3object2)).thenReturn(Future.failed(new AmazonServiceException("Expected exception")))
-      when(fileManager.getObjectMetadata(s3object3)).thenReturn(Future.successful(ObjectMetadata(Map.empty,Instant.now)))
-      when(fileManager.getObjectContent(any())).thenReturn(Future.successful(ObjectContent(stringInputStream, fileContentsAsBytes.length)))
+      when(fileManager.getObjectMetadata(s3object1))
+        .thenReturn(Future.successful(ObjectMetadata(Map.empty, Instant.now)))
+      when(fileManager.getObjectMetadata(s3object2))
+        .thenReturn(Future.failed(new AmazonServiceException("Expected exception")))
+      when(fileManager.getObjectMetadata(s3object3))
+        .thenReturn(Future.successful(ObjectMetadata(Map.empty, Instant.now)))
+      when(fileManager.getObjectContent(any()))
+        .thenReturn(Future.successful(ObjectContent(stringInputStream, fileContentsAsBytes.length)))
 
-      val scanningService = mock[ScanningService]
-      when(scanningService.scan(meq(s3object1), any(), any())).thenReturn(Future.successful(FileIsClean(s3object1)))
-      when(scanningService.scan(meq(s3object3), any(), any())).thenReturn(Future.successful(FileIsClean(s3object3)))
+      val fileCheckingService = mock[FileCheckingService]
+      when(fileCheckingService.check(meq(s3object1), any(), any()))
+        .thenReturn(Future.successful(ValidFileCheckingResult(s3object1)))
+      when(fileCheckingService.check(meq(s3object3), any(), any()))
+        .thenReturn(Future.successful(ValidFileCheckingResult(s3object3)))
 
-      val scanningResultHandler = mock[ScanningResultHandler]
-      when(scanningResultHandler.handleScanningResult(FileIsClean(s3object1))).thenReturn(Future.successful(SafeToContinue))
-      when(scanningResultHandler.handleScanningResult(FileIsClean(s3object3))).thenReturn(Future.successful(SafeToContinue))
+      val scanningResultHandler = mock[FileCheckingResultHandler]
+      when(scanningResultHandler.handleCheckingResult(ValidFileCheckingResult(s3object1)))
+        .thenReturn(Future.successful(SafeToContinue))
+      when(scanningResultHandler.handleCheckingResult(ValidFileCheckingResult(s3object3)))
+        .thenReturn(Future.successful(SafeToContinue))
 
       val instanceTerminator = mock[InstanceTerminator]
 
       val queueOrchestrator =
-        new ScanUploadedFilesFlow(queueConsumer, parser, fileManager, scanningService, scanningResultHandler, instanceTerminator)
+        new ScanUploadedFilesFlow(
+          queueConsumer,
+          parser,
+          fileManager,
+          fileCheckingService,
+          scanningResultHandler,
+          instanceTerminator)
 
       When("the orchestrator is called")
       Await.result(queueOrchestrator.run(), 30 seconds)
@@ -284,21 +330,21 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).poll()
 
       And("the subsequent components should be invoked for 1st and 3rd messages")
-      verify(scanningService).scan(meq(s3object1), any(), any())
-      verify(scanningService).scan(meq(s3object3), any(), any())
+      verify(fileCheckingService).check(meq(s3object1), any(), any())
+      verify(fileCheckingService).check(meq(s3object3), any(), any())
 
-      verify(scanningResultHandler).handleScanningResult(FileIsClean(s3object1))
-      verify(scanningResultHandler).handleScanningResult(FileIsClean(s3object3))
+      verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object1))
+      verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object3))
 
       verify(queueConsumer).confirm(validMessage1)
       verify(queueConsumer).confirm(validMessage3)
 
       And("the subsequent components should not be invoked for the 2nd message")
-      verify(scanningService, never()).scan(meq(s3object2), any(), any())
-      verify(scanningResultHandler, never()).handleScanningResult(FileIsClean(s3object2))
+      verify(fileCheckingService, never()).check(meq(s3object2), any(), any())
+      verify(scanningResultHandler, never()).handleCheckingResult(ValidFileCheckingResult(s3object2))
       verify(queueConsumer, never()).confirm(validMessage2)
 
-      verifyNoMoreInteractions(scanningService, scanningResultHandler, queueConsumer, instanceTerminator)
+      verifyNoMoreInteractions(fileCheckingService, scanningResultHandler, queueConsumer, instanceTerminator)
     }
 
     "skip processing if file content is unavailable" in {
@@ -317,31 +363,44 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       val validMessage3 = Message("ID3", "VALID-BODY", "RECEIPT-3")
 
       val queueConsumer = mock[QueueConsumer]
-      when(queueConsumer.poll()).thenReturn(List(validMessage1,validMessage2,validMessage3))
+      when(queueConsumer.poll()).thenReturn(List(validMessage1, validMessage2, validMessage3))
       when(queueConsumer.confirm(any())).thenReturn(Future.successful(()))
 
       val fileContentsAsBytes = "FileContents".getBytes
-      val stringInputStream = new ByteArrayInputStream(fileContentsAsBytes)
+      val stringInputStream   = new ByteArrayInputStream(fileContentsAsBytes)
 
       And("the fileManager fails to return file content for the 2nd message")
       val fileManager = mock[FileManager]
       when(fileManager.getObjectMetadata(any())).thenReturn(ObjectMetadata(Map.empty, Instant.now))
-      when(fileManager.getObjectContent(meq(s3object1))).thenReturn(Future.successful(ObjectContent(stringInputStream, fileContentsAsBytes.length)))
-      when(fileManager.getObjectContent(meq(s3object2))).thenReturn(Future.failed(new AmazonServiceException("Expected exception")))
-      when(fileManager.getObjectContent(meq(s3object3))).thenReturn(Future.successful(ObjectContent(stringInputStream, fileContentsAsBytes.length)))
+      when(fileManager.getObjectContent(meq(s3object1)))
+        .thenReturn(Future.successful(ObjectContent(stringInputStream, fileContentsAsBytes.length)))
+      when(fileManager.getObjectContent(meq(s3object2)))
+        .thenReturn(Future.failed(new AmazonServiceException("Expected exception")))
+      when(fileManager.getObjectContent(meq(s3object3)))
+        .thenReturn(Future.successful(ObjectContent(stringInputStream, fileContentsAsBytes.length)))
 
-      val scanningService = mock[ScanningService]
-      when(scanningService.scan(meq(s3object1), any(), any())).thenReturn(Future.successful(FileIsClean(s3object1)))
-      when(scanningService.scan(meq(s3object3), any(), any())).thenReturn(Future.successful(FileIsClean(s3object3)))
+      val fileCheckingService = mock[FileCheckingService]
+      when(fileCheckingService.check(meq(s3object1), any(), any()))
+        .thenReturn(Future.successful(ValidFileCheckingResult(s3object1)))
+      when(fileCheckingService.check(meq(s3object3), any(), any()))
+        .thenReturn(Future.successful(ValidFileCheckingResult(s3object3)))
 
-      val scanningResultHandler = mock[ScanningResultHandler]
-      when(scanningResultHandler.handleScanningResult(FileIsClean(s3object1))).thenReturn(Future.successful(SafeToContinue))
-      when(scanningResultHandler.handleScanningResult(FileIsClean(s3object3))).thenReturn(Future.successful(SafeToContinue))
+      val scanningResultHandler = mock[FileCheckingResultHandler]
+      when(scanningResultHandler.handleCheckingResult(ValidFileCheckingResult(s3object1)))
+        .thenReturn(Future.successful(SafeToContinue))
+      when(scanningResultHandler.handleCheckingResult(ValidFileCheckingResult(s3object3)))
+        .thenReturn(Future.successful(SafeToContinue))
 
       val instanceTerminator = mock[InstanceTerminator]
 
       val queueOrchestrator =
-        new ScanUploadedFilesFlow(queueConsumer, parser, fileManager, scanningService, scanningResultHandler, instanceTerminator)
+        new ScanUploadedFilesFlow(
+          queueConsumer,
+          parser,
+          fileManager,
+          fileCheckingService,
+          scanningResultHandler,
+          instanceTerminator)
 
       When("the orchestrator is called")
       Await.result(queueOrchestrator.run(), 30 seconds)
@@ -350,21 +409,21 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).poll()
 
       And("the subsequent components should be invoked for 1st and 3rd messages")
-      verify(scanningService).scan(meq(s3object1), any(), any())
-      verify(scanningService).scan(meq(s3object3), any(), any())
+      verify(fileCheckingService).check(meq(s3object1), any(), any())
+      verify(fileCheckingService).check(meq(s3object3), any(), any())
 
-      verify(scanningResultHandler).handleScanningResult(FileIsClean(s3object1))
-      verify(scanningResultHandler).handleScanningResult(FileIsClean(s3object3))
+      verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object1))
+      verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object3))
 
       verify(queueConsumer).confirm(validMessage1)
       verify(queueConsumer).confirm(validMessage3)
 
       And("the subsequent components should not be invoked for the 2nd message")
-      verify(scanningService, never()).scan(meq(s3object2), any(), any())
-      verify(scanningResultHandler, never()).handleScanningResult(FileIsClean(s3object2))
+      verify(fileCheckingService, never()).check(meq(s3object2), any(), any())
+      verify(scanningResultHandler, never()).handleCheckingResult(ValidFileCheckingResult(s3object2))
       verify(queueConsumer, never()).confirm(validMessage2)
 
-      verifyNoMoreInteractions(scanningService, scanningResultHandler, queueConsumer, instanceTerminator)
+      verifyNoMoreInteractions(fileCheckingService, scanningResultHandler, queueConsumer, instanceTerminator)
     }
   }
 }

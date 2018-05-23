@@ -29,7 +29,10 @@ case class ObjectContent(inputStream: InputStream, length: Long)
 
 trait FileManager {
   def copyToOutboundBucket(objectLocation: S3ObjectLocation): Future[Unit]
-  def writeToQuarantineBucket(objectLocation: S3ObjectLocation, content: InputStream, metadata: ObjectMetadata): Future[Unit]
+  def writeToQuarantineBucket(
+    objectLocation: S3ObjectLocation,
+    content: InputStream,
+    metadata: ObjectMetadata): Future[Unit]
   def delete(objectLocation: S3ObjectLocation): Future[Unit]
   def getObjectContent(objectLocation: S3ObjectLocation): Future[ObjectContent]
   def getObjectMetadata(objectLocation: S3ObjectLocation): Future[ObjectMetadata]

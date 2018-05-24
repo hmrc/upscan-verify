@@ -30,7 +30,6 @@ class ScannerModule extends Module {
       bind[ContinuousPoller].toSelf.eagerly(),
       bind[ScanningService].to[ClamAvScanningService],
       bind[FileManager].to[S3FileManager],
-      bind[FileTypeCheckingService].to[FileTypeCheckingService],
       bind[InstanceTerminator].to[Ec2InstanceTerminator],
       bind[VirusNotifier].toInstance(LoggingVirusNotifier)
     )

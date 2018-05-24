@@ -58,8 +58,7 @@ class ScanUploadedFilesFlow @Inject()(
         implicit val context = Some(MessageContext(LoggingDetails.fromS3ObjectLocation(parsedMessage.location)))
 
         for {
-          metadata <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))
-          _ = checkMetadata(metadata)
+          metadata       <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))
           scanningResult <- toEitherT(fileCheckingService.check(parsedMessage.location, metadata))
           instanceSafety <- toEitherT(scanningResultHandler.handleCheckingResult(scanningResult))
           _              <- toEitherT(consumer.confirm(message))
@@ -82,12 +81,6 @@ class ScanUploadedFilesFlow @Inject()(
       case Left(ExceptionWithContext(exception, None)) =>
         Logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)
     }
-
-  }
-
-  private def checkMetadata(metadata: ObjectMetadata): Unit = {
-    val consumingService = metadata.consumingService
-    Logger.debug(s"x-amz-meta-consuming-service: [$consumingService].")
   }
 
   private def terminateIfInstanceNotSafe(instanceSafety: InstanceSafety) =

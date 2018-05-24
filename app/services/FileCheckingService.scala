@@ -41,5 +41,4 @@ class FileCheckingService @Inject()(
       objectContent  <- fileManager.getObjectContent(location)
       scanningResult <- fileTypeCheckingService.check(location, objectContent, objectMetadata)
     } yield scanningResult
-
 }

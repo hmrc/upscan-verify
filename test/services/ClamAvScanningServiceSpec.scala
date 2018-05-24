@@ -21,7 +21,7 @@ import java.time.{LocalDateTime, ZoneOffset}
 
 import com.codahale.metrics.MetricRegistry
 import com.kenshoo.play.metrics.Metrics
-import model.{InvalidFileCheckingResult, S3ObjectLocation, ValidFileCheckingResult}
+import model.{FileInfectedCheckingResult, InvalidFileCheckingResult, S3ObjectLocation, ValidFileCheckingResult}
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
 import org.scalatest.mockito.MockitoSugar
@@ -116,7 +116,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val result = Await.result(scanningService.scan(fileLocation, fileContent, fileMetadata), 2.seconds)
 
       Then("a scanning infected result should be returned")
-      result shouldBe InvalidFileCheckingResult(fileLocation, "File dirty")
+      result shouldBe FileInfectedCheckingResult(fileLocation, "File dirty")
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("cleanFileUpload").getCount              shouldBe 0

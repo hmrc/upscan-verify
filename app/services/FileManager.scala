@@ -23,7 +23,10 @@ import model.S3ObjectLocation
 
 import scala.concurrent.Future
 
-case class ObjectMetadata(items: Map[String, String], uploadedTimestamp: Instant)
+case class ObjectMetadata(items: Map[String, String], uploadedTimestamp: Instant) {
+  def originalFilename = items.get("original-filename")
+  def consumingService = items.get("consuming-service")
+}
 
 case class ObjectContent(inputStream: InputStream, length: Long)
 

@@ -19,7 +19,7 @@ package services
 import java.io.InputStream
 import java.time.{LocalDateTime, ZoneOffset}
 
-import model.{FileCheckingResult, InvalidFileCheckingResult, S3ObjectLocation, ValidFileCheckingResult}
+import model._
 import org.apache.commons.io.IOUtils
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito._
@@ -127,7 +127,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
       When("scanning infected file")
-      Await.result(handler.handleCheckingResult(InvalidFileCheckingResult(file, details)), 10 seconds)
+      Await.result(handler.handleCheckingResult(FileInfectedCheckingResult(file, details)), 10 seconds)
 
       Then("notification is created")
       verify(virusNotifier).notifyFileInfected(file, details)
@@ -162,7 +162,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
       When("scanning infected file")
       val result =
-        Await.ready(handler.handleCheckingResult(InvalidFileCheckingResult(file, "There is a virus")), 10 seconds)
+        Await.ready(handler.handleCheckingResult(FileInfectedCheckingResult(file, "There is a virus")), 10 seconds)
 
       Then("file is not deleted")
       verifyZeroInteractions(fileManager)
@@ -187,7 +187,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
       When("when processing scanning result")
       val result =
-        Await.ready(handler.handleCheckingResult(InvalidFileCheckingResult(file, "There is a virus")), 10 seconds)
+        Await.ready(handler.handleCheckingResult(FileInfectedCheckingResult(file, "There is a virus")), 10 seconds)
 
       Then("the process fails")
       result.value.get.isFailure shouldBe true

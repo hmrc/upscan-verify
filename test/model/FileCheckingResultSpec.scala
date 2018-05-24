@@ -25,29 +25,6 @@ import scala.concurrent.duration._
 
 class FileCheckingResultSpec extends UnitSpec with GivenWhenThen {
   "FileCheckingResult" should {
-    "construct correctly from a successful virus scan result" in {
-      Given("a clean virus scanning result and a file location")
-      val fileLocation = S3ObjectLocation("some-bucket-name", "some-object-key")
-      val scanResult   = Clean
-
-      When("a file checking result is created")
-      val checkingResult = FileCheckingResult(scanResult, fileLocation)
-
-      Then("the created result should be a Valid File Checking result")
-      checkingResult shouldBe ValidFileCheckingResult(fileLocation)
-    }
-
-    "construct correctly from a failed virus scan result" in {
-      Given("an infected virus scanning result and a file location")
-      val fileLocation = S3ObjectLocation("some-bucket-name", "some-object-key")
-      val scanResult   = Infected("This file is dirty")
-
-      When("a file checking result is created")
-      val checkingResult = FileCheckingResult(scanResult, fileLocation)
-
-      Then("the created result should be a Valid File Checking result")
-      checkingResult shouldBe InvalidFileCheckingResult(fileLocation, "This file is dirty")
-    }
 
     "chain two different successful check results" in {
       Given("a successful file check result")
@@ -56,7 +33,7 @@ class FileCheckingResultSpec extends UnitSpec with GivenWhenThen {
 
       When("the result is chained to a second successful file check result")
       val otherFileLocation = S3ObjectLocation("some-other-bucket-name", "some-other-object-key")
-      val secondSuccessfulCheck: (S3ObjectLocation) => Future[FileCheckingResult] = { _ =>
+      val secondSuccessfulCheck: () => Future[FileCheckingResult] = { () =>
         Future.successful(ValidFileCheckingResult(otherFileLocation))
       }
 
@@ -69,17 +46,17 @@ class FileCheckingResultSpec extends UnitSpec with GivenWhenThen {
     "chain two different failed check results" in {
       Given("a failed file check result")
       val fileLocation     = S3ObjectLocation("some-bucket-name", "some-object-key")
-      val firstFailedCheck = InvalidFileCheckingResult(fileLocation, "Some first error")
+      val firstFailedCheck = FileInfectedCheckingResult(fileLocation, "Some first error")
 
       When("the result is chained to a second failed file check result")
       val otherFileLocation = S3ObjectLocation("some-other-bucket-name", "some-other-object-key")
-      val secondFailedCheck: (S3ObjectLocation) => Future[FileCheckingResult] = { _ =>
-        Future.successful(InvalidFileCheckingResult(otherFileLocation, "Some second error"))
+      val secondFailedCheck: () => Future[FileCheckingResult] = { () =>
+        Future.successful(FileInfectedCheckingResult(otherFileLocation, "Some second error"))
       }
 
       Then("the eventual result should be the first failed check")
       val eventualResult: FileCheckingResult = Await.result(firstFailedCheck.andThen(secondFailedCheck), 2.seconds)
-      eventualResult shouldBe InvalidFileCheckingResult(fileLocation, "Some first error")
+      eventualResult shouldBe FileInfectedCheckingResult(fileLocation, "Some first error")
     }
 
     "chain a successful followed by failure check results" in {
@@ -89,29 +66,29 @@ class FileCheckingResultSpec extends UnitSpec with GivenWhenThen {
 
       When("the result is chained to a successful file check result")
       val otherFileLocation = S3ObjectLocation("some-other-bucket-name", "some-other-object-key")
-      val secondFailedCheck: (S3ObjectLocation) => Future[FileCheckingResult] = { _ =>
-        Future.successful(InvalidFileCheckingResult(otherFileLocation, "Some second error"))
+      val secondFailedCheck: () => Future[FileCheckingResult] = { () =>
+        Future.successful(FileInfectedCheckingResult(otherFileLocation, "Some second error"))
       }
 
       Then("the eventual result should be the second failed check")
       val eventualResult: FileCheckingResult = Await.result(firstSuccessfulCheck.andThen(secondFailedCheck), 2.seconds)
-      eventualResult shouldBe InvalidFileCheckingResult(otherFileLocation, "Some second error")
+      eventualResult shouldBe FileInfectedCheckingResult(otherFileLocation, "Some second error")
     }
 
     "chain a failure followed by successful checking results" in {
       Given("a failed file check result")
       val fileLocation     = S3ObjectLocation("some-bucket-name", "some-object-key")
-      val firstFailedCheck = InvalidFileCheckingResult(fileLocation, "Some first error")
+      val firstFailedCheck = FileInfectedCheckingResult(fileLocation, "Some first error")
 
       When("the result is chained to a successful file check result")
       val otherFileLocation = S3ObjectLocation("some-other-bucket-name", "some-other-object-key")
-      val secondSuccessfulCheck: (S3ObjectLocation) => Future[FileCheckingResult] = { _ =>
+      val secondSuccessfulCheck: () => Future[FileCheckingResult] = { () =>
         Future.successful(ValidFileCheckingResult(otherFileLocation))
       }
 
       Then("the eventual result should be the first failed check")
       val eventualResult: FileCheckingResult = Await.result(firstFailedCheck.andThen(secondSuccessfulCheck), 2.seconds)
-      eventualResult shouldBe InvalidFileCheckingResult(fileLocation, "Some first error")
+      eventualResult shouldBe FileInfectedCheckingResult(fileLocation, "Some first error")
     }
   }
 }

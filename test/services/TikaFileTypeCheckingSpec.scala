@@ -27,30 +27,30 @@ class TikaFileTypeCheckingSpec extends UnitSpec with Matchers with Assertions wi
     val tikaFileTypeDetector = new TikaFileTypeDetector
 
     "properly detect XML file" in {
-      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.xml")) shouldBe MimeType(
+      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.xml"), None) shouldBe MimeType(
         "application/xml")
     }
 
     "properly detect JPEG file" in {
-      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.jpg")) shouldBe MimeType("image/jpeg")
+      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.jpg"), None) shouldBe MimeType("image/jpeg")
     }
 
     "properly detect PNG file" in {
-      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.png")) shouldBe MimeType("image/png")
+      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.png"), None) shouldBe MimeType("image/png")
     }
 
     "properly detect PDF file" in {
-      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.pdf")) shouldBe MimeType(
+      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.pdf"), None) shouldBe MimeType(
         "application/pdf")
     }
 
     "properly detect Open Office Writer file" in {
-      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.odt")) shouldBe MimeType(
+      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.odt"), None) shouldBe MimeType(
         "application/vnd.oasis.opendocument.text")
     }
 
     "properly detect MS-Word file" in {
-      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.docx")) shouldBe MimeType(
+      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.docx"), None) shouldBe MimeType(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     }
 

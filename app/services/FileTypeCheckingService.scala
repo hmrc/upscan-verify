@@ -23,15 +23,14 @@ import play.api.Logger
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class FileTypeCheckingService @Inject()(fileManager: FileManager, fileTypeDetector: FileTypeDetector)(
-  implicit ec: ExecutionContext) {
+class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector)(implicit ec: ExecutionContext) {
 
-  def check(location: S3ObjectLocation): Future[FileCheckingResult] =
-    for {
-      fileContent <- fileManager.getObjectContent(location)
-    } yield {
-      val fileType = fileTypeDetector.detectType(fileContent.inputStream)
-      Logger.info(s"File [$location] has a type [$fileType]")
-      ValidFileCheckingResult(location)
-    }
+  def check(
+    location: S3ObjectLocation,
+    objectContent: ObjectContent,
+    objectMetadata: ObjectMetadata): Future[FileCheckingResult] = {
+    val fileType = fileTypeDetector.detectType(objectContent.inputStream, objectMetadata.originalFilename)
+    Logger.info(s"File [$location] has a type [$fileType]")
+    Future.successful(ValidFileCheckingResult(location))
+  }
 }

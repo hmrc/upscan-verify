@@ -16,9 +16,9 @@
 
 package model
 
-import uk.gov.hmrc.clamav.model.{Clean, Infected, ScanningResult}
+import services.MimeType
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 case class Message(id: String, body: String, receiptHandle: String)
 
@@ -28,21 +28,22 @@ case class FileUploadEvent(location: S3ObjectLocation)
 sealed trait FileCheckingResult {
   val location: S3ObjectLocation
 
-  def andThen(f: (S3ObjectLocation) => Future[FileCheckingResult]): Future[FileCheckingResult] =
+  def andThen(f: () => Future[FileCheckingResult]): Future[FileCheckingResult] =
     this match {
-      case v: ValidFileCheckingResult   => f(v.location)
+      case v: ValidFileCheckingResult   => f()
       case i: InvalidFileCheckingResult => Future.successful(i)
     }
 }
 
 object FileCheckingResult {
-  def apply(virusResult: ScanningResult, location: S3ObjectLocation): FileCheckingResult =
-    virusResult match {
-      case Clean             => ValidFileCheckingResult(location)
-      case Infected(message) => InvalidFileCheckingResult(location, message)
-    }
+
+  implicit class FutureFileCheckingResult(origin: Future[FileCheckingResult]) {
+    def andThenCheck(f: () => Future[FileCheckingResult])(implicit ec: ExecutionContext): Future[FileCheckingResult] =
+      origin.flatMap(result => result.andThen(f))
+  }
 }
 
 case class ValidFileCheckingResult(location: S3ObjectLocation) extends FileCheckingResult
-
-case class InvalidFileCheckingResult(location: S3ObjectLocation, details: String) extends FileCheckingResult
+sealed trait InvalidFileCheckingResult extends FileCheckingResult
+case class FileInfectedCheckingResult(location: S3ObjectLocation, details: String) extends InvalidFileCheckingResult
+case class IncorrectFileType(location: S3ObjectLocation, typeFound: MimeType) extends InvalidFileCheckingResult

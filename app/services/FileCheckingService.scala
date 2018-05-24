@@ -23,16 +23,23 @@ import model._
 import scala.concurrent.{ExecutionContext, Future}
 
 class FileCheckingService @Inject()(
+  fileManager: FileManager,
   virusScanningService: ScanningService,
   fileTypeCheckingService: FileTypeCheckingService)(implicit ec: ExecutionContext) {
 
-  def check(
-    location: S3ObjectLocation,
-    objectContent: ObjectContent,
-    objectMetadata: ObjectMetadata): Future[FileCheckingResult] =
+  def check(location: S3ObjectLocation, objectMetadata: ObjectMetadata): Future[FileCheckingResult] =
+    scanTheFile(location, objectMetadata).andThenCheck(() => validateFileType(location, objectMetadata))
+
+  private def scanTheFile(location: S3ObjectLocation, objectMetadata: ObjectMetadata) =
     for {
-      virusScanningIssues <- virusScanningService.scan(location, objectContent, objectMetadata)
-      issues              <- virusScanningIssues.andThen(fileTypeCheckingService.check)
-    } yield issues
+      objectContent  <- fileManager.getObjectContent(location)
+      scanningResult <- virusScanningService.scan(location, objectContent, objectMetadata)
+    } yield scanningResult
+
+  private def validateFileType(location: S3ObjectLocation, objectMetadata: ObjectMetadata) =
+    for {
+      objectContent  <- fileManager.getObjectContent(location)
+      scanningResult <- fileTypeCheckingService.check(location, objectContent, objectMetadata)
+    } yield scanningResult
 
 }

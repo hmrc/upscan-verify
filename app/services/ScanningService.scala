@@ -56,11 +56,11 @@ class ClamAvScanningService @Inject()(
       scanResult <- antivirusClient.sendAndCheck(fileContent.inputStream, fileContent.length.toInt) map {
                      case result if result == Clean =>
                        metrics.defaultRegistry.counter("cleanFileUpload").inc()
-                       FileCheckingResult(result, location)
+                       ValidFileCheckingResult(location)
                      case result @ Infected(message) =>
                        Logger.warn(s"File is infected: [$message].")
                        metrics.defaultRegistry.counter("quarantineFileUpload").inc()
-                       FileCheckingResult(result, location)
+                       FileInfectedCheckingResult(location, message)
                    }
 
     } yield {

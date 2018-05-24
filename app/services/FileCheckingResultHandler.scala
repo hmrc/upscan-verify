@@ -35,12 +35,13 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifie
     implicit val ld = LoggingDetails.fromS3ObjectLocation(result.location)
 
     result match {
-      case ValidFileCheckingResult(location)            => handleValid(location)
-      case InvalidFileCheckingResult(location, details) => handleInvalid(location, details)
+      case ValidFileCheckingResult(location)             => handleValid(location)
+      case FileInfectedCheckingResult(location, details) => handleInfected(location, details)
+      case IncorrectFileType(location, mime)             => ???
     }
   }
 
-  private def handleInvalid(objectLocation: S3ObjectLocation, details: String)(implicit ec: ExecutionContext) =
+  private def handleInfected(objectLocation: S3ObjectLocation, details: String)(implicit ec: ExecutionContext) =
     for {
       _        <- virusNotifier.notifyFileInfected(objectLocation, details)
       metadata <- fileManager.getObjectMetadata(objectLocation)

@@ -60,8 +60,7 @@ class ScanUploadedFilesFlow @Inject()(
         for {
           metadata <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))
           _ = checkMetadata(metadata)
-          objectContent  <- toEitherT(fileManager.getObjectContent(parsedMessage.location))
-          scanningResult <- toEitherT(fileCheckingService.check(parsedMessage.location, objectContent, metadata))
+          scanningResult <- toEitherT(fileCheckingService.check(parsedMessage.location, metadata))
           instanceSafety <- toEitherT(scanningResultHandler.handleCheckingResult(scanningResult))
           _              <- toEitherT(consumer.confirm(message))
           _              <- toEitherT(terminateIfInstanceNotSafe(instanceSafety))
@@ -87,7 +86,7 @@ class ScanUploadedFilesFlow @Inject()(
   }
 
   private def checkMetadata(metadata: ObjectMetadata): Unit = {
-    val consumingService = metadata.items.get("consuming-service")
+    val consumingService = metadata.consumingService
     Logger.debug(s"x-amz-meta-consuming-service: [$consumingService].")
   }
 

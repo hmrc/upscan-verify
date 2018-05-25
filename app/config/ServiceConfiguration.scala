@@ -19,7 +19,7 @@ package config
 import javax.inject.Inject
 
 import com.typesafe.config.ConfigValue
-import model.{AllowedFileTypes, ConsumingServicesConfiguration}
+import model.{AllowedMimeTypes, ConsumingServicesConfiguration}
 import play.api.Configuration
 
 import scala.collection.JavaConversions._
@@ -77,18 +77,20 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
   override def processingBatchSize: Int = getRequired(configuration.getInt, "processingBatchSize")
 
   override def consumingServicesConfiguration: ConsumingServicesConfiguration = {
-    def toPerServiceConfiguration(consumingServiceConfig: (String, ConfigValue)): AllowedFileTypes = {
+    def toPerServiceConfiguration(consumingServiceConfig: (String, ConfigValue)): AllowedMimeTypes = {
       val consumingService = consumingServiceConfig._1
       val filesTypes       = consumingServiceConfig._2.unwrapped().toString.split(",").toList
-      AllowedFileTypes(serviceName = consumingService, allowedFileTypes = filesTypes)
+      AllowedMimeTypes(serviceName = consumingService, allowedMimeTypes = filesTypes)
     }
 
+    val key = "fileTypesFilter.allowedMimeTypes"
+
     val configurationMap = configuration
-      .getObject("fileTypesFilter.allowedFileTypes")
+      .getObject(key)
       .map(_.toList.map(toPerServiceConfiguration))
 
     configurationMap
       .map(new ConsumingServicesConfiguration(_))
-      .getOrElse(throw new Exception("Configuration key not found: fileTypesFilter.allowedFileTypes"))
+      .getOrElse(throw new Exception(s"Configuration key not found: $key"))
   }
 }

@@ -42,8 +42,8 @@ class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector, serv
   private def fileTypeLog(location: S3ObjectLocation, objectMetadata: ObjectMetadata): String =
     objectMetadata.items.get("consuming-service") match {
       case Some(consumingService) =>
-        val allowedFileTypes = serviceConfiguration.consumingServicesConfiguration.allowedFileTypes(consumingService)
-        s"Consuming service has allowed file types: [$allowedFileTypes]"
+        val allowedMimeTypes = serviceConfiguration.consumingServicesConfiguration.allowedMimeTypes(consumingService)
+        s"Consuming service [$consumingService] has allowed MIME types: [$allowedMimeTypes]"
       case None => s"No x-amz-meta-consuming-service metadata for [${location.objectKey}]"
     }
 }

@@ -17,7 +17,7 @@
 package config
 
 import com.typesafe.config.ConfigFactory
-import model.{AllowedFileTypes, ConsumingServicesConfiguration}
+import model.{AllowedMimeTypes, ConsumingServicesConfiguration}
 import org.scalatest.GivenWhenThen
 import play.api.Configuration
 import uk.gov.hmrc.play.test.UnitSpec
@@ -34,9 +34,9 @@ class PlayBasedServiceConfigurationSpec extends UnitSpec with GivenWhenThen {
       Then("the consumer service configuration should be configured correctly")
       val expectedConsumerConfiguration = new ConsumingServicesConfiguration(
         List(
-          AllowedFileTypes("test-user-agent-two", List("docx", "odt")),
-          AllowedFileTypes("test-user-agent-one", List("pdf", "jpg")),
-          AllowedFileTypes("test-user-agent-three", List("png"))
+          AllowedMimeTypes("test-user-agent-two", List("docx", "odt")),
+          AllowedMimeTypes("test-user-agent-one", List("pdf", "jpg")),
+          AllowedMimeTypes("test-user-agent-three", List("png"))
         ))
 
       playBasedServiceConfiguration.consumingServicesConfiguration.serviceConfigurations shouldEqual

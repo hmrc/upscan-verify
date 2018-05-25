@@ -44,6 +44,17 @@ object FileCheckingResult {
 }
 
 case class ValidFileCheckingResult(location: S3ObjectLocation) extends FileCheckingResult
+
 sealed trait InvalidFileCheckingResult extends FileCheckingResult
 case class FileInfectedCheckingResult(location: S3ObjectLocation, details: String) extends InvalidFileCheckingResult
 case class IncorrectFileType(location: S3ObjectLocation, typeFound: MimeType) extends InvalidFileCheckingResult
+
+case class AllowedMimeTypes(serviceName: String, allowedMimeTypes: List[String])
+
+case class ConsumingServicesConfiguration(serviceConfigurations: List[AllowedMimeTypes]) {
+  def allowedMimeTypes(consumingService: String): List[String] =
+    serviceConfigurations
+      .find(_.serviceName == consumingService)
+      .map(_.allowedMimeTypes)
+      .getOrElse(Nil)
+}

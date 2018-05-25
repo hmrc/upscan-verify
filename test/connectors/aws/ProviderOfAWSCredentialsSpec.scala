@@ -18,6 +18,7 @@ package connectors.aws
 
 import com.amazonaws.auth.{AWSCredentialsProvider, AWSSessionCredentials, EC2ContainerCredentialsProviderWrapper}
 import config.ServiceConfiguration
+import model.ConsumingServicesConfiguration
 import org.scalatest.Matchers
 import uk.gov.hmrc.play.test.UnitSpec
 
@@ -47,6 +48,8 @@ class ProviderOfAWSCredentialsSpec extends UnitSpec with Matchers {
         override def useContainerCredentials = false
 
         override def processingBatchSize: Int = ???
+
+        override def consumingServicesConfiguration: ConsumingServicesConfiguration = ???
       }
 
       val credentials: AWSCredentialsProvider = new ProviderOfAWSCredentials(configuration).get()
@@ -79,6 +82,8 @@ class ProviderOfAWSCredentialsSpec extends UnitSpec with Matchers {
         override def useContainerCredentials = false
 
         override def processingBatchSize: Int = ???
+
+        override def consumingServicesConfiguration: ConsumingServicesConfiguration = ???
       }
 
       val credentials: AWSCredentialsProvider = new ProviderOfAWSCredentials(configuration).get()
@@ -110,6 +115,8 @@ class ProviderOfAWSCredentialsSpec extends UnitSpec with Matchers {
         override def useContainerCredentials = true
 
         override def processingBatchSize: Int = ???
+
+        override def consumingServicesConfiguration: ConsumingServicesConfiguration = ???
       }
 
       val credentials: AWSCredentialsProvider = new ProviderOfAWSCredentials(configuration).get()

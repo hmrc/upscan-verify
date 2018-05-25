@@ -17,7 +17,12 @@
 package config
 
 import javax.inject.Inject
+
+import com.typesafe.config.ConfigValue
+import model.{AllowedMimeTypes, ConsumingServicesConfiguration}
 import play.api.Configuration
+
+import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 
 trait ServiceConfiguration {
@@ -40,6 +45,8 @@ trait ServiceConfiguration {
   def useContainerCredentials: Boolean
 
   def processingBatchSize: Int
+
+  def consumingServicesConfiguration: ConsumingServicesConfiguration
 
 }
 
@@ -68,4 +75,22 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
   override def quarantineBucket: String = getRequired(configuration.getString(_), "aws.s3.bucket.quarantine")
 
   override def processingBatchSize: Int = getRequired(configuration.getInt, "processingBatchSize")
+
+  override def consumingServicesConfiguration: ConsumingServicesConfiguration = {
+    def toPerServiceConfiguration(consumingServiceConfig: (String, ConfigValue)): AllowedMimeTypes = {
+      val consumingService = consumingServiceConfig._1
+      val filesTypes       = consumingServiceConfig._2.unwrapped().toString.split(",").toList
+      AllowedMimeTypes(serviceName = consumingService, allowedMimeTypes = filesTypes)
+    }
+
+    val key = "fileTypesFilter.allowedMimeTypes"
+
+    val configurationMap = configuration
+      .getObject(key)
+      .map(_.toList.map(toPerServiceConfiguration))
+
+    configurationMap
+      .map(new ConsumingServicesConfiguration(_))
+      .getOrElse(throw new Exception(s"Configuration key not found: $key"))
+  }
 }

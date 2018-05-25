@@ -18,19 +18,32 @@ package services
 
 import javax.inject.Inject
 
+import config.ServiceConfiguration
 import model.{FileCheckingResult, S3ObjectLocation, ValidFileCheckingResult}
 import play.api.Logger
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector)(implicit ec: ExecutionContext) {
+class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector, serviceConfiguration: ServiceConfiguration)(
+  implicit ec: ExecutionContext) {
 
   def check(
     location: S3ObjectLocation,
     objectContent: ObjectContent,
     objectMetadata: ObjectMetadata): Future[FileCheckingResult] = {
     val fileType = fileTypeDetector.detectType(objectContent.inputStream, objectMetadata.originalFilename)
+
     Logger.info(s"File [$location] has a type [$fileType]")
+    Logger.info(fileTypeLog(location, objectMetadata))
+
     Future.successful(ValidFileCheckingResult(location))
   }
+
+  private def fileTypeLog(location: S3ObjectLocation, objectMetadata: ObjectMetadata): String =
+    objectMetadata.items.get("consuming-service") match {
+      case Some(consumingService) =>
+        val allowedMimeTypes = serviceConfiguration.consumingServicesConfiguration.allowedMimeTypes(consumingService)
+        s"Consuming service [$consumingService] has allowed MIME types: [$allowedMimeTypes]"
+      case None => s"No x-amz-meta-consuming-service metadata for [${location.objectKey}]"
+    }
 }

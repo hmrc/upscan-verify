@@ -207,7 +207,7 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       When("a call to copy to quarantine is made")
       val content  = new ByteArrayInputStream("This is a dirty file".getBytes)
       val metadata = services.ObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified)
-      Await.result(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
+      Await.result(fileManager.writeToRejectedBucket(fileLocation, content, metadata), 2.seconds)
 
       Then("a new S3 object with details set as contents and object metadata set should be created")
       verify(s3client).putObject(any(), any(), any(), any())
@@ -233,7 +233,7 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       When("a call to copy to quarantine is made")
       val content  = new ByteArrayInputStream("This is a dirty file".getBytes)
       val metadata = services.ObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified)
-      val result   = Await.ready(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
+      val result   = Await.ready(fileManager.writeToRejectedBucket(fileLocation, content, metadata), 2.seconds)
 
       And("a new S3 object with details set as contents and object metadata set should be created")
       val metadataCaptor: ArgumentCaptor[ObjectMetadata] = ArgumentCaptor.forClass(classOf[ObjectMetadata])

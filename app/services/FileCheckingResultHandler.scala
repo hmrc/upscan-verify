@@ -35,24 +35,34 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifie
     implicit val ld = LoggingDetails.fromS3ObjectLocation(result.location)
 
     result match {
-      case ValidFileCheckingResult(location)             => handleValid(location)
-      case FileInfectedCheckingResult(location, details) => handleInfected(location, details)
-      case IncorrectFileType(location, mime)             => ???
+      case ValidFileCheckingResult(location)                   => handleValid(location)
+      case FileInfectedCheckingResult(location, details)       => handleInfected(location, details)
+      case IncorrectFileType(location, mime, consumingService) => handleIncorrectType(location, mime, consumingService)
     }
   }
+
+  private def handleValid(objectLocation: S3ObjectLocation)(implicit ec: ExecutionContext) =
+    for {
+      _ <- fileManager.copyToOutboundBucket(objectLocation)
+      _ <- fileManager.delete(objectLocation)
+    } yield SafeToContinue
 
   private def handleInfected(objectLocation: S3ObjectLocation, details: String)(implicit ec: ExecutionContext) =
     for {
       _        <- virusNotifier.notifyFileInfected(objectLocation, details)
       metadata <- fileManager.getObjectMetadata(objectLocation)
       quarantineObjectContent = new ByteArrayInputStream(details.getBytes)
-      _ <- fileManager.writeToQuarantineBucket(objectLocation, quarantineObjectContent, metadata)
+      _ <- fileManager.writeToRejectedBucket(objectLocation, quarantineObjectContent, metadata)
       _ <- fileManager.delete(objectLocation)
     } yield ShouldTerminate
 
-  private def handleValid(objectLocation: S3ObjectLocation)(implicit ec: ExecutionContext) =
+  private def handleIncorrectType(objectLocation: S3ObjectLocation, mimeType: MimeType, serviceName: Option[String])(
+    implicit ec: ExecutionContext) =
     for {
-      _ <- fileManager.copyToOutboundBucket(objectLocation)
+      metadata <- fileManager.getObjectMetadata(objectLocation)
+      details                 = s"MIME type [${mimeType.value}] is not allowed for service: [${serviceName.getOrElse("No service name provided")}]"
+      quarantineObjectContent = new ByteArrayInputStream(details.getBytes)
+      _ <- fileManager.writeToRejectedBucket(objectLocation, quarantineObjectContent, metadata)
       _ <- fileManager.delete(objectLocation)
     } yield SafeToContinue
 }

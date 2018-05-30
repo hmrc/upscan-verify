@@ -100,8 +100,12 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) 
 
     Future {
       val fileFromLocation = s3Client.getObject(objectLocation.bucket, objectLocation.objectKey)
+
+      val objectContent = fileFromLocation.getObjectContent
       Logger.debug(s"Fetched content for objectKey: [${objectLocation.objectKey}].")
-      ObjectContent(fileFromLocation.getObjectContent, fileFromLocation.getObjectMetadata.getContentLength)
+
+      fileFromLocation.close()
+      ObjectContent(objectContent, fileFromLocation.getObjectMetadata.getContentLength)
     }
   }
 

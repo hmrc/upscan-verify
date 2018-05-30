@@ -24,7 +24,7 @@ import org.apache.tika.metadata.{Metadata, TikaMetadataKeys}
 case class MimeType(value: String) extends AnyVal
 
 trait FileTypeDetector {
-  def detectType(inputStream: InputStream, fileName : Option[String]): MimeType
+  def detectType(inputStream: InputStream, fileName: Option[String]): MimeType
 }
 
 class TikaFileTypeDetector extends FileTypeDetector {
@@ -32,12 +32,18 @@ class TikaFileTypeDetector extends FileTypeDetector {
   private val config   = TikaConfig.getDefaultConfig
   private val detector = config.getDetector
 
-  def detectType(inputStream: InputStream, fileName : Option[String]): MimeType = {
+  def detectType(inputStream: InputStream, fileName: Option[String]): MimeType = {
     import org.apache.tika.io.TikaInputStream
+
     val tikaInputStream = TikaInputStream.get(inputStream)
+
     val metadata = new Metadata()
     fileName.foreach(metadata.add(TikaMetadataKeys.RESOURCE_NAME_KEY, _))
     val detectionResult = detector.detect(tikaInputStream, new Metadata())
+
+    tikaInputStream.close()
+    inputStream.close()
+
     MimeType(s"${detectionResult.getType}/${detectionResult.getSubtype}")
   }
 }

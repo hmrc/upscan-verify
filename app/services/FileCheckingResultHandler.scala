@@ -47,22 +47,26 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifie
       _ <- fileManager.delete(objectLocation)
     } yield SafeToContinue
 
-  private def handleInfected(objectLocation: S3ObjectLocation, details: String)(implicit ec: ExecutionContext) =
+  private def handleInfected(objectLocation: S3ObjectLocation, details: String)(implicit ec: ExecutionContext) = {
+    val objectContent = new ByteArrayInputStream(details.getBytes)
     for {
       _        <- virusNotifier.notifyFileInfected(objectLocation, details)
       metadata <- fileManager.getObjectMetadata(objectLocation)
-      quarantineObjectContent = new ByteArrayInputStream(details.getBytes)
-      _ <- fileManager.writeToRejectedBucket(objectLocation, quarantineObjectContent, metadata)
-      _ <- fileManager.delete(objectLocation)
+      _        <- fileManager.writeToQuarantineBucket(objectLocation, objectContent, metadata)
+      _        <- fileManager.delete(objectLocation)
     } yield ShouldTerminate
+  }
 
   private def handleIncorrectType(objectLocation: S3ObjectLocation, mimeType: MimeType, serviceName: Option[String])(
-    implicit ec: ExecutionContext) =
+    implicit ec: ExecutionContext) = {
+    val details =
+      s"MIME type [${mimeType.value}] is not allowed for service: [${serviceName.getOrElse("No service name provided")}]"
+    val objectContent = new ByteArrayInputStream(details.getBytes)
+
     for {
       metadata <- fileManager.getObjectMetadata(objectLocation)
-      details                 = s"MIME type [${mimeType.value}] is not allowed for service: [${serviceName.getOrElse("No service name provided")}]"
-      quarantineObjectContent = new ByteArrayInputStream(details.getBytes)
-      _ <- fileManager.writeToRejectedBucket(objectLocation, quarantineObjectContent, metadata)
-      _ <- fileManager.delete(objectLocation)
+      _        <- fileManager.writeToQuarantineBucket(objectLocation, objectContent, metadata)
+      _        <- fileManager.delete(objectLocation)
     } yield SafeToContinue
+  }
 }

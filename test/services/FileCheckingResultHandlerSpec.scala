@@ -122,7 +122,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
       when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
       when(fileManager.getObjectMetadata(file)).thenReturn(Future.successful(objectMetadata))
-      when(fileManager.writeToRejectedBucket(ArgumentMatchers.eq(file), any(), any()))
+      when(fileManager.writeToQuarantineBucket(ArgumentMatchers.eq(file), any(), any()))
         .thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
@@ -138,7 +138,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       And("file metadata and error details are stored in the quarantine bucket")
       val captor: ArgumentCaptor[InputStream] = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
-        .writeToRejectedBucket(ArgumentMatchers.eq(file), captor.capture(), ArgumentMatchers.eq(objectMetadata))
+        .writeToQuarantineBucket(ArgumentMatchers.eq(file), captor.capture(), ArgumentMatchers.eq(objectMetadata))
       IOUtils.toString(captor.getValue) shouldBe "There is a virus"
 
       And("infected file is deleted")
@@ -194,7 +194,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
     }
 
-    "Add error and metadata to rejected bucket, and delete incorrect file in case of invalid file types" in {
+    "Add error and metadata to quarantine bucket, and delete incorrect file in case of invalid file types" in {
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
@@ -209,7 +209,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
       when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
       when(fileManager.getObjectMetadata(file)).thenReturn(Future.successful(objectMetadata))
-      when(fileManager.writeToRejectedBucket(ArgumentMatchers.eq(file), any(), any()))
+      when(fileManager.writeToQuarantineBucket(ArgumentMatchers.eq(file), any(), any()))
         .thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
@@ -226,7 +226,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       And("file metadata and error details are stored in the quarantine bucket")
       val captor: ArgumentCaptor[InputStream] = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
-        .writeToRejectedBucket(ArgumentMatchers.eq(file), captor.capture(), ArgumentMatchers.eq(objectMetadata))
+        .writeToQuarantineBucket(ArgumentMatchers.eq(file), captor.capture(), ArgumentMatchers.eq(objectMetadata))
       IOUtils.toString(captor.getValue) shouldBe "MIME type [application/pdf] is not allowed for service: [valid-test-service]"
 
       And("incorrectly typed file is deleted")

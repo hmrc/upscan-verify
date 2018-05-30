@@ -48,7 +48,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
         Future.successful(ObjectContent(new ByteArrayInputStream(content), content.length))
     }
 
-    override def writeToRejectedBucket(
+    override def writeToQuarantineBucket(
       file: S3ObjectLocation,
       content: InputStream,
       metadata: ObjectMetadata): Future[Unit] = ???

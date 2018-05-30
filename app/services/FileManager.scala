@@ -32,7 +32,7 @@ case class ObjectContent(inputStream: InputStream, length: Long)
 
 trait FileManager {
   def copyToOutboundBucket(objectLocation: S3ObjectLocation): Future[Unit]
-  def writeToRejectedBucket(
+  def writeToQuarantineBucket(
     objectLocation: S3ObjectLocation,
     content: InputStream,
     metadata: ObjectMetadata): Future[Unit]

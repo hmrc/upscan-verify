@@ -54,7 +54,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       val checkingService = new FileTypeCheckingService(detector, configuration)
 
       When("the file is checked")
-      val result: FileCheckingResult = Await.result(checkingService.check(location, content, metadata), 2.seconds)
+      val result: FileCheckingResult = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
       Then("a valid result should be returned")
       result shouldBe ValidFileCheckingResult(location)
@@ -82,9 +82,9 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       val checkingService = new FileTypeCheckingService(detector, configuration)
 
       When("the file is checked")
-      val result: FileCheckingResult = Await.result(checkingService.check(location, content, metadata), 2.seconds)
+      val result: FileCheckingResult = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
-      Then("a valid result should be returned")
+      Then("an incorrect file type result should be returned")
       result shouldBe IncorrectFileType(location, fileMimeType, Some("valid-test-service"))
     }
 
@@ -110,9 +110,9 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       val checkingService = new FileTypeCheckingService(detector, configuration)
 
       When("the file is checked")
-      val result: FileCheckingResult = Await.result(checkingService.check(location, content, metadata), 2.seconds)
+      val result: FileCheckingResult = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
-      Then("a valid result should be returned")
+      Then("an incorrect file type result should be returned")
       result shouldBe IncorrectFileType(location, fileMimeType, None)
     }
   }

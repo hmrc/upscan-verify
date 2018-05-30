@@ -25,9 +25,10 @@ import play.api.Logger
 import scala.concurrent.{ExecutionContext, Future}
 
 class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector, serviceConfiguration: ServiceConfiguration)(
-  implicit ec: ExecutionContext) {
+  implicit ec: ExecutionContext)
+    extends FileChecker {
 
-  def check(
+  override def scan(
     location: S3ObjectLocation,
     objectContent: ObjectContent,
     objectMetadata: ObjectMetadata): Future[FileCheckingResult] = {

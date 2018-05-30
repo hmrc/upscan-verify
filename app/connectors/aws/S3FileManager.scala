@@ -52,7 +52,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) 
     }
   }
 
-  override def writeToRejectedBucket(
+  override def writeToQuarantineBucket(
     objectLocation: S3ObjectLocation,
     content: InputStream,
     metadata: ObjectMetadata): Future[Unit] = {
@@ -62,7 +62,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) 
 
     Future {
       s3Client.putObject(config.quarantineBucket, objectLocation.objectKey, content, quarantineObjectMetadata)
-      Logger.debug(s"Wrote object with objectKey: [${objectLocation.objectKey}], to rejected bucket.")
+      Logger.debug(s"Wrote object with objectKey: [${objectLocation.objectKey}], to quarantine bucket.")
     }
   }
 

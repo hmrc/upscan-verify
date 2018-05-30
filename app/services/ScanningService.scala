@@ -30,12 +30,7 @@ import util.logging.LoggingDetails
 
 import scala.concurrent.Future
 
-trait ScanningService {
-  def scan(
-    location: S3ObjectLocation,
-    objectContent: ObjectContent,
-    objectMetadata: ObjectMetadata): Future[FileCheckingResult]
-}
+trait ScanningService extends FileChecker
 
 class ClamAvScanningService @Inject()(
   clamClientFactory: ClamAntiVirusFactory,

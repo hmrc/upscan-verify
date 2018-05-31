@@ -16,7 +16,7 @@
 
 package services
 
-import java.io.ByteArrayInputStream
+import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
 
 import model.{FileInfectedCheckingResult, IncorrectFileType, S3ObjectLocation, ValidFileCheckingResult}
@@ -36,7 +36,7 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
 
     val location = S3ObjectLocation("bucket", "file")
     val metadata = ObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)
-    val content  = ObjectContent(new ByteArrayInputStream(Array.emptyByteArray), 0L)
+    val content  = StubObjectContent(new ByteArrayInputStream(Array.emptyByteArray), 0L)
 
     "succeed when virus and file type scanning succedded" in {
 
@@ -96,5 +96,4 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       )
     }
   }
-
 }

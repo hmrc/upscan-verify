@@ -28,7 +28,12 @@ case class ObjectMetadata(items: Map[String, String], uploadedTimestamp: Instant
   def consumingService = items.get("consuming-service")
 }
 
-case class ObjectContent(inputStream: InputStream, length: Long)
+trait ObjectContent {
+  val inputStream: InputStream
+  val length: Long
+
+  def close(): Unit
+}
 
 trait FileManager {
   def copyToOutboundBucket(objectLocation: S3ObjectLocation): Future[Unit]

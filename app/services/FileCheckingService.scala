@@ -34,11 +34,17 @@ class FileCheckingService @Inject()(
     for {
       objectContent  <- fileManager.getObjectContent(location)
       scanningResult <- virusScanningService.scan(location, objectContent, objectMetadata)
-    } yield scanningResult
+    } yield {
+      objectContent.close()
+      scanningResult
+    }
 
   private def validateFileType(location: S3ObjectLocation, objectMetadata: ObjectMetadata) =
     for {
       objectContent  <- fileManager.getObjectContent(location)
       scanningResult <- fileTypeCheckingService.scan(location, objectContent, objectMetadata)
-    } yield scanningResult
+    } yield {
+      objectContent.close()
+      scanningResult
+    }
 }

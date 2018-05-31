@@ -29,8 +29,8 @@ case class ObjectMetadata(items: Map[String, String], uploadedTimestamp: Instant
 }
 
 trait ObjectContent {
-  val inputStream: InputStream
-  val length: Long
+  def inputStream: InputStream
+  def length: Long
 
   def close(): Unit
 }

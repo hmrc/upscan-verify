@@ -32,9 +32,10 @@ import util.logging.LoggingDetails
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 
-case class S3ObjectContent(inputStream: InputStream, length: Long, private val s3Object: S3Object)
-    extends ObjectContent {
+class S3ObjectContent(override val length: Long, s3Object: S3Object) extends ObjectContent {
   override def close(): Unit = s3Object.close()
+
+  override def inputStream: InputStream = s3Object.getObjectContent
 }
 
 class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) extends FileManager {
@@ -105,9 +106,8 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) 
 
     Future {
       val fileFromLocation = s3Client.getObject(objectLocation.bucket, objectLocation.objectKey)
-      val objectContent    = fileFromLocation.getObjectContent
       Logger.debug(s"Fetched content for objectKey: [${objectLocation.objectKey}].")
-      S3ObjectContent(objectContent, fileFromLocation.getObjectMetadata.getContentLength, fileFromLocation)
+      new S3ObjectContent(fileFromLocation.getObjectMetadata.getContentLength, fileFromLocation)
     }
   }
 

@@ -16,6 +16,7 @@
 
 package services
 
+import java.io.ByteArrayInputStream
 import javax.inject.Inject
 
 import config.ServiceConfiguration
@@ -30,9 +31,12 @@ class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector, serv
 
   override def scan(
     location: S3ObjectLocation,
-    objectContent: ObjectContent,
+    objectContent: ObjectContentAsByteArray,
     objectMetadata: ObjectMetadata): Future[FileCheckingResult] = {
-    val fileType         = fileTypeDetector.detectType(objectContent.inputStream, objectMetadata.originalFilename)
+
+    val inputStream = new ByteArrayInputStream(objectContent.byteArray)
+
+    val fileType         = fileTypeDetector.detectType(inputStream, objectMetadata.originalFilename)
     val consumingService = objectMetadata.items.get("consuming-service")
 
     if (isAllowedMimeType(fileType, location, consumingService)) Future.successful(ValidFileCheckingResult(location))

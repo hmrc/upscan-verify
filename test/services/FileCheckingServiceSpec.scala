@@ -36,7 +36,7 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
 
     val location = S3ObjectLocation("bucket", "file")
     val metadata = ObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)
-    val content  = ObjectContent(new ByteArrayInputStream(Array.emptyByteArray), 0L)
+    val content  = ObjectContentAsByteArray(Array.emptyByteArray, 0L)
 
     "succeed when virus and file type scanning succedded" in {
 
@@ -45,7 +45,8 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       val fileTypeCheckingService = mock[FileTypeCheckingService]
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
-      when(fileManager.getObjectContent(location)).thenReturn(Future.successful(content), Future.successful(content))
+      when(fileManager.getObjectContentAsByeArray(location))
+        .thenReturn(Future.successful(content), Future.successful(content))
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(ValidFileCheckingResult(location)))
       when(fileTypeCheckingService.scan(location, content, metadata))
@@ -61,7 +62,8 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       val fileTypeCheckingService = mock[FileTypeCheckingService]
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
-      when(fileManager.getObjectContent(location)).thenReturn(Future.successful(content), Future.successful(content))
+      when(fileManager.getObjectContentAsByeArray(location))
+        .thenReturn(Future.successful(content), Future.successful(content))
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(FileInfectedCheckingResult(location, "Virus")))
       when(fileTypeCheckingService.scan(location, content, metadata))
@@ -82,7 +84,8 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       val fileTypeCheckingService = mock[FileTypeCheckingService]
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
-      when(fileManager.getObjectContent(location)).thenReturn(Future.successful(content), Future.successful(content))
+      when(fileManager.getObjectContentAsByeArray(location))
+        .thenReturn(Future.successful(content), Future.successful(content))
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(ValidFileCheckingResult(location)))
       when(fileTypeCheckingService.scan(location, content, metadata))

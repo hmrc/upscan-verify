@@ -16,10 +16,11 @@
 
 package services
 
+import java.io.ByteArrayInputStream
 import java.time.Instant
 import java.util.concurrent.TimeUnit
-
 import javax.inject.Inject
+
 import com.kenshoo.play.metrics.Metrics
 import model._
 import play.api.Logger
@@ -40,15 +41,17 @@ class ClamAvScanningService @Inject()(
 
   override def scan(
     location: S3ObjectLocation,
-    fileContent: ObjectContent,
+    fileContent: ObjectContentAsByteArray,
     metadata: ObjectMetadata): Future[FileCheckingResult] = {
     implicit val ld = LoggingDetails.fromS3ObjectLocation(location)
 
     val antivirusClient       = clamClientFactory.getClient()
     val startTimeMilliseconds = System.currentTimeMillis()
 
+    val inputStream = new ByteArrayInputStream(fileContent.byteArray)
+
     for {
-      scanResult <- antivirusClient.sendAndCheck(fileContent.inputStream, fileContent.length.toInt) map {
+      scanResult <- antivirusClient.sendAndCheck(inputStream, fileContent.length.toInt) map {
                      case result if result == Clean =>
                        metrics.defaultRegistry.counter("cleanFileUpload").inc()
                        ValidFileCheckingResult(location)
@@ -59,6 +62,7 @@ class ClamAvScanningService @Inject()(
                    }
 
     } yield {
+      inputStream.close()
       val endTimeMilliseconds = System.currentTimeMillis()
       addUploadToEndScanMetrics(metadata.uploadedTimestamp, endTimeMilliseconds)
       addScanningTimeMetrics(startTimeMilliseconds, endTimeMilliseconds)

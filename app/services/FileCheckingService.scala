@@ -39,6 +39,6 @@ class FileCheckingService @Inject()(
   private def validateFileType(location: S3ObjectLocation, objectMetadata: ObjectMetadata) =
     for {
       objectContent  <- fileManager.getObjectContent(location)
-      scanningResult <- fileTypeCheckingService.check(location, objectContent, objectMetadata)
+      scanningResult <- fileTypeCheckingService.scan(location, objectContent, objectMetadata)
     } yield scanningResult
 }

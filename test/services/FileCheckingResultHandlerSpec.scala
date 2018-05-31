@@ -193,5 +193,75 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       result.value.get.isFailure shouldBe true
 
     }
+
+    "Add error and metadata to quarantine bucket, and delete incorrect file in case of invalid file types" in {
+      val fileManager: FileManager     = mock[FileManager]
+      val virusNotifier: VirusNotifier = mock[VirusNotifier]
+
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
+
+      Given("there is a file of a type that is not allowed")
+      val file     = S3ObjectLocation("bucket", "file")
+      val mimeType = MimeType("application/pdf")
+
+      val lastModified   = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
+      val objectMetadata = ObjectMetadata(Map("callbackUrl" -> "url"), lastModified)
+
+      when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
+      when(fileManager.getObjectMetadata(file)).thenReturn(Future.successful(objectMetadata))
+      when(fileManager.writeToQuarantineBucket(ArgumentMatchers.eq(file), any(), any()))
+        .thenReturn(Future.successful(()))
+      when(fileManager.delete(file)).thenReturn(Future.successful(()))
+
+      When("checking incorrectly typed file")
+      Await
+        .result(handler.handleCheckingResult(IncorrectFileType(file, mimeType, Some("valid-test-service"))), 10.seconds)
+
+      Then("no virus notification is created")
+      verifyNoMoreInteractions(virusNotifier)
+
+      And("metadata have been requested")
+      verify(fileManager).getObjectMetadata(file)
+
+      And("file metadata and error details are stored in the quarantine bucket")
+      val captor: ArgumentCaptor[InputStream] = ArgumentCaptor.forClass(classOf[InputStream])
+      verify(fileManager)
+        .writeToQuarantineBucket(ArgumentMatchers.eq(file), captor.capture(), ArgumentMatchers.eq(objectMetadata))
+      IOUtils.toString(captor.getValue) shouldBe "MIME type [application/pdf] is not allowed for service: [valid-test-service]"
+
+      And("incorrectly typed file is deleted")
+      verify(fileManager).delete(file)
+      verifyNoMoreInteractions(fileManager)
+    }
+
+    "Return failure if deleting a file if incorrect type fails" in {
+      Given("there is a file of a type that is not allowed")
+
+      val lastModified   = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
+      val objectMetadata = ObjectMetadata(Map("callbackUrl" -> "url"), lastModified)
+
+      val file                     = S3ObjectLocation("bucket", "file")
+      val mimeType                 = MimeType("application/pdf")
+      val fileManager: FileManager = mock[FileManager]
+      when(fileManager.getObjectMetadata(file)).thenReturn(Future.successful(objectMetadata))
+
+      val virusNotifier: VirusNotifier = mock[VirusNotifier]
+
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
+
+      And("a file manager that fails to delete correctly")
+      when(fileManager.delete(file)).thenReturn(Future.failed(new RuntimeException("Expected failure")))
+
+      When("when processing checking result")
+      val result =
+        Await.ready(
+          handler.handleCheckingResult(IncorrectFileType(file, mimeType, Some("valid-test-service"))),
+          10.seconds)
+
+      Then("the process fails")
+      result.value.get.isFailure shouldBe true
+
+    }
+
   }
 }

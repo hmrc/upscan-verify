@@ -19,31 +19,43 @@ package services
 import javax.inject.Inject
 
 import config.ServiceConfiguration
-import model.{FileCheckingResult, S3ObjectLocation, ValidFileCheckingResult}
+import model.{FileCheckingResult, IncorrectFileType, S3ObjectLocation, ValidFileCheckingResult}
 import play.api.Logger
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector, serviceConfiguration: ServiceConfiguration)(
-  implicit ec: ExecutionContext) {
+  implicit ec: ExecutionContext)
+    extends FileChecker {
 
-  def check(
+  override def scan(
     location: S3ObjectLocation,
     objectContent: ObjectContent,
     objectMetadata: ObjectMetadata): Future[FileCheckingResult] = {
-    val fileType = fileTypeDetector.detectType(objectContent.inputStream, objectMetadata.originalFilename)
+    val fileType         = fileTypeDetector.detectType(objectContent.inputStream, objectMetadata.originalFilename)
+    val consumingService = objectMetadata.items.get("consuming-service")
 
-    Logger.info(s"File [$location] has a type [$fileType]")
-    Logger.info(fileTypeLog(location, objectMetadata))
-
-    Future.successful(ValidFileCheckingResult(location))
+    if (isAllowedMimeType(fileType, location, consumingService)) Future.successful(ValidFileCheckingResult(location))
+    else Future.successful(IncorrectFileType(location, fileType, consumingService))
   }
 
-  private def fileTypeLog(location: S3ObjectLocation, objectMetadata: ObjectMetadata): String =
-    objectMetadata.items.get("consuming-service") match {
-      case Some(consumingService) =>
-        val allowedMimeTypes = serviceConfiguration.consumingServicesConfiguration.allowedMimeTypes(consumingService)
-        s"Consuming service [$consumingService] has allowed MIME types: [$allowedMimeTypes]"
-      case None => s"No x-amz-meta-consuming-service metadata for [${location.objectKey}]"
+  private def isAllowedMimeType(
+    mimeType: MimeType,
+    location: S3ObjectLocation,
+    consumingService: Option[String]): Boolean =
+    consumingService match {
+      case Some(service) => isAllowedForService(mimeType, service)
+      case None =>
+        Logger.error(s"No x-amz-meta-consuming-service metadata for [${location.objectKey}]")
+        false
     }
+
+  private def isAllowedForService(mimeType: MimeType, consumingService: String): Boolean = {
+    val allowedMimeTypes = serviceConfiguration.consumingServicesConfiguration.allowedMimeTypes(consumingService)
+    if (allowedMimeTypes.contains(mimeType.value)) true
+    else {
+      Logger.error(s"Consuming service [$consumingService] does not allow MIME type: [${mimeType.value}]")
+      false
+    }
+  }
 }

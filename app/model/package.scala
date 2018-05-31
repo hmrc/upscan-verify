@@ -47,7 +47,8 @@ case class ValidFileCheckingResult(location: S3ObjectLocation) extends FileCheck
 
 sealed trait InvalidFileCheckingResult extends FileCheckingResult
 case class FileInfectedCheckingResult(location: S3ObjectLocation, details: String) extends InvalidFileCheckingResult
-case class IncorrectFileType(location: S3ObjectLocation, typeFound: MimeType) extends InvalidFileCheckingResult
+case class IncorrectFileType(location: S3ObjectLocation, typeFound: MimeType, consumingService: Option[String])
+    extends InvalidFileCheckingResult
 
 case class AllowedMimeTypes(serviceName: String, allowedMimeTypes: List[String])
 

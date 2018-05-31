@@ -48,10 +48,10 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       when(fileManager.getObjectContent(location)).thenReturn(Future.successful(content), Future.successful(content))
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(ValidFileCheckingResult(location)))
-      when(fileTypeCheckingService.check(location, content, metadata))
+      when(fileTypeCheckingService.scan(location, content, metadata))
         .thenReturn(Future.successful(ValidFileCheckingResult(location)))
 
-      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe ValidFileCheckingResult(location)
+      Await.result(fileCheckingService.check(location, metadata), 30.seconds) shouldBe ValidFileCheckingResult(location)
     }
 
     "do not check file type if virus found and return virus details" in {
@@ -64,7 +64,7 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       when(fileManager.getObjectContent(location)).thenReturn(Future.successful(content), Future.successful(content))
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(FileInfectedCheckingResult(location, "Virus")))
-      when(fileTypeCheckingService.check(location, content, metadata))
+      when(fileTypeCheckingService.scan(location, content, metadata))
         .thenReturn(Future.successful(ValidFileCheckingResult(location)))
 
       Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe FileInfectedCheckingResult(
@@ -85,12 +85,15 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       when(fileManager.getObjectContent(location)).thenReturn(Future.successful(content), Future.successful(content))
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(ValidFileCheckingResult(location)))
-      when(fileTypeCheckingService.check(location, content, metadata))
-        .thenReturn(Future.successful(IncorrectFileType(location, MimeType("application/xml"))))
+      when(fileTypeCheckingService.scan(location, content, metadata))
+        .thenReturn(
+          Future.successful(IncorrectFileType(location, MimeType("application/xml"), Some("valid-test-service"))))
 
       Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe IncorrectFileType(
         location,
-        MimeType("application/xml"))
+        MimeType("application/xml"),
+        Some("valid-test-service")
+      )
     }
   }
 

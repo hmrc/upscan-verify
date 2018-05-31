@@ -57,6 +57,14 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
       Future.successful(ObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified))
     }
+
+    override def getObjectContentAsByeArray(file: S3ObjectLocation): Future[ObjectContentAsByteArray] =
+      file.objectKey match {
+        case "bad-file" => Future.failed(new RuntimeException("File not retrieved"))
+        case _ =>
+          val content = "Hello World".getBytes
+          Future.successful(ObjectContentAsByteArray(content, content.length))
+      }
   }
 
   "ClamAvScanningService" should {
@@ -126,9 +134,9 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
     }
   }
 
-  private def fetchObject(fileLocation: S3ObjectLocation): (ObjectContent, ObjectMetadata) =
+  private def fetchObject(fileLocation: S3ObjectLocation): (ObjectContentAsByteArray, ObjectMetadata) =
     for {
-      content  <- fileManager.getObjectContent(fileLocation)
+      content  <- fileManager.getObjectContentAsByeArray(fileLocation)
       metadata <- fileManager.getObjectMetadata(fileLocation)
     } yield (content, metadata)
 }

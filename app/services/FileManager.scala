@@ -29,6 +29,7 @@ case class ObjectMetadata(items: Map[String, String], uploadedTimestamp: Instant
 }
 
 case class ObjectContent(inputStream: InputStream, length: Long)
+case class ObjectContentAsByteArray(byteArray: Array[Byte], length: Long)
 
 trait FileManager {
   def copyToOutboundBucket(objectLocation: S3ObjectLocation): Future[Unit]
@@ -39,4 +40,5 @@ trait FileManager {
   def delete(objectLocation: S3ObjectLocation): Future[Unit]
   def getObjectContent(objectLocation: S3ObjectLocation): Future[ObjectContent]
   def getObjectMetadata(objectLocation: S3ObjectLocation): Future[ObjectMetadata]
+  def getObjectContentAsByeArray(objectLocation: S3ObjectLocation): Future[ObjectContentAsByteArray]
 }

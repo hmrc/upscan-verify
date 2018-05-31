@@ -18,14 +18,14 @@ package connectors.aws
 
 import java.io.InputStream
 import java.time.format.DateTimeFormatter
-
 import javax.inject.Inject
+
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.{CopyObjectRequest, ObjectMetadata => S3ObjectMetadata}
 import config.ServiceConfiguration
 import model.S3ObjectLocation
 import play.api.Logger
-import services.{FileManager, ObjectContent, ObjectMetadata}
+import services.{FileManager, ObjectContent, ObjectContentAsByteArray, ObjectMetadata}
 import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetails
 import util.logging.LoggingDetails
 
@@ -100,11 +100,8 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) 
 
     Future {
       val fileFromLocation = s3Client.getObject(objectLocation.bucket, objectLocation.objectKey)
-
-      val objectContent = fileFromLocation.getObjectContent
+      val objectContent    = fileFromLocation.getObjectContent
       Logger.debug(s"Fetched content for objectKey: [${objectLocation.objectKey}].")
-
-      fileFromLocation.close()
       ObjectContent(objectContent, fileFromLocation.getObjectMetadata.getContentLength)
     }
   }
@@ -117,6 +114,23 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) 
     } yield {
       Logger.debug(s"Fetched metadata for objectKey: [${objectLocation.objectKey}].")
       ObjectMetadata(metadata.getUserMetadata.asScala.toMap, metadata.getLastModified.toInstant)
+    }
+  }
+
+  override def getObjectContentAsByeArray(objectLocation: S3ObjectLocation): Future[ObjectContentAsByteArray] = {
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
+
+    Future {
+      val fileFromLocation = s3Client.getObject(objectLocation.bucket, objectLocation.objectKey)
+
+      val objectContent = fileFromLocation.getObjectContent
+      val objectContentAsByteArray =
+        Stream.continually(objectContent.read).takeWhile(_ != -1).map(_.toByte).toArray
+
+      fileFromLocation.close()
+
+      Logger.debug(s"Fetched content for objectKey: [${objectLocation.objectKey}].")
+      ObjectContentAsByteArray(objectContentAsByteArray, fileFromLocation.getObjectMetadata.getContentLength)
     }
   }
 }

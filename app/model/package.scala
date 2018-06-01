@@ -16,6 +16,7 @@
 
 package model
 
+import play.api.libs.json._
 import services.MimeType
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -58,4 +59,27 @@ case class ConsumingServicesConfiguration(serviceConfigurations: List[AllowedMim
       .find(_.serviceName == consumingService)
       .map(_.allowedMimeTypes)
       .getOrElse(Nil)
+}
+
+sealed trait FileCheckingError {
+  def value: String
+}
+
+case object Quarantine extends FileCheckingError {
+  override def value: String = "QUARANTINE"
+}
+case object Rejected extends FileCheckingError {
+  override def value: String = "REJECTED"
+}
+
+object FileCheckingError {
+  implicit val fileCheckingErrorWrites: Writes[FileCheckingError] = new Writes[FileCheckingError] {
+    override def writes(fileCheckingError: FileCheckingError): JsValue = JsString(fileCheckingError.value)
+  }
+}
+
+case class ErrorMessage(failedReason: FileCheckingError, message: String)
+
+object ErrorMessage {
+  implicit val errorMessageWrites: Writes[ErrorMessage] = Json.writes[ErrorMessage]
 }

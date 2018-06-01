@@ -21,7 +21,7 @@ import java.time.{LocalDateTime, ZoneOffset}
 
 import com.codahale.metrics.MetricRegistry
 import com.kenshoo.play.metrics.Metrics
-import model.{FileInfectedCheckingResult, InvalidFileCheckingResult, S3ObjectLocation, ValidFileCheckingResult}
+import model.{FileInfectedCheckingResult, S3ObjectLocation, ValidFileCheckingResult}
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
 import org.scalatest.mockito.MockitoSugar
@@ -45,7 +45,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       case "bad-file" => Future.failed(new RuntimeException("File not retrieved"))
       case _ =>
         val content = "Hello World".getBytes
-        Future.successful(ObjectContent(new ByteArrayInputStream(content), content.length))
+        Future.successful(StubObjectContent(new ByteArrayInputStream(content), content.length))
     }
 
     override def writeToQuarantineBucket(

@@ -20,8 +20,7 @@ import java.io.ByteArrayInputStream
 import java.time.Instant
 
 import model.{FileInfectedCheckingResult, IncorrectFileType, S3ObjectLocation, ValidFileCheckingResult}
-import org.mockito.Mockito
-import org.mockito.Mockito.when
+import org.mockito.Mockito.{times, verify, verifyZeroInteractions, when}
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{GivenWhenThen, Matchers}
 import uk.gov.hmrc.play.test.UnitSpec
@@ -36,9 +35,10 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
 
     val location = S3ObjectLocation("bucket", "file")
     val metadata = ObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)
-    val content  = ObjectContent(new ByteArrayInputStream(Array.emptyByteArray), 0L)
 
     "succeed when virus and file type scanning succedded" in {
+      val content = mock[ObjectContent]
+      when(content.inputStream).thenReturn(new ByteArrayInputStream(Array.emptyByteArray))
 
       val fileManager             = mock[FileManager]
       val virusScanningService    = mock[ScanningService]
@@ -52,9 +52,13 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
         .thenReturn(Future.successful(ValidFileCheckingResult(location)))
 
       Await.result(fileCheckingService.check(location, metadata), 30.seconds) shouldBe ValidFileCheckingResult(location)
+
+      verify(content, times(2)).close()
     }
 
     "do not check file type if virus found and return virus details" in {
+      val content = mock[ObjectContent]
+      when(content.inputStream).thenReturn(new ByteArrayInputStream(Array.emptyByteArray))
 
       val fileManager             = mock[FileManager]
       val virusScanningService    = mock[ScanningService]
@@ -71,11 +75,13 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
         location,
         "Virus")
 
-      Mockito.verifyZeroInteractions(fileTypeCheckingService)
-
+      verify(content, times(1)).close()
+      verifyZeroInteractions(fileTypeCheckingService)
     }
 
     "return failed file type scanning if virus not found but invalid file type" in {
+      val content = mock[ObjectContent]
+      when(content.inputStream).thenReturn(new ByteArrayInputStream(Array.emptyByteArray))
 
       val fileManager             = mock[FileManager]
       val virusScanningService    = mock[ScanningService]
@@ -94,7 +100,8 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
         MimeType("application/xml"),
         Some("valid-test-service")
       )
+
+      verify(content, times(2)).close()
     }
   }
-
 }

@@ -16,13 +16,8 @@
 
 package services
 
-import model.{FileCheckingResult, S3ObjectLocation}
+import java.io.InputStream
 
-import scala.concurrent.Future
-
-trait FileChecker {
-  def scan(
-    location: S3ObjectLocation,
-    objectContent: ObjectContent,
-    objectMetadata: ObjectMetadata): Future[FileCheckingResult]
+case class StubObjectContent(inputStream: InputStream, length: Long) extends ObjectContent {
+  override def close(): Unit = ()
 }

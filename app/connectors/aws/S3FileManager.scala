@@ -18,10 +18,10 @@ package connectors.aws
 
 import java.io.InputStream
 import java.time.format.DateTimeFormatter
-
 import javax.inject.Inject
+
 import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.{CopyObjectRequest, ObjectMetadata => S3ObjectMetadata}
+import com.amazonaws.services.s3.model.{CopyObjectRequest, S3Object, ObjectMetadata => S3ObjectMetadata}
 import config.ServiceConfiguration
 import model.S3ObjectLocation
 import play.api.Logger
@@ -31,6 +31,12 @@ import util.logging.LoggingDetails
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
+
+class S3ObjectContent(override val length: Long, s3Object: S3Object) extends ObjectContent {
+  override def close(): Unit = s3Object.close()
+
+  override def inputStream: InputStream = s3Object.getObjectContent
+}
 
 class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) extends FileManager {
 
@@ -100,12 +106,8 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) 
 
     Future {
       val fileFromLocation = s3Client.getObject(objectLocation.bucket, objectLocation.objectKey)
-
-      val objectContent = fileFromLocation.getObjectContent
       Logger.debug(s"Fetched content for objectKey: [${objectLocation.objectKey}].")
-
-      fileFromLocation.close()
-      ObjectContent(objectContent, fileFromLocation.getObjectMetadata.getContentLength)
+      new S3ObjectContent(fileFromLocation.getObjectMetadata.getContentLength, fileFromLocation)
     }
   }
 

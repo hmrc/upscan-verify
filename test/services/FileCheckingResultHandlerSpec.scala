@@ -35,7 +35,7 @@ import scala.concurrent.{Await, Future}
 
 class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Eventually with GivenWhenThen {
 
-  "ScanningResultHandler" should {
+  "FileCheckingResultHandler" should {
     "Move clean file from inbound bucket to outbound bucket" in {
 
       val fileManager: FileManager     = mock[FileManager]
@@ -139,7 +139,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val captor: ArgumentCaptor[InputStream] = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
         .writeToQuarantineBucket(ArgumentMatchers.eq(file), captor.capture(), ArgumentMatchers.eq(objectMetadata))
-      IOUtils.toString(captor.getValue) shouldBe "There is a virus"
+      IOUtils.toString(captor.getValue) shouldBe """{"failedReason":"QUARANTINE","message":"There is a virus"}"""
 
       And("infected file is deleted")
       verify(fileManager).delete(file)
@@ -227,7 +227,8 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val captor: ArgumentCaptor[InputStream] = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
         .writeToQuarantineBucket(ArgumentMatchers.eq(file), captor.capture(), ArgumentMatchers.eq(objectMetadata))
-      IOUtils.toString(captor.getValue) shouldBe "MIME type [application/pdf] is not allowed for service: [valid-test-service]"
+      IOUtils.toString(captor.getValue) shouldBe
+        """{"failedReason":"REJECTED","message":"MIME type [application/pdf] is not allowed for service: [valid-test-service]"}"""
 
       And("incorrectly typed file is deleted")
       verify(fileManager).delete(file)

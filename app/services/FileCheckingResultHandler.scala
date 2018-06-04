@@ -17,9 +17,10 @@
 package services
 
 import java.io.ByteArrayInputStream
-
 import javax.inject.Inject
+
 import model._
+import play.api.libs.json.Json
 import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetails
 import util.logging.LoggingDetails
 
@@ -48,7 +49,9 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifie
     } yield SafeToContinue
 
   private def handleInfected(objectLocation: S3ObjectLocation, details: String)(implicit ec: ExecutionContext) = {
-    val objectContent = new ByteArrayInputStream(details.getBytes)
+    val fileCheckingError = ErrorMessage(Quarantine, details)
+    val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
+
     for {
       _        <- virusNotifier.notifyFileInfected(objectLocation, details)
       metadata <- fileManager.getObjectMetadata(objectLocation)
@@ -61,7 +64,8 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifie
     implicit ec: ExecutionContext) = {
     val details =
       s"MIME type [${mimeType.value}] is not allowed for service: [${serviceName.getOrElse("No service name provided")}]"
-    val objectContent = new ByteArrayInputStream(details.getBytes)
+    val fileCheckingError = ErrorMessage(Rejected, details)
+    val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
 
     for {
       metadata <- fileManager.getObjectMetadata(objectLocation)

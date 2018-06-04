@@ -16,9 +16,10 @@
 
 package config
 
+import java.util
 import javax.inject.Inject
 
-import com.typesafe.config.ConfigValue
+import com.typesafe.config.{ConfigObject, ConfigValue}
 import model.{AllowedMimeTypes, ConsumingServicesConfiguration}
 import play.api.Configuration
 
@@ -77,20 +78,28 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
   override def processingBatchSize: Int = getRequired(configuration.getInt, "processingBatchSize")
 
   override def consumingServicesConfiguration: ConsumingServicesConfiguration = {
-    def toPerServiceConfiguration(consumingServiceConfig: (String, ConfigValue)): AllowedMimeTypes = {
-      val consumingService = consumingServiceConfig._1
-      val filesTypes       = consumingServiceConfig._2.unwrapped().toString.split(",").toList
-      AllowedMimeTypes(serviceName = consumingService, allowedMimeTypes = filesTypes)
+    def toPerServiceConfiguration(consumingServiceConfig: ConfigObject): Either[String, AllowedMimeTypes] = {
+      val serviceAsMap = consumingServiceConfig.unwrapped.toMap
+      (serviceAsMap.get("user-agent"), serviceAsMap.get("mime-types")) match {
+        case (Some(service: String), Some(mimeTypes: String)) =>
+          Right(AllowedMimeTypes(service, mimeTypes.split(",").toList))
+        case _ => Left(s"Could not parse config object for services configuration: $serviceAsMap")
+      }
     }
 
     val key = "fileTypesFilter.allowedMimeTypes"
-
-    val configurationMap = configuration
-      .getObject(key)
-      .map(_.toList.map(toPerServiceConfiguration))
-
-    configurationMap
-      .map(new ConsumingServicesConfiguration(_))
+    val servicesConfigArray = configuration
+      .getObjectList(key)
       .getOrElse(throw new Exception(s"Configuration key not found: $key"))
+
+    val serviceAllowedMimeTypes = servicesConfigArray.toList.map(toPerServiceConfiguration)
+
+    serviceAllowedMimeTypes.collect({ case Left(error) => error }) match {
+      case Nil =>
+        val allowed = serviceAllowedMimeTypes.collect({ case Right(allowedMimeTypes) => allowedMimeTypes })
+        ConsumingServicesConfiguration(allowed)
+      case errors =>
+        throw new Exception(s"Configuration key not correctly configured: $key, errors: ${errors.mkString(", ")}")
+    }
   }
 }

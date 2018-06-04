@@ -18,11 +18,11 @@ package config
 
 import com.typesafe.config.ConfigFactory
 import model.{AllowedMimeTypes, ConsumingServicesConfiguration}
-import org.scalatest.GivenWhenThen
+import org.scalatest.{Assertions, GivenWhenThen, Matchers}
 import play.api.Configuration
 import uk.gov.hmrc.play.test.UnitSpec
 
-class PlayBasedServiceConfigurationSpec extends UnitSpec with GivenWhenThen {
+class PlayBasedServiceConfigurationSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen {
   "PlayBasedServiceConfiguration" should {
     "parse consuming service configuration" in {
       Given("a Play configuration file with configured services")
@@ -32,10 +32,10 @@ class PlayBasedServiceConfigurationSpec extends UnitSpec with GivenWhenThen {
       val playBasedServiceConfiguration = new PlayBasedServiceConfiguration(configuration)
 
       Then("the consumer service configuration should be configured correctly")
-      val expectedConsumerConfiguration = new ConsumingServicesConfiguration(
+      val expectedConsumerConfiguration = ConsumingServicesConfiguration(
         List(
-          AllowedMimeTypes("test-user-agent-two", List("docx", "odt")),
           AllowedMimeTypes("test-user-agent-one", List("pdf", "jpg")),
+          AllowedMimeTypes("test-user-agent-two", List("docx", "odt")),
           AllowedMimeTypes("test-user-agent-three", List("png"))
         ))
 
@@ -51,9 +51,25 @@ class PlayBasedServiceConfigurationSpec extends UnitSpec with GivenWhenThen {
       val playBasedServiceConfiguration = new PlayBasedServiceConfiguration(configuration)
 
       Then("the consumer service configuration should be an empty set")
-      val expectedConsumerConfiguration = new ConsumingServicesConfiguration(List.empty)
+      val expectedConsumerConfiguration = ConsumingServicesConfiguration(List.empty)
       playBasedServiceConfiguration.consumingServicesConfiguration.serviceConfigurations shouldEqual
         expectedConsumerConfiguration.serviceConfigurations
     }
+  }
+
+  "throw an error for badly formatted consuming service configuration" in {
+    Given("a Play configuration file with a badly formatted configured service")
+    val configuration = Configuration(ConfigFactory.load("test-three.conf"))
+
+    When("the configuration is parsed")
+    val playBasedServiceConfiguration = new PlayBasedServiceConfiguration(configuration)
+
+    Then("an Exception with details of the problem should be thrown")
+    val result = intercept[Exception] {
+      playBasedServiceConfiguration.consumingServicesConfiguration.serviceConfigurations
+    }
+    result.getMessage shouldBe "Configuration key not correctly configured: fileTypesFilter.allowedMimeTypes, " +
+      "errors: Could not parse config object for services configuration: Map(something-else -> Just a badly configured object)"
+
   }
 }

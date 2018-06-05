@@ -139,7 +139,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val captor: ArgumentCaptor[InputStream] = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
         .writeToQuarantineBucket(ArgumentMatchers.eq(file), captor.capture(), ArgumentMatchers.eq(objectMetadata))
-      IOUtils.toString(captor.getValue) shouldBe """{"failedReason":"QUARANTINE","message":"There is a virus"}"""
+      IOUtils.toString(captor.getValue) shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
 
       And("infected file is deleted")
       verify(fileManager).delete(file)
@@ -228,7 +228,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       verify(fileManager)
         .writeToQuarantineBucket(ArgumentMatchers.eq(file), captor.capture(), ArgumentMatchers.eq(objectMetadata))
       IOUtils.toString(captor.getValue) shouldBe
-        """{"failedReason":"REJECTED","message":"MIME type [application/pdf] is not allowed for service: [valid-test-service]"}"""
+        """{"failureReason":"REJECTED","message":"MIME type [application/pdf] is not allowed for service: [valid-test-service]"}"""
 
       And("incorrectly typed file is deleted")
       verify(fileManager).delete(file)

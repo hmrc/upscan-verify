@@ -19,6 +19,9 @@ package services
 import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
 
+import com.kenshoo.play.metrics.Metrics
+import com.codahale.metrics.MetricRegistry
+
 import com.amazonaws.AmazonServiceException
 import model._
 import org.mockito.ArgumentMatchers.{any, eq => meq}
@@ -40,6 +43,12 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       case "VALID-BODY" => Future.successful(FileUploadEvent(S3ObjectLocation("bucket", message.id)))
       case _            => Future.failed(new Exception("Invalid body"))
     }
+  }
+
+  def metricsStub() = new Metrics {
+    override val defaultRegistry: MetricRegistry = new MetricRegistry
+
+    override def toJson: String = ???
   }
 
   "ScanUploadedFilesFlow" should {
@@ -66,6 +75,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       when(scanningResultHandler.handleCheckingResult(any())).thenReturn(Future.successful(SafeToContinue))
 
       val instanceTerminator = mock[InstanceTerminator]
+      val metrics            = metricsStub()
       val queueOrchestrator =
         new ScanUploadedFilesFlow(
           queueConsumer,
@@ -73,7 +83,9 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          instanceTerminator)
+          instanceTerminator,
+          metrics
+        )
 
       When("the orchestrator is called")
       Await.result(queueOrchestrator.run(), 30 seconds)
@@ -83,6 +95,9 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
       And("scanning result handler is called")
       verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object))
+
+      And("the metrics should be successfully updated")
+      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 1
 
       And("successfully processed messages are confirmed")
       verify(queueConsumer).confirm(validMessage)
@@ -111,6 +126,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       val instanceTerminator = mock[InstanceTerminator]
       when(instanceTerminator.terminate()).thenReturn(Future(()))
 
+      val metrics = metricsStub()
+
       val queueOrchestrator =
         new ScanUploadedFilesFlow(
           queueConsumer,
@@ -118,7 +135,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          instanceTerminator)
+          instanceTerminator,
+          metrics)
 
       When("the orchestrator is called")
       Await.result(queueOrchestrator.run(), 30 seconds)
@@ -129,6 +147,9 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       And("scanning result handler is called")
       verify(scanningResultHandler)
         .handleCheckingResult(FileInfectedCheckingResult(s3object, "Virus name"))
+
+      And("the metrics should be successfully updated")
+      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 1
 
       And("successfully processed messages are confirmed")
       And("instance is terminated")
@@ -173,6 +194,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       val instanceTerminator = mock[InstanceTerminator]
       when(instanceTerminator.terminate()).thenReturn(Future(()))
 
+      val metrics = metricsStub()
+
       val queueOrchestrator =
         new ScanUploadedFilesFlow(
           queueConsumer,
@@ -180,7 +203,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          instanceTerminator)
+          instanceTerminator,
+          metrics)
 
       When("the orchestrator is called")
       Await.result(queueOrchestrator.run(), 30 seconds)
@@ -196,6 +220,9 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       And("successfully processed messages are confirmed")
       verify(queueConsumer).confirm(validMessage1)
       verify(queueConsumer).confirm(validMessage2)
+
+      And("the metrics should be successfully updated")
+      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 2
 
       And("invalid messages are not confirmed")
       verifyNoMoreInteractions(queueConsumer)
@@ -235,6 +262,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       when(scanningResultHandler.handleCheckingResult(any())).thenReturn(Future.successful(SafeToContinue))
 
       val instanceTerminator = mock[InstanceTerminator]
+      val metrics            = metricsStub()
 
       val queueOrchestrator =
         new ScanUploadedFilesFlow(
@@ -243,7 +271,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          instanceTerminator)
+          instanceTerminator,
+          metrics)
 
       When("the orchestrator is called")
       Await.result(queueOrchestrator.run(), 30 seconds)
@@ -259,6 +288,9 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       And("successfully processed messages are confirmed")
       verify(queueConsumer).confirm(validMessage1)
       verify(queueConsumer).confirm(validMessage3)
+
+      And("the metrics should be successfully updated")
+      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 2
 
       And("invalid messages are not confirmed")
       verifyNoMoreInteractions(queueConsumer)
@@ -309,6 +341,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
         .thenReturn(Future.successful(SafeToContinue))
 
       val instanceTerminator = mock[InstanceTerminator]
+      val metrics            = metricsStub()
 
       val queueOrchestrator =
         new ScanUploadedFilesFlow(
@@ -317,7 +350,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          instanceTerminator)
+          instanceTerminator,
+          metrics)
 
       When("the orchestrator is called")
       Await.result(queueOrchestrator.run(), 30 seconds)
@@ -341,6 +375,9 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer, never()).confirm(validMessage2)
 
       verifyNoMoreInteractions(fileCheckingService, scanningResultHandler, queueConsumer, instanceTerminator)
+
+      And("the metrics should be successfully updated")
+      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 2
     }
   }
 }

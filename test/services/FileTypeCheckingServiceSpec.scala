@@ -25,12 +25,20 @@ import org.mockito.Mockito.when
 import org.scalatest.GivenWhenThen
 import org.scalatest.mockito.MockitoSugar
 import uk.gov.hmrc.play.test.UnitSpec
+import com.kenshoo.play.metrics.Metrics
+import com.codahale.metrics.MetricRegistry
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with MockitoSugar {
+
+  def metricsStub() = new Metrics {
+    override val defaultRegistry: MetricRegistry = new MetricRegistry
+
+    override def toJson: String = ???
+  }
 
   "FileTypeCheckingService" should {
     "return valid result for whitelisted mime type for service" in {
@@ -51,13 +59,19 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       val configuration = mock[ServiceConfiguration]
       when(configuration.consumingServicesConfiguration).thenReturn(consumingServicesConfiguration)
 
-      val checkingService = new FileTypeCheckingService(detector, configuration)
+      val metrics         = metricsStub()
+      val checkingService = new FileTypeCheckingService(detector, configuration, metrics)
 
       When("the file is checked")
       val result: FileCheckingResult = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
       Then("a valid result should be returned")
       result shouldBe ValidFileCheckingResult(location)
+
+      And("the metrics should be successfully updated")
+      metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 1
+      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount        shouldBe 0
+      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
     }
 
     "return invalid result when mime type not listed for service" in {
@@ -79,13 +93,19 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       val configuration = mock[ServiceConfiguration]
       when(configuration.consumingServicesConfiguration).thenReturn(consumingServicesConfiguration)
 
-      val checkingService = new FileTypeCheckingService(detector, configuration)
+      val metrics         = metricsStub()
+      val checkingService = new FileTypeCheckingService(detector, configuration, metrics)
 
       When("the file is checked")
       val result: FileCheckingResult = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
       Then("an incorrect file type result should be returned")
       result shouldBe IncorrectFileType(location, fileMimeType, Some("valid-test-service"))
+
+      And("the metrics should be successfully updated")
+      metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 0
+      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount        shouldBe 1
+      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
     }
 
     "return invalid result when file does not have service name" in {
@@ -107,13 +127,19 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       val configuration = mock[ServiceConfiguration]
       when(configuration.consumingServicesConfiguration).thenReturn(consumingServicesConfiguration)
 
-      val checkingService = new FileTypeCheckingService(detector, configuration)
+      val metrics         = metricsStub()
+      val checkingService = new FileTypeCheckingService(detector, configuration, metrics)
 
       When("the file is checked")
       val result: FileCheckingResult = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
       Then("an incorrect file type result should be returned")
       result shouldBe IncorrectFileType(location, fileMimeType, None)
+
+      And("the metrics should be successfully updated")
+      metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 0
+      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount        shouldBe 1
+      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
     }
   }
 }

@@ -16,9 +16,14 @@
 
 package services
 
+import java.time.Instant
+import java.util.concurrent.TimeUnit
+
 import cats.implicits._
 import cats.data.EitherT
 import javax.inject.Inject
+
+import com.kenshoo.play.metrics.Metrics
 import model.Message
 import play.api.Logger
 import uk.gov.hmrc.http.logging.LoggingDetails
@@ -37,7 +42,8 @@ class ScanUploadedFilesFlow @Inject()(
   fileManager: FileManager,
   fileCheckingService: FileCheckingService,
   scanningResultHandler: FileCheckingResultHandler,
-  ec2InstanceTerminator: InstanceTerminator)(implicit ec: ExecutionContext)
+  ec2InstanceTerminator: InstanceTerminator,
+  metrics: Metrics)(implicit ec: ExecutionContext)
     extends PollingJob {
 
   def run(): Future[Unit] = {
@@ -50,7 +56,6 @@ class ScanUploadedFilesFlow @Inject()(
   }
 
   private def processMessage(message: Message): Future[Unit] = {
-
     val outcome = for {
       parsedMessage <- toEitherT(parser.parse(message))(context = None)
 
@@ -60,6 +65,7 @@ class ScanUploadedFilesFlow @Inject()(
         for {
           metadata       <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))
           scanningResult <- toEitherT(fileCheckingService.check(parsedMessage.location, metadata))
+          _              <- toEitherT(addUploadToEndScanMetrics(metadata.uploadedTimestamp, System.currentTimeMillis))
           instanceSafety <- toEitherT(scanningResultHandler.handleCheckingResult(scanningResult))
           _              <- toEitherT(consumer.confirm(message))
           _              <- toEitherT(terminateIfInstanceNotSafe(instanceSafety))
@@ -96,4 +102,10 @@ class ScanUploadedFilesFlow @Inject()(
         .recover { case error: Exception => Left(ExceptionWithContext(error, context)) }
     EitherT(futureEither)
   }
+
+  private def addUploadToEndScanMetrics(uploadedTimestamp: Instant, endTimeMilliseconds: Long): Future[Unit] =
+    Future.successful {
+      val interval = endTimeMilliseconds - uploadedTimestamp.toEpochMilli
+      metrics.defaultRegistry.timer("uploadToScanComplete").update(interval, TimeUnit.MILLISECONDS)
+    }
 }

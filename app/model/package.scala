@@ -78,7 +78,7 @@ object FileCheckingError {
   }
 }
 
-case class ErrorMessage(failedReason: FileCheckingError, message: String)
+case class ErrorMessage(failureReason: FileCheckingError, message: String)
 
 object ErrorMessage {
   implicit val errorMessageWrites: Writes[ErrorMessage] = Json.writes[ErrorMessage]

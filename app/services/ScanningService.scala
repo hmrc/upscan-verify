@@ -60,15 +60,9 @@ class ClamAvScanningService @Inject()(
 
     } yield {
       val endTimeMilliseconds = System.currentTimeMillis()
-      addUploadToEndScanMetrics(metadata.uploadedTimestamp, endTimeMilliseconds)
       addScanningTimeMetrics(startTimeMilliseconds, endTimeMilliseconds)
       scanResult
     }
-  }
-
-  private def addUploadToEndScanMetrics(uploadedTimestamp: Instant, endTimeMilliseconds: Long) = {
-    val interval = endTimeMilliseconds - uploadedTimestamp.toEpochMilli
-    metrics.defaultRegistry.timer("uploadToScanComplete").update(interval, TimeUnit.MILLISECONDS)
   }
 
   private def addScanningTimeMetrics(startTimeMilliseconds: Long, endTimeMilliseconds: Long) = {

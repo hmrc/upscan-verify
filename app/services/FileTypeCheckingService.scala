@@ -16,27 +16,41 @@
 
 package services
 
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import com.kenshoo.play.metrics.Metrics
+import play.api.Logger
 
 import config.ServiceConfiguration
 import model.{FileCheckingResult, IncorrectFileType, S3ObjectLocation, ValidFileCheckingResult}
-import play.api.Logger
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector, serviceConfiguration: ServiceConfiguration)(
-  implicit ec: ExecutionContext)
+class FileTypeCheckingService @Inject()(
+  fileTypeDetector: FileTypeDetector,
+  serviceConfiguration: ServiceConfiguration,
+  metrics: Metrics)(implicit ec: ExecutionContext)
     extends FileChecker {
 
   override def scan(
     location: S3ObjectLocation,
     objectContent: ObjectContent,
     objectMetadata: ObjectMetadata): Future[FileCheckingResult] = {
-    val fileType         = fileTypeDetector.detectType(objectContent.inputStream, objectMetadata.originalFilename)
-    val consumingService = objectMetadata.items.get("consuming-service")
 
-    if (isAllowedMimeType(fileType, location, consumingService)) Future.successful(ValidFileCheckingResult(location))
-    else Future.successful(IncorrectFileType(location, fileType, consumingService))
+    val startTimeMilliseconds = System.currentTimeMillis()
+
+    val consumingService = objectMetadata.items.get("consuming-service")
+    val fileType         = fileTypeDetector.detectType(objectContent.inputStream, objectMetadata.originalFilename)
+
+    addCheckingTimeMetrics(startTimeMilliseconds)
+
+    if (isAllowedMimeType(fileType, location, consumingService)) {
+      metrics.defaultRegistry.counter("validTypeFileUpload").inc()
+      Future.successful(ValidFileCheckingResult(location))
+    } else {
+      metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
+      Future.successful(IncorrectFileType(location, fileType, consumingService))
+    }
   }
 
   private def isAllowedMimeType(
@@ -57,5 +71,11 @@ class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector, serv
       Logger.error(s"Consuming service [$consumingService] does not allow MIME type: [${mimeType.value}]")
       false
     }
+  }
+
+  private def addCheckingTimeMetrics(startTimeMilliseconds: Long) = {
+    val endTimeMilliseconds = System.currentTimeMillis()
+    val interval            = endTimeMilliseconds - startTimeMilliseconds
+    metrics.defaultRegistry.timer("fileTypeCheckingTime").update(interval, TimeUnit.MILLISECONDS)
   }
 }

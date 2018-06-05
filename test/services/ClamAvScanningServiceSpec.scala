@@ -90,10 +90,9 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       result shouldBe ValidFileCheckingResult(fileLocation)
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.counter("cleanFileUpload").getCount              shouldBe 1
-      metrics.defaultRegistry.counter("quarantineFileUpload").getCount         shouldBe 0
-      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 1
-      metrics.defaultRegistry.timer("scanningTime").getSnapshot.size()         shouldBe 1
+      metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 1
+      metrics.defaultRegistry.counter("quarantineFileUpload").getCount shouldBe 0
+      metrics.defaultRegistry.timer("scanningTime").getSnapshot.size() shouldBe 1
     }
 
     "return infected if file can be retrieved and scan result infected" in {
@@ -119,10 +118,9 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       result shouldBe FileInfectedCheckingResult(fileLocation, "File dirty")
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.counter("cleanFileUpload").getCount              shouldBe 0
-      metrics.defaultRegistry.counter("quarantineFileUpload").getCount         shouldBe 1
-      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 1
-      metrics.defaultRegistry.timer("scanningTime").getSnapshot.size()         shouldBe 1
+      metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 0
+      metrics.defaultRegistry.counter("quarantineFileUpload").getCount shouldBe 1
+      metrics.defaultRegistry.timer("scanningTime").getSnapshot.size() shouldBe 1
     }
   }
 

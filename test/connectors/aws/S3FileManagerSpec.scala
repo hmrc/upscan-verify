@@ -48,6 +48,7 @@ import org.mockito.{ArgumentCaptor, Mockito}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Assertions, GivenWhenThen, Matchers}
+import services.OutboundObjectMetadata
 import uk.gov.hmrc.play.test.UnitSpec
 
 import scala.collection.JavaConverters._
@@ -70,17 +71,16 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
 
       val s3client: AmazonS3 = mock[AmazonS3]
       when(s3client.copyObject(any(): CopyObjectRequest)).thenReturn(new CopyObjectResult())
-      when(s3client.getObjectMetadata(any(), any())).thenReturn(s3Metadata)
 
       val fileManager = new S3FileManager(s3client, configuration)
 
       When("copying the file is requested")
-      Await.result(fileManager.copyToOutboundBucket(S3ObjectLocation("inboundBucket", "file")), 2.seconds)
+      Await.result(
+        fileManager
+          .copyToOutboundBucket(S3ObjectLocation("inboundBucket", "file"), OutboundObjectMetadata(items = Map.empty)),
+        2.seconds)
 
-      Then("the S3 object metadata should be retrieved for copying")
-      verify(s3client).getObjectMetadata("inboundBucket", "file")
-
-      And("the S3 copy method of AWS client should be called")
+      Then("the S3 copy method of AWS client should be called")
       verify(s3client).copyObject(any(): CopyObjectRequest)
       verifyNoMoreInteractions(s3client)
     }
@@ -88,11 +88,14 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
     "return error if copying the file failed" in {
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      when(s3client.copyObject(any(), any(), any(), any())).thenThrow(new RuntimeException("exception"))
+      when(s3client.copyObject(any(): CopyObjectRequest)).thenThrow(new RuntimeException("exception"))
       val fileManager = new S3FileManager(s3client, configuration)
 
       When("copying the file is requested")
-      val result = Await.ready(fileManager.copyToOutboundBucket(S3ObjectLocation("inboundBucket", "file")), 2.seconds)
+      val result = Await.ready(
+        fileManager
+          .copyToOutboundBucket(S3ObjectLocation("inboundBucket", "file"), OutboundObjectMetadata(items = Map.empty)),
+        2.seconds)
 
       Then("error is returned")
 
@@ -131,7 +134,8 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       val metadata = Await.result(fileManager.getObjectMetadata(S3ObjectLocation("inboundBucket", "file")), 2.seconds)
 
       Then("metadata is properly returned")
-      metadata shouldBe services.ObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified)
+      metadata shouldBe services
+        .InboundObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified)
     }
 
     "return error if retrieving metadata fails" in {}
@@ -205,8 +209,9 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       val fileManager        = new S3FileManager(s3client, configuration)
 
       When("a call to copy to quarantine is made")
-      val content  = new ByteArrayInputStream("This is a dirty file".getBytes)
-      val metadata = services.ObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified)
+      val content = new ByteArrayInputStream("This is a dirty file".getBytes)
+      val metadata =
+        services.OutboundObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"))
       Await.result(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
 
       Then("a new S3 object with details set as contents and object metadata set should be created")
@@ -231,9 +236,10 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       val fileManager = new S3FileManager(s3client, configuration)
 
       When("a call to copy to quarantine is made")
-      val content  = new ByteArrayInputStream("This is a dirty file".getBytes)
-      val metadata = services.ObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified)
-      val result   = Await.ready(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
+      val content = new ByteArrayInputStream("This is a dirty file".getBytes)
+      val metadata =
+        services.OutboundObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"))
+      val result = Await.ready(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
 
       And("a new S3 object with details set as contents and object metadata set should be created")
       val metadataCaptor: ArgumentCaptor[ObjectMetadata] = ArgumentCaptor.forClass(classOf[ObjectMetadata])

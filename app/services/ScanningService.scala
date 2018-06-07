@@ -16,15 +16,14 @@
 
 package services
 
-import java.time.Instant
 import java.util.concurrent.TimeUnit
 
-import javax.inject.Inject
 import com.kenshoo.play.metrics.Metrics
+import javax.inject.Inject
 import model._
 import play.api.Logger
-import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
+import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetails
 import util.logging.LoggingDetails
 
@@ -41,7 +40,7 @@ class ClamAvScanningService @Inject()(
   override def scan(
     location: S3ObjectLocation,
     fileContent: ObjectContent,
-    metadata: ObjectMetadata): Future[FileCheckingResult] = {
+    metadata: InboundObjectMetadata): Future[FileCheckingResult] = {
     implicit val ld = LoggingDetails.fromS3ObjectLocation(location)
 
     val antivirusClient       = clamClientFactory.getClient()

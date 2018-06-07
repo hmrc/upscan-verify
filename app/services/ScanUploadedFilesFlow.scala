@@ -66,7 +66,7 @@ class ScanUploadedFilesFlow @Inject()(
           metadata       <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))
           scanningResult <- toEitherT(fileCheckingService.check(parsedMessage.location, metadata))
           _              <- toEitherT(addUploadToEndScanMetrics(metadata.uploadedTimestamp, System.currentTimeMillis))
-          instanceSafety <- toEitherT(scanningResultHandler.handleCheckingResult(scanningResult))
+          instanceSafety <- toEitherT(scanningResultHandler.handleCheckingResult(scanningResult, metadata))
           _              <- toEitherT(consumer.confirm(message))
           _              <- toEitherT(terminateIfInstanceNotSafe(instanceSafety))
         } yield ()

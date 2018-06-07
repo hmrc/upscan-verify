@@ -35,7 +35,7 @@ class FileTypeCheckingService @Inject()(
   override def scan(
     location: S3ObjectLocation,
     objectContent: ObjectContent,
-    objectMetadata: ObjectMetadata): Future[FileCheckingResult] = {
+    objectMetadata: InboundObjectMetadata): Future[FileCheckingResult] = {
 
     val startTimeMilliseconds = System.currentTimeMillis()
 

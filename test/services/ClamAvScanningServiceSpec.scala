@@ -39,7 +39,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
   val fileManager = new FileManager {
     override def delete(file: S3ObjectLocation): Future[Unit] = ???
 
-    override def copyToOutboundBucket(file: S3ObjectLocation): Future[Unit] = ???
+    override def copyToOutboundBucket(file: S3ObjectLocation, metadata: OutboundObjectMetadata): Future[Unit] = ???
 
     override def getObjectContent(file: S3ObjectLocation): Future[ObjectContent] = file.objectKey match {
       case "bad-file" => Future.failed(new RuntimeException("File not retrieved"))
@@ -51,11 +51,11 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
     override def writeToQuarantineBucket(
       file: S3ObjectLocation,
       content: InputStream,
-      metadata: ObjectMetadata): Future[Unit] = ???
+      metadata: OutboundObjectMetadata): Future[Unit] = ???
 
-    override def getObjectMetadata(file: S3ObjectLocation): Future[ObjectMetadata] = {
+    override def getObjectMetadata(file: S3ObjectLocation): Future[InboundObjectMetadata] = {
       val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
-      Future.successful(ObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified))
+      Future.successful(InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified))
     }
   }
 
@@ -124,7 +124,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
     }
   }
 
-  private def fetchObject(fileLocation: S3ObjectLocation): (ObjectContent, ObjectMetadata) =
+  private def fetchObject(fileLocation: S3ObjectLocation): (ObjectContent, InboundObjectMetadata) =
     for {
       content  <- fileManager.getObjectContent(fileLocation)
       metadata <- fileManager.getObjectMetadata(fileLocation)

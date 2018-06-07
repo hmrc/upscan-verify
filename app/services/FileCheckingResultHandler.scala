@@ -30,47 +30,55 @@ sealed trait InstanceSafety extends Product with Serializable
 case object SafeToContinue extends InstanceSafety
 case object ShouldTerminate extends InstanceSafety
 
-class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifier: VirusNotifier) {
+class FileCheckingResultHandler @Inject()(
+  fileManager: FileManager,
+  virusNotifier: VirusNotifier,
+  checksumCalculator: ChecksumCalculator) {
 
-  def handleCheckingResult(result: FileCheckingResult): Future[InstanceSafety] = {
+  def handleCheckingResult(result: FileCheckingResult, metadata: InboundObjectMetadata): Future[InstanceSafety] = {
     implicit val ld = LoggingDetails.fromS3ObjectLocation(result.location)
 
     result match {
-      case ValidFileCheckingResult(location)                   => handleValid(location)
-      case FileInfectedCheckingResult(location, details)       => handleInfected(location, details)
-      case IncorrectFileType(location, mime, consumingService) => handleIncorrectType(location, mime, consumingService)
+      case ValidFileCheckingResult(location)             => handleValid(location, metadata)
+      case FileInfectedCheckingResult(location, details) => handleInfected(location, details, metadata)
+      case IncorrectFileType(location, mime, consumingService) =>
+        handleIncorrectType(location, metadata, mime, consumingService)
     }
   }
 
-  private def handleValid(objectLocation: S3ObjectLocation)(implicit ec: ExecutionContext) =
+  private def handleValid(objectLocation: S3ObjectLocation, metadata: InboundObjectMetadata)(
+    implicit ec: ExecutionContext) =
     for {
-      _ <- fileManager.copyToOutboundBucket(objectLocation)
-      _ <- fileManager.delete(objectLocation)
+      checksum <- checksumCalculator.calculateChecksum(objectLocation)
+      _        <- fileManager.copyToOutboundBucket(objectLocation, OutboundObjectMetadata.valid(metadata, checksum))
+      _        <- fileManager.delete(objectLocation)
     } yield SafeToContinue
 
-  private def handleInfected(objectLocation: S3ObjectLocation, details: String)(implicit ec: ExecutionContext) = {
+  private def handleInfected(objectLocation: S3ObjectLocation, details: String, metadata: InboundObjectMetadata)(
+    implicit ec: ExecutionContext) = {
     val fileCheckingError = ErrorMessage(Quarantine, details)
     val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
 
     for {
-      _        <- virusNotifier.notifyFileInfected(objectLocation, details)
-      metadata <- fileManager.getObjectMetadata(objectLocation)
-      _        <- fileManager.writeToQuarantineBucket(objectLocation, objectContent, metadata)
-      _        <- fileManager.delete(objectLocation)
+      _ <- virusNotifier.notifyFileInfected(objectLocation, details)
+      _ <- fileManager.writeToQuarantineBucket(objectLocation, objectContent, OutboundObjectMetadata.invalid(metadata))
+      _ <- fileManager.delete(objectLocation)
     } yield ShouldTerminate
   }
 
-  private def handleIncorrectType(objectLocation: S3ObjectLocation, mimeType: MimeType, serviceName: Option[String])(
-    implicit ec: ExecutionContext) = {
+  private def handleIncorrectType(
+    objectLocation: S3ObjectLocation,
+    metadata: InboundObjectMetadata,
+    mimeType: MimeType,
+    serviceName: Option[String])(implicit ec: ExecutionContext) = {
     val details =
       s"MIME type [${mimeType.value}] is not allowed for service: [${serviceName.getOrElse("No service name provided")}]"
     val fileCheckingError = ErrorMessage(Rejected, details)
     val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
 
     for {
-      metadata <- fileManager.getObjectMetadata(objectLocation)
-      _        <- fileManager.writeToQuarantineBucket(objectLocation, objectContent, metadata)
-      _        <- fileManager.delete(objectLocation)
+      _ <- fileManager.writeToQuarantineBucket(objectLocation, objectContent, OutboundObjectMetadata.invalid(metadata))
+      _ <- fileManager.delete(objectLocation)
     } yield SafeToContinue
   }
 }

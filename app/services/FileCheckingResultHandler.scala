@@ -50,7 +50,7 @@ class FileCheckingResultHandler @Inject()(
     implicit ec: ExecutionContext) =
     for {
       checksum <- checksumCalculator.calculateChecksum(objectLocation)
-      _        <- fileManager.copyToOutboundBucket(objectLocation, OutboundObjectMetadata.valid(metadata, checksum))
+      _        <- fileManager.copyToOutboundBucket(objectLocation, ValidOutboundObjectMetadata(metadata, checksum))
       _        <- fileManager.delete(objectLocation)
     } yield SafeToContinue
 
@@ -61,7 +61,7 @@ class FileCheckingResultHandler @Inject()(
 
     for {
       _ <- virusNotifier.notifyFileInfected(objectLocation, details)
-      _ <- fileManager.writeToQuarantineBucket(objectLocation, objectContent, OutboundObjectMetadata.invalid(metadata))
+      _ <- fileManager.writeToQuarantineBucket(objectLocation, objectContent, InvalidOutboundObjectMetadata(metadata))
       _ <- fileManager.delete(objectLocation)
     } yield ShouldTerminate
   }
@@ -77,7 +77,7 @@ class FileCheckingResultHandler @Inject()(
     val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
 
     for {
-      _ <- fileManager.writeToQuarantineBucket(objectLocation, objectContent, OutboundObjectMetadata.invalid(metadata))
+      _ <- fileManager.writeToQuarantineBucket(objectLocation, objectContent, InvalidOutboundObjectMetadata(metadata))
       _ <- fileManager.delete(objectLocation)
     } yield SafeToContinue
   }

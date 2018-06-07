@@ -29,21 +29,24 @@ case class InboundObjectMetadata(items: Map[String, String], uploadedTimestamp: 
   def consumingService = items.get("consuming-service")
 }
 
-case class OutboundObjectMetadata(items: Map[String, String])
+sealed trait OutboundObjectMetadata {
+  def items: Map[String, String]
+}
 
-object OutboundObjectMetadata {
+case class ValidOutboundObjectMetadata(inboundMetadata: InboundObjectMetadata, checksum: String)
+    extends OutboundObjectMetadata {
 
-  def valid(inboundMetadata: InboundObjectMetadata, checksum: String) = {
-    val lastModified =
-      DateTimeFormatter.ISO_INSTANT.format(inboundMetadata.uploadedTimestamp)
-    val outboundMetadataItems = inboundMetadata.items +
+  lazy val items = {
+    val lastModified = DateTimeFormatter.ISO_INSTANT.format(inboundMetadata.uploadedTimestamp)
+    inboundMetadata.items +
       ("initiate-date" -> lastModified) +
       ("checksum"      -> checksum)
-    OutboundObjectMetadata(outboundMetadataItems)
   }
 
-  def invalid(inboundMetadata: InboundObjectMetadata) =
-    OutboundObjectMetadata(inboundMetadata.items)
+}
+
+case class InvalidOutboundObjectMetadata(inboundMetadata: InboundObjectMetadata) extends OutboundObjectMetadata {
+  lazy val items = inboundMetadata.items
 }
 
 trait ObjectContent {

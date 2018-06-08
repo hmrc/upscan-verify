@@ -46,17 +46,23 @@ import org.apache.commons.io.IOUtils
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{doThrow, verify, verifyNoMoreInteractions, when}
 import org.mockito.{ArgumentCaptor, Mockito}
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Assertions, GivenWhenThen, Matchers}
-import services.{InboundObjectMetadata, ValidOutboundObjectMetadata}
+import services.{InboundObjectMetadata, ObjectContent, ValidOutboundObjectMetadata}
 import uk.gov.hmrc.play.test.UnitSpec
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
-class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen with MockitoSugar {
+class S3FileManagerSpec
+    extends UnitSpec
+    with Matchers
+    with Assertions
+    with GivenWhenThen
+    with MockitoSugar
+    with Eventually {
   private val configuration = mock[ServiceConfiguration]
   when(configuration.outboundBucket).thenReturn("outboundBucket")
   when(configuration.quarantineBucket).thenReturn("quarantineBucket")
@@ -164,10 +170,18 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
 
     "return bytes of a successfully retrieved file" in {
       val fileLocation           = S3ObjectLocation("inboundBucket", "file")
-      val byteArray: Array[Byte] = "Hello World".getBytes
+      val fileContent            = "Hello World"
+      val byteArray: Array[Byte] = fileContent.getBytes
+      var s3ObjectClosed         = false
 
-      val s3Object = new S3Object()
+      val s3Object = new S3Object() {
+        override def close(): Unit = {
+          super.close()
+          s3ObjectClosed = true
+        }
+      }
       s3Object.setObjectContent(new ByteArrayInputStream(byteArray))
+
       val fileMetadata = new ObjectMetadata()
       fileMetadata.setContentLength(byteArray.length)
       s3Object.setObjectMetadata(fileMetadata)
@@ -179,11 +193,51 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       val fileManager = new S3FileManager(s3client, configuration)
 
       When("the bytes are requested")
-      val result = Await.result(fileManager.getObjectContent(fileLocation), 2.seconds)
+      def readingFunction(f: ObjectContent) =
+        Future.successful(IOUtils.toString(f.inputStream, "UTF-8"), f.length)
+      val result = Await.result(fileManager.withObjectContent(fileLocation)(readingFunction), 2.seconds)
 
       Then("expected byte array is returned")
-      result.length                           shouldBe byteArray.length
-      IOUtils.toByteArray(result.inputStream) shouldBe byteArray
+      result shouldBe (fileContent, fileContent.length)
+
+      And("stream has been closed")
+      eventually {
+        s3ObjectClosed shouldBe true
+      }
+    }
+
+    "close the object if file processing failed" in {
+      val fileLocation           = S3ObjectLocation("inboundBucket", "file")
+      val fileContent            = "Hello World"
+      val byteArray: Array[Byte] = fileContent.getBytes
+      var s3ObjectClosed         = false
+
+      val s3Object = new S3Object() {
+        override def close(): Unit = {
+          super.close()
+          s3ObjectClosed = true
+        }
+      }
+      s3Object.setObjectContent(new ByteArrayInputStream(byteArray))
+      val fileMetadata = new ObjectMetadata()
+      fileMetadata.setContentLength(byteArray.length)
+      s3Object.setObjectMetadata(fileMetadata)
+
+      val s3client: AmazonS3 = mock[AmazonS3]
+      when(s3client.getObject(fileLocation.bucket, fileLocation.objectKey)).thenReturn(s3Object)
+
+      Given("a valid file location")
+      val fileManager = new S3FileManager(s3client, configuration)
+
+      When("the file has been read")
+      Await.ready(
+        fileManager.withObjectContent(fileLocation)(_ => Future.failed(new RuntimeException("expected failure"))),
+        2.seconds)
+
+      And("stream has been closed")
+      eventually {
+        s3ObjectClosed shouldBe true
+      }
     }
 
     "return error if file retrieval fails" in {
@@ -199,7 +253,7 @@ class S3FileManagerSpec extends UnitSpec with Matchers with Assertions with Give
       val fileManager = new S3FileManager(s3client, configuration)
 
       When("the bytes are requested")
-      val result = Await.ready(fileManager.getObjectContent(fileLocation), 2.seconds)
+      val result = Await.ready(fileManager.withObjectContent(fileLocation)(Future.successful), 2.seconds)
 
       Then("error is returned")
       ScalaFutures.whenReady(result.failed) { error =>

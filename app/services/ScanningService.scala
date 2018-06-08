@@ -31,10 +31,7 @@ import scala.concurrent.Future
 
 trait ScanningService extends FileChecker
 
-class ClamAvScanningService @Inject()(
-  clamClientFactory: ClamAntiVirusFactory,
-  fileManager: FileManager,
-  metrics: Metrics)
+class ClamAvScanningService @Inject()(clamClientFactory: ClamAntiVirusFactory, metrics: Metrics)
     extends ScanningService {
 
   override def scan(

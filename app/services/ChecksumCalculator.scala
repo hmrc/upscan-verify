@@ -32,10 +32,8 @@ trait ChecksumCalculator {
 class SHA256ChecksumCalculator @Inject()(fileManager: FileManager)(implicit ec: ExecutionContext)
     extends ChecksumCalculator {
   override def calculateChecksum(objectLocation: S3ObjectLocation): Future[String] =
-    for (file <- fileManager.getObjectContent(objectLocation)) yield {
-      val checksum = computeChecksum(file.inputStream)
-      file.close()
-      checksum
+    fileManager.withObjectContent(objectLocation) { content =>
+      Future(computeChecksum(content.inputStream))
     }
 
   private def computeChecksum(objectContent: InputStream): String =

@@ -31,20 +31,12 @@ class FileCheckingService @Inject()(
     scanTheFile(location, objectMetadata).andThenCheck(() => validateFileType(location, objectMetadata))
 
   private def scanTheFile(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata) =
-    for {
-      objectContent  <- fileManager.getObjectContent(location)
-      scanningResult <- virusScanningService.scan(location, objectContent, objectMetadata)
-    } yield {
-      objectContent.close()
-      scanningResult
+    fileManager.withObjectContent(location) { objectContent: ObjectContent =>
+      virusScanningService.scan(location, objectContent, objectMetadata)
     }
 
   private def validateFileType(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata) =
-    for {
-      objectContent  <- fileManager.getObjectContent(location)
-      scanningResult <- fileTypeCheckingService.scan(location, objectContent, objectMetadata)
-    } yield {
-      objectContent.close()
-      scanningResult
+    fileManager.withObjectContent(location) { objectContent: ObjectContent =>
+      fileTypeCheckingService.scan(location, objectContent, objectMetadata)
     }
 }

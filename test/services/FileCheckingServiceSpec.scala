@@ -34,7 +34,7 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
   "File checking service" should {
 
     val location = S3ObjectLocation("bucket", "file")
-    val metadata = ObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)
+    val metadata = InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)
 
     "succeed when virus and file type scanning succedded" in {
       val content = mock[ObjectContent]

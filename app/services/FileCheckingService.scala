@@ -27,10 +27,10 @@ class FileCheckingService @Inject()(
   virusScanningService: ScanningService,
   fileTypeCheckingService: FileTypeCheckingService)(implicit ec: ExecutionContext) {
 
-  def check(location: S3ObjectLocation, objectMetadata: ObjectMetadata): Future[FileCheckingResult] =
+  def check(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata): Future[FileCheckingResult] =
     scanTheFile(location, objectMetadata).andThenCheck(() => validateFileType(location, objectMetadata))
 
-  private def scanTheFile(location: S3ObjectLocation, objectMetadata: ObjectMetadata) =
+  private def scanTheFile(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata) =
     for {
       objectContent  <- fileManager.getObjectContent(location)
       scanningResult <- virusScanningService.scan(location, objectContent, objectMetadata)
@@ -39,7 +39,7 @@ class FileCheckingService @Inject()(
       scanningResult
     }
 
-  private def validateFileType(location: S3ObjectLocation, objectMetadata: ObjectMetadata) =
+  private def validateFileType(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata) =
     for {
       objectContent  <- fileManager.getObjectContent(location)
       scanningResult <- fileTypeCheckingService.scan(location, objectContent, objectMetadata)

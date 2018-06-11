@@ -31,12 +31,6 @@ import util.logging.LoggingDetails
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 
-class S3ObjectContent(override val length: Long, s3Object: S3Object) extends ObjectContent {
-  override def close(): Unit = s3Object.close()
-
-  override def inputStream: InputStream = s3Object.getObjectContent
-}
-
 class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) extends FileManager {
 
   override def copyToOutboundBucket(
@@ -87,14 +81,21 @@ class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) 
     }
   }
 
-  override def getObjectContent(objectLocation: S3ObjectLocation): Future[ObjectContent] = {
+  override def withObjectContent[T](objectLocation: S3ObjectLocation)(
+    function: ObjectContent => Future[T]): Future[T] = {
     implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
 
     Future {
       val fileFromLocation = s3Client.getObject(objectLocation.bucket, objectLocation.objectKey)
+      val content =
+        ObjectContent(fileFromLocation.getObjectContent, fileFromLocation.getObjectMetadata.getContentLength)
       Logger.debug(s"Fetched content for objectKey: [${objectLocation.objectKey}].")
-      new S3ObjectContent(fileFromLocation.getObjectMetadata.getContentLength, fileFromLocation)
-    }
+
+      val result: Future[T] = function(content)
+      result.onComplete(_ => fileFromLocation.close())
+      result
+    }.flatMap(f => f)
+
   }
 
   override def getObjectMetadata(objectLocation: S3ObjectLocation): Future[services.InboundObjectMetadata] = {

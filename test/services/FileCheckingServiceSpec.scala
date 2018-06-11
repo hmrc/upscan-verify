@@ -16,36 +16,59 @@
 
 package services
 
-import java.io.ByteArrayInputStream
+import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
 
 import model.{FileInfectedCheckingResult, IncorrectFileType, S3ObjectLocation, ValidFileCheckingResult}
-import org.mockito.Mockito.{times, verify, verifyZeroInteractions, when}
+import org.mockito.ArgumentMatchers
+import org.mockito.Mockito.{verifyZeroInteractions, when}
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{GivenWhenThen, Matchers}
 import uk.gov.hmrc.play.test.UnitSpec
 
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen with MockitoSugar {
 
   "File checking service" should {
 
+    val content = ObjectContent(new ByteArrayInputStream("TEST".getBytes), "TEST".length)
+
+    val fileManager = new FileManager {
+      override def copyToOutboundBucket(
+        objectLocation: S3ObjectLocation,
+        metadata: OutboundObjectMetadata): Future[Unit] = ???
+
+      override def writeToQuarantineBucket(
+        objectLocation: S3ObjectLocation,
+        content: InputStream,
+        metadata: OutboundObjectMetadata): Future[Unit] = ???
+
+      override def delete(objectLocation: S3ObjectLocation): Future[Unit] = ???
+
+      override def getObjectMetadata(objectLocation: S3ObjectLocation): Future[InboundObjectMetadata] = ???
+
+      override def withObjectContent[T](objectLocation: S3ObjectLocation)(
+        function: ObjectContent => Future[T]): Future[T] =
+        if (objectLocation.objectKey.contains("exception")) {
+          Future.failed(new RuntimeException("Expected exception"))
+        } else {
+          function(content)
+        }
+
+    }
+
     val location = S3ObjectLocation("bucket", "file")
     val metadata = InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)
 
     "succeed when virus and file type scanning succedded" in {
-      val content = mock[ObjectContent]
-      when(content.inputStream).thenReturn(new ByteArrayInputStream(Array.emptyByteArray))
 
-      val fileManager             = mock[FileManager]
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
-      when(fileManager.getObjectContent(location)).thenReturn(Future.successful(content), Future.successful(content))
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(ValidFileCheckingResult(location)))
       when(fileTypeCheckingService.scan(location, content, metadata))
@@ -53,19 +76,14 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
 
       Await.result(fileCheckingService.check(location, metadata), 30.seconds) shouldBe ValidFileCheckingResult(location)
 
-      verify(content, times(2)).close()
     }
 
     "do not check file type if virus found and return virus details" in {
-      val content = mock[ObjectContent]
-      when(content.inputStream).thenReturn(new ByteArrayInputStream(Array.emptyByteArray))
 
-      val fileManager             = mock[FileManager]
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
-      when(fileManager.getObjectContent(location)).thenReturn(Future.successful(content), Future.successful(content))
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(FileInfectedCheckingResult(location, "Virus")))
       when(fileTypeCheckingService.scan(location, content, metadata))
@@ -75,20 +93,15 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
         location,
         "Virus")
 
-      verify(content, times(1)).close()
       verifyZeroInteractions(fileTypeCheckingService)
     }
 
     "return failed file type scanning if virus not found but invalid file type" in {
-      val content = mock[ObjectContent]
-      when(content.inputStream).thenReturn(new ByteArrayInputStream(Array.emptyByteArray))
 
-      val fileManager             = mock[FileManager]
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
-      when(fileManager.getObjectContent(location)).thenReturn(Future.successful(content), Future.successful(content))
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(ValidFileCheckingResult(location)))
       when(fileTypeCheckingService.scan(location, content, metadata))
@@ -101,7 +114,6 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
         Some("valid-test-service")
       )
 
-      verify(content, times(2)).close()
     }
   }
 }

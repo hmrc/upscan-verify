@@ -49,12 +49,7 @@ case class InvalidOutboundObjectMetadata(inboundMetadata: InboundObjectMetadata)
   lazy val items = inboundMetadata.items
 }
 
-trait ObjectContent {
-  def inputStream: InputStream
-  def length: Long
-
-  def close(): Unit
-}
+case class ObjectContent(inputStream: InputStream, length: Long)
 
 trait FileManager {
   def copyToOutboundBucket(objectLocation: S3ObjectLocation, metadata: OutboundObjectMetadata): Future[Unit]
@@ -63,6 +58,7 @@ trait FileManager {
     content: InputStream,
     metadata: OutboundObjectMetadata): Future[Unit]
   def delete(objectLocation: S3ObjectLocation): Future[Unit]
-  def getObjectContent(objectLocation: S3ObjectLocation): Future[ObjectContent]
   def getObjectMetadata(objectLocation: S3ObjectLocation): Future[InboundObjectMetadata]
+
+  def withObjectContent[T](objectLocation: S3ObjectLocation)(function: ObjectContent => Future[T]): Future[T]
 }

@@ -16,7 +16,7 @@
 
 package services
 
-import java.io.{ByteArrayInputStream, InputStream}
+import java.io.ByteArrayInputStream
 import java.time.{LocalDateTime, ZoneOffset}
 
 import com.codahale.metrics.MetricRegistry
@@ -30,34 +30,10 @@ import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
 import uk.gov.hmrc.play.test.UnitSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen with MockitoSugar {
-
-  val fileManager = new FileManager {
-    override def delete(file: S3ObjectLocation): Future[Unit] = ???
-
-    override def copyToOutboundBucket(file: S3ObjectLocation, metadata: OutboundObjectMetadata): Future[Unit] = ???
-
-    override def getObjectContent(file: S3ObjectLocation): Future[ObjectContent] = file.objectKey match {
-      case "bad-file" => Future.failed(new RuntimeException("File not retrieved"))
-      case _ =>
-        val content = "Hello World".getBytes
-        Future.successful(StubObjectContent(new ByteArrayInputStream(content), content.length))
-    }
-
-    override def writeToQuarantineBucket(
-      file: S3ObjectLocation,
-      content: InputStream,
-      metadata: OutboundObjectMetadata): Future[Unit] = ???
-
-    override def getObjectMetadata(file: S3ObjectLocation): Future[InboundObjectMetadata] = {
-      val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
-      Future.successful(InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified))
-    }
-  }
 
   "ClamAvScanningService" should {
 
@@ -75,13 +51,16 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       Mockito.when(factory.getClient()).thenReturn(client)
 
       val metrics         = metricsStub()
-      val scanningService = new ClamAvScanningService(factory, fileManager, metrics)
+      val scanningService = new ClamAvScanningService(factory, metrics)
 
       Given("a file location pointing to a clean file")
       val fileLocation = S3ObjectLocation("inboundBucket", "file")
 
       And("file content with metadata")
-      val (fileContent, fileMetadata) = fetchObject(fileLocation)
+      val content      = "Hello World".getBytes
+      val fileContent  = ObjectContent(new ByteArrayInputStream(content), content.length)
+      val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
+      val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified)
 
       When("scanning service is called")
       val result = Await.result(scanningService.scan(fileLocation, fileContent, fileMetadata), 2.seconds)
@@ -103,13 +82,16 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       Mockito.when(factory.getClient()).thenReturn(client)
 
       val metrics         = metricsStub()
-      val scanningService = new ClamAvScanningService(factory, fileManager, metrics)
+      val scanningService = new ClamAvScanningService(factory, metrics)
 
       Given("a file location pointing to a clean file")
       val fileLocation = S3ObjectLocation("inboundBucket", "file")
 
       And("file content with metadata")
-      val (fileContent, fileMetadata) = fetchObject(fileLocation)
+      val content      = "Hello World".getBytes
+      val fileContent  = ObjectContent(new ByteArrayInputStream(content), content.length)
+      val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
+      val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified)
 
       When("scanning service is called")
       val result = Await.result(scanningService.scan(fileLocation, fileContent, fileMetadata), 2.seconds)
@@ -124,9 +106,4 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
     }
   }
 
-  private def fetchObject(fileLocation: S3ObjectLocation): (ObjectContent, InboundObjectMetadata) =
-    for {
-      content  <- fileManager.getObjectContent(fileLocation)
-      metadata <- fileManager.getObjectMetadata(fileLocation)
-    } yield (content, metadata)
 }

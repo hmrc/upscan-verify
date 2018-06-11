@@ -16,7 +16,7 @@
 
 package services
 
-import java.io.ByteArrayInputStream
+import java.io.{ByteArrayInputStream, InputStream}
 
 import model._
 import org.mockito.Mockito.when
@@ -31,37 +31,55 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class SHA256ChecksumCalculatorSpec extends UnitSpec with GivenWhenThen with MockitoSugar {
 
   "SHA256ChecksumCalculator" should {
-    "return checksum if loading file succeeds" in {
 
-      val fileManager = mock[FileManager]
+    val fileManager = new FileManager {
+      override def copyToOutboundBucket(
+        objectLocation: S3ObjectLocation,
+        metadata: OutboundObjectMetadata): Future[Unit] = ???
+
+      override def writeToQuarantineBucket(
+        objectLocation: S3ObjectLocation,
+        content: InputStream,
+        metadata: OutboundObjectMetadata): Future[Unit] = ???
+
+      override def delete(objectLocation: S3ObjectLocation): Future[Unit] = ???
+
+      override def getObjectMetadata(objectLocation: S3ObjectLocation): Future[InboundObjectMetadata] = ???
+
+      override def withObjectContent[T](objectLocation: S3ObjectLocation)(
+        function: ObjectContent => Future[T]): Future[T] =
+        if (objectLocation.objectKey.contains("exception")) {
+          Future.failed(new RuntimeException("Expected exception"))
+        } else {
+          val stubContent = s"contentOfDocument$objectLocation".getBytes
+          val stubObject  = ObjectContent(new ByteArrayInputStream(stubContent), stubContent.length)
+          function(stubObject)
+        }
+
+    }
+
+    "return checksum if loading file succeeds" in {
 
       val checksumCalculationService = new SHA256ChecksumCalculator(fileManager)
 
       Given("there is a file on S3")
 
-      val location    = S3ObjectLocation("inbound-bucket", "valid-file")
-      val fileContent = StubObjectContent(new ByteArrayInputStream("TEST".getBytes), 4L)
-
-      when(fileManager.getObjectContent(objectLocation = location)).thenReturn(Future.successful(fileContent))
+      val location = S3ObjectLocation("inbound-bucket", "valid-file")
 
       When("the file is checked")
       val result: String = Await.result(checksumCalculationService.calculateChecksum(location), 2.seconds)
 
       Then("a valid result should be returned")
-      result shouldBe "94ee059335e587e501cc4bf90613e0814f00a7b08bc7c648fd865a2af6a22cc2"
+      result shouldBe "396f101dd52e8b2ace0dcf5ed09b1d1f030e608938510ce46e7a5c7a4e775100"
     }
 
     "return failure if loading the file fails" in {
-      val fileManager = mock[FileManager]
 
       val checksumCalculationService = new SHA256ChecksumCalculator(fileManager)
 
       Given("fetching the file from S3 fails")
 
-      val location = S3ObjectLocation("inbound-bucket", "valid-file")
-
-      when(fileManager.getObjectContent(objectLocation = location))
-        .thenReturn(Future.failed(new Exception("Expected exception")))
+      val location = S3ObjectLocation("inbound-bucket", "exception")
 
       When("the file is checked")
       val calculationResult = checksumCalculationService.calculateChecksum(location)

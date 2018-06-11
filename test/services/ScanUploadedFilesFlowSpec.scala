@@ -62,8 +62,6 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       when(queueConsumer.confirm(any())).thenReturn(Future.successful(()))
 
       val fileManager = mock[FileManager]
-      when(fileManager.getObjectContent(s3object))
-        .thenReturn(Future.successful(StubObjectContent(mock[InputStream], 0)))
 
       val inboundObjectMetadata =
         InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)

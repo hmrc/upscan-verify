@@ -16,6 +16,8 @@
 
 package services
 
+import java.io.ByteArrayInputStream
+
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Assertions, GivenWhenThen, Matchers}
 import uk.gov.hmrc.play.test.UnitSpec
@@ -32,11 +34,18 @@ class TikaFileTypeCheckingSpec extends UnitSpec with Matchers with Assertions wi
     }
 
     "properly detect JPEG file" in {
-      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.jpg"), None) shouldBe MimeType("image/jpeg")
+      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.jpg"), None) shouldBe MimeType(
+        "image/jpeg")
+    }
+
+    "properly handle empty file" in {
+      tikaFileTypeDetector.detectType(new ByteArrayInputStream(Array.emptyByteArray), None) shouldBe MimeType(
+        "application/octet-stream")
     }
 
     "properly detect PNG file" in {
-      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.png"), None) shouldBe MimeType("image/png")
+      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.png"), None) shouldBe MimeType(
+        "image/png")
     }
 
     "properly detect PDF file" in {

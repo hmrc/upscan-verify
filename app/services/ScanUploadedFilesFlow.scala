@@ -67,8 +67,7 @@ class ScanUploadedFilesFlow @Inject()(
         for {
           metadata       <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))
           scanningResult <- toEitherT(fileCheckingService.check(parsedMessage.location, metadata))
-          _              <- toEitherT(addUploadToEndScanMetrics(metadata.uploadedTimestamp, System.currentTimeMillis))
-          _              <- toEitherT(addUploadToStartProcessMetrics(metadata.uploadedTimestamp, messageProcessingStartTime))
+          _              <- toEitherT(addMetrics(metadata.uploadedTimestamp, messageProcessingStartTime, System.currentTimeMillis))
           instanceSafety <- toEitherT(scanningResultHandler.handleCheckingResult(scanningResult, metadata))
           _              <- toEitherT(consumer.confirm(message))
           _              <- toEitherT(terminateIfInstanceNotSafe(instanceSafety))
@@ -105,6 +104,22 @@ class ScanUploadedFilesFlow @Inject()(
         .recover { case error: Exception => Left(ExceptionWithContext(error, context)) }
     EitherT(futureEither)
   }
+
+  private def addMetrics(
+    uploadedTimestamp: Instant,
+    startTimeMilliseconds: Long,
+    endTimeMilliseconds: Long): Future[Unit] =
+    for {
+      _ <- addUploadToStartProcessMetrics(uploadedTimestamp, startTimeMilliseconds)
+      _ <- addUploadToEndScanMetrics(uploadedTimestamp, endTimeMilliseconds)
+      _ <- addInternalProcessMetrics(startTimeMilliseconds, endTimeMilliseconds)
+    } yield ()
+
+  private def addInternalProcessMetrics(startTimeMilliseconds: Long, endTimeMilliseconds: Long): Future[Unit] =
+    Future.successful {
+      val interval = endTimeMilliseconds - startTimeMilliseconds
+      metrics.defaultRegistry.timer("upscanVerifyProcessing").update(interval, TimeUnit.MILLISECONDS)
+    }
 
   private def addUploadToStartProcessMetrics(uploadedTimestamp: Instant, startTimeMilliseconds: Long): Future[Unit] =
     Future.successful {

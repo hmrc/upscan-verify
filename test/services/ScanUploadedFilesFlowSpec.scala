@@ -98,7 +98,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object), inboundObjectMetadata)
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 1
+      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 1
+      metrics.defaultRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 1
 
       And("successfully processed messages are confirmed")
       verify(queueConsumer).confirm(validMessage)
@@ -151,7 +152,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
         .handleCheckingResult(FileInfectedCheckingResult(s3object, "Virus name"), inboundObjectMetadata)
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 1
+      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 1
+      metrics.defaultRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 1
 
       And("successfully processed messages are confirmed")
       And("instance is terminated")
@@ -229,7 +231,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).confirm(validMessage2)
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 2
+      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 2
+      metrics.defaultRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 2
 
       And("invalid messages are not confirmed")
       verifyNoMoreInteractions(queueConsumer)
@@ -300,7 +303,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).confirm(validMessage3)
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 2
+      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 2
+      metrics.defaultRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 2
 
       And("invalid messages are not confirmed")
       verifyNoMoreInteractions(queueConsumer)
@@ -389,7 +393,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verifyNoMoreInteractions(fileCheckingService, scanningResultHandler, queueConsumer, instanceTerminator)
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size() shouldBe 2
+      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 2
+      metrics.defaultRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 2
     }
   }
 }

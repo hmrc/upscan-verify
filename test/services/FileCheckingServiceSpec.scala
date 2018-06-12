@@ -19,7 +19,7 @@ package services
 import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
 
-import model.{FileInfectedCheckingResult, IncorrectFileType, S3ObjectLocation, ValidFileCheckingResult}
+import model._
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.{verifyZeroInteractions, when}
 import org.scalatest.mockito.MockitoSugar
@@ -70,11 +70,12 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(ValidFileCheckingResult(location)))
+        .thenReturn(Future.successful(FileCheckingResultWithChecksum(ValidFileCheckingResult(location), "CHECKSUM")))
       when(fileTypeCheckingService.scan(location, content, metadata))
         .thenReturn(Future.successful(ValidFileCheckingResult(location)))
 
-      Await.result(fileCheckingService.check(location, metadata), 30.seconds) shouldBe ValidFileCheckingResult(location)
+      Await.result(fileCheckingService.check(location, metadata), 30.seconds) shouldBe
+        FileCheckingResultWithChecksum(ValidFileCheckingResult(location), "CHECKSUM")
 
     }
 
@@ -85,13 +86,14 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(FileInfectedCheckingResult(location, "Virus")))
+        .thenReturn(
+          Future.successful(FileCheckingResultWithChecksum(FileInfectedCheckingResult(location, "Virus"), "CHECKSUM")))
       when(fileTypeCheckingService.scan(location, content, metadata))
         .thenReturn(Future.successful(ValidFileCheckingResult(location)))
 
-      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe FileInfectedCheckingResult(
-        location,
-        "Virus")
+      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe FileCheckingResultWithChecksum(
+        FileInfectedCheckingResult(location, "Virus"),
+        "CHECKSUM")
 
       verifyZeroInteractions(fileTypeCheckingService)
     }
@@ -103,16 +105,18 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(ValidFileCheckingResult(location)))
+        .thenReturn(Future.successful(FileCheckingResultWithChecksum(ValidFileCheckingResult(location), "CHECKSUM")))
       when(fileTypeCheckingService.scan(location, content, metadata))
         .thenReturn(
           Future.successful(IncorrectFileType(location, MimeType("application/xml"), Some("valid-test-service"))))
 
-      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe IncorrectFileType(
-        location,
-        MimeType("application/xml"),
-        Some("valid-test-service")
-      )
+      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe FileCheckingResultWithChecksum(
+        IncorrectFileType(
+          location,
+          MimeType("application/xml"),
+          Some("valid-test-service")
+        ),
+        "CHECKSUM")
 
     }
   }

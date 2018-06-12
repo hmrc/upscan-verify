@@ -16,17 +16,21 @@
 
 package services
 
-import java.io.ByteArrayInputStream
+import java.io.{ByteArrayInputStream, InputStream}
 import java.time.{LocalDateTime, ZoneOffset}
 
 import com.codahale.metrics.MetricRegistry
 import com.kenshoo.play.metrics.Metrics
-import model.{FileInfectedCheckingResult, S3ObjectLocation, ValidFileCheckingResult}
+import model.{FileCheckingResultWithChecksum, FileInfectedCheckingResult, S3ObjectLocation, ValidFileCheckingResult}
+import org.apache.commons.codec.digest.DigestUtils
+import org.apache.commons.io.IOUtils
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
+import org.mockito.invocation.InvocationOnMock
+import org.mockito.stubbing.Answer
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Assertions, GivenWhenThen, Matchers}
-import uk.gov.hmrc.clamav.model.{Clean, Infected}
+import uk.gov.hmrc.clamav.model.{Clean, Infected, ScanningResult}
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
 import uk.gov.hmrc.play.test.UnitSpec
 
@@ -45,7 +49,15 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
 
     "return success if file can be retrieved and scan result clean" in {
       val client = mock[ClamAntiVirus]
-      Mockito.when(client.sendAndCheck(any(), any())(any())).thenReturn(Future.successful(Clean))
+      Mockito
+        .when(client.sendAndCheck(any(), any())(any()))
+        .thenAnswer(new Answer[Future[ScanningResult]] {
+          override def answer(invocationOnMock: InvocationOnMock): Future[ScanningResult] = {
+            IOUtils
+              .toByteArray(invocationOnMock.getArgument(0).asInstanceOf[InputStream]) //reading the file in order to populate MD5
+            Future.successful(Clean)
+          }
+        })
 
       val factory = mock[ClamAntiVirusFactory]
       Mockito.when(factory.getClient()).thenReturn(client)
@@ -57,16 +69,17 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val fileLocation = S3ObjectLocation("inboundBucket", "file")
 
       And("file content with metadata")
-      val content      = "Hello World".getBytes
-      val fileContent  = ObjectContent(new ByteArrayInputStream(content), content.length)
-      val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
-      val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified)
+      val content          = "Hello World".getBytes
+      val expectedChecksum = DigestUtils.sha256Hex(content)
+      val fileContent      = ObjectContent(new ByteArrayInputStream(content), content.length)
+      val lastModified     = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
+      val fileMetadata     = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified)
 
       When("scanning service is called")
       val result = Await.result(scanningService.scan(fileLocation, fileContent, fileMetadata), 2.seconds)
 
       Then("a scanning clean result should be returned")
-      result shouldBe ValidFileCheckingResult(fileLocation)
+      result shouldBe FileCheckingResultWithChecksum(ValidFileCheckingResult(fileLocation), expectedChecksum)
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 1
@@ -76,7 +89,15 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
 
     "return infected if file can be retrieved and scan result infected" in {
       val client = mock[ClamAntiVirus]
-      Mockito.when(client.sendAndCheck(any(), any())(any())).thenReturn(Future.successful(Infected("File dirty")))
+      Mockito
+        .when(client.sendAndCheck(any(), any())(any()))
+        .thenAnswer(new Answer[Future[ScanningResult]] {
+          override def answer(invocationOnMock: InvocationOnMock): Future[ScanningResult] = {
+            IOUtils
+              .toByteArray(invocationOnMock.getArgument(0).asInstanceOf[InputStream]) //reading the file in order to populate MD5
+            Future.successful(Infected("File dirty"))
+          }
+        })
 
       val factory = mock[ClamAntiVirusFactory]
       Mockito.when(factory.getClient()).thenReturn(client)
@@ -88,16 +109,19 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val fileLocation = S3ObjectLocation("inboundBucket", "file")
 
       And("file content with metadata")
-      val content      = "Hello World".getBytes
-      val fileContent  = ObjectContent(new ByteArrayInputStream(content), content.length)
-      val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
-      val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified)
+      val content          = "Hello World".getBytes
+      val expectedChecksum = DigestUtils.sha256Hex(content)
+      val fileContent      = ObjectContent(new ByteArrayInputStream(content), content.length)
+      val lastModified     = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
+      val fileMetadata     = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified)
 
       When("scanning service is called")
       val result = Await.result(scanningService.scan(fileLocation, fileContent, fileMetadata), 2.seconds)
 
       Then("a scanning infected result should be returned")
-      result shouldBe FileInfectedCheckingResult(fileLocation, "File dirty")
+      result shouldBe FileCheckingResultWithChecksum(
+        FileInfectedCheckingResult(fileLocation, "File dirty"),
+        expectedChecksum)
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 0

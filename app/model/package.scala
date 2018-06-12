@@ -36,11 +36,14 @@ sealed trait FileCheckingResult {
     }
 }
 
-object FileCheckingResult {
+case class FileCheckingResultWithChecksum(result: FileCheckingResult, checksum: String)
 
-  implicit class FutureFileCheckingResult(origin: Future[FileCheckingResult]) {
-    def andThenCheck(f: () => Future[FileCheckingResult])(implicit ec: ExecutionContext): Future[FileCheckingResult] =
-      origin.flatMap(result => result.andThen(f))
+object FileCheckingResultWithChecksum {
+
+  implicit class FutureFileCheckingResult(origin: Future[FileCheckingResultWithChecksum]) {
+    def andThenCheck(f: () => Future[FileCheckingResult])(
+      implicit ec: ExecutionContext): Future[FileCheckingResultWithChecksum] =
+      origin.flatMap(result => result.result.andThen(f).map(FileCheckingResultWithChecksum(_, result.checksum)))
   }
 }
 

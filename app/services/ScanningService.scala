@@ -16,14 +16,11 @@
 
 package services
 
-import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
-import java.util.zip.{CheckedInputStream, Checksum}
 
 import com.kenshoo.play.metrics.Metrics
 import javax.inject.Inject
 import model._
-import org.apache.commons.codec.binary.Hex
 import play.api.Logger
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
@@ -51,43 +48,23 @@ class ClamAvScanningService @Inject()(clamClientFactory: ClamAntiVirusFactory, m
     val antivirusClient       = clamClientFactory.getClient()
     val startTimeMilliseconds = System.currentTimeMillis()
 
-    val checksum = new Checksum {
-
-      private val digest = MessageDigest.getInstance("SHA-256")
-
-      override def update(i: Int): Unit =
-        digest.update(i.toByte)
-
-      override def update(bytes: Array[Byte], i: Int, i1: Int): Unit =
-        digest.update(bytes, i, i1)
-
-      override def getValue: Long = ???
-
-      override def reset(): Unit =
-        digest.reset()
-
-      def getChecksum() = Hex.encodeHexString(digest.digest())
-
-    }
-    val inputStream = new CheckedInputStream(fileContent.inputStream, checksum)
+    val inputStream = new MessageDigestComputingInputStream(fileContent.inputStream, "SHA-256")
 
     for {
       scanResult <- antivirusClient.sendAndCheck(inputStream, fileContent.length.toInt) map {
-                     case result if result == Clean =>
+                     case Clean =>
                        metrics.defaultRegistry.counter("cleanFileUpload").inc()
-                       FileCheckingResultWithChecksum(ValidFileCheckingResult(location), checksum.getChecksum())
-                     case result @ Infected(message) =>
+                       ValidFileCheckingResult(location)
+                     case Infected(message) =>
                        Logger.warn(s"File is infected: [$message].")
                        metrics.defaultRegistry.counter("quarantineFileUpload").inc()
-                       FileCheckingResultWithChecksum(
-                         FileInfectedCheckingResult(location, message),
-                         checksum.getChecksum())
+                       FileInfectedCheckingResult(location, message)
                    }
 
     } yield {
       val endTimeMilliseconds = System.currentTimeMillis()
       addScanningTimeMetrics(startTimeMilliseconds, endTimeMilliseconds)
-      scanResult
+      FileCheckingResultWithChecksum(scanResult, inputStream.getChecksum())
     }
   }
 

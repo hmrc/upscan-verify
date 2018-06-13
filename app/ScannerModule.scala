@@ -32,7 +32,6 @@ class ScannerModule extends Module {
       bind[FileManager].to[S3FileManager],
       bind[InstanceTerminator].to[Ec2InstanceTerminator],
       bind[VirusNotifier].toInstance(LoggingVirusNotifier),
-      bind[FileTypeDetector].to[TikaFileTypeDetector],
-      bind[ChecksumCalculator].to[SHA256ChecksumCalculator]
+      bind[FileTypeDetector].to[TikaFileTypeDetector]
     )
 }

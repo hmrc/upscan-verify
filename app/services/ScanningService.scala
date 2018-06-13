@@ -36,7 +36,10 @@ trait ScanningService {
     objectMetadata: InboundObjectMetadata): Future[FileCheckingResultWithChecksum]
 }
 
-class ClamAvScanningService @Inject()(clamClientFactory: ClamAntiVirusFactory, metrics: Metrics)
+class ClamAvScanningService @Inject()(
+  clamClientFactory: ClamAntiVirusFactory,
+  messageDigestComputingInputStreamFactory: ChecksumComputingInputStreamFactory,
+  metrics: Metrics)
     extends ScanningService {
 
   override def scan(
@@ -48,7 +51,7 @@ class ClamAvScanningService @Inject()(clamClientFactory: ClamAntiVirusFactory, m
     val antivirusClient       = clamClientFactory.getClient()
     val startTimeMilliseconds = System.currentTimeMillis()
 
-    val inputStream = new MessageDigestComputingInputStream(fileContent.inputStream, "SHA-256")
+    val inputStream = messageDigestComputingInputStreamFactory.create(fileContent.inputStream)
 
     for {
       scanResult <- antivirusClient.sendAndCheck(inputStream, fileContent.length.toInt) map {

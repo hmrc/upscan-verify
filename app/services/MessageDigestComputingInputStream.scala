@@ -21,8 +21,22 @@ import java.security.MessageDigest
 
 import org.apache.commons.codec.binary.Hex
 
+trait ChecksumComputingInputStreamFactory {
+  def create(source: InputStream): InputStream with ChecksumSource
+}
+
+object SHA256ChecksumComputingInputStreamFactory extends ChecksumComputingInputStreamFactory {
+  def create(source: InputStream): InputStream with ChecksumSource =
+    new MessageDigestComputingInputStream(source, "SHA-256")
+}
+
+trait ChecksumSource {
+  def getChecksum(): String
+}
+
 class MessageDigestComputingInputStream(inputStream: InputStream, digestType: String)
-    extends FilterInputStream(inputStream) {
+    extends FilterInputStream(inputStream)
+    with ChecksumSource {
 
   val digest = MessageDigest.getInstance(digestType)
 

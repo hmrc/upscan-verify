@@ -70,7 +70,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
       val fileCheckingService = mock[FileCheckingService]
       when(fileCheckingService.check(any(), any()))
-        .thenReturn(Future.successful(ValidFileCheckingResult(s3object)))
+        .thenReturn(Future.successful(FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object), "CHECKSUM")))
 
       val scanningResultHandler = mock[FileCheckingResultHandler]
       when(scanningResultHandler.handleCheckingResult(any(), any())).thenReturn(Future.successful(SafeToContinue))
@@ -95,7 +95,9 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).poll()
 
       And("scanning result handler is called")
-      verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object), inboundObjectMetadata)
+      verify(scanningResultHandler).handleCheckingResult(
+        FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object), "CHECKSUM"),
+        inboundObjectMetadata)
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 1
@@ -122,7 +124,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
       val fileCheckingService = mock[FileCheckingService]
       when(fileCheckingService.check(any(), any()))
-        .thenReturn(Future.successful(FileInfectedCheckingResult(s3object, "Virus name")))
+        .thenReturn(Future.successful(
+          FileCheckingResultWithChecksum(FileInfectedCheckingResult(s3object, "Virus name"), "CHECKSUM")))
 
       val scanningResultHandler = mock[FileCheckingResultHandler]
       when(scanningResultHandler.handleCheckingResult(any(), any())).thenReturn(Future.successful(ShouldTerminate))
@@ -150,7 +153,9 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
       And("scanning result handler is called")
       verify(scanningResultHandler)
-        .handleCheckingResult(FileInfectedCheckingResult(s3object, "Virus name"), inboundObjectMetadata)
+        .handleCheckingResult(
+          FileCheckingResultWithChecksum(FileInfectedCheckingResult(s3object, "Virus name"), "CHECKSUM"),
+          inboundObjectMetadata)
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 1
@@ -188,17 +193,23 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
       val fileCheckingService = mock[FileCheckingService]
       when(fileCheckingService.check(meq(s3object1), any()))
-        .thenReturn(Future.successful(ValidFileCheckingResult(s3object1)))
+        .thenReturn(Future.successful(FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object1), "CHECKSUM")))
       when(fileCheckingService.check(meq(s3object3), any()))
-        .thenReturn(Future.successful(FileInfectedCheckingResult(s3object3, "infection")))
+        .thenReturn(Future.successful(
+          FileCheckingResultWithChecksum(FileInfectedCheckingResult(s3object3, "infection"), "CHECKSUM")))
 
       val scanningResultHandler = mock[FileCheckingResultHandler]
-      when(scanningResultHandler.handleCheckingResult(ValidFileCheckingResult(s3object1), inboundObjectMetadata))
+      when(
+        scanningResultHandler.handleCheckingResult(
+          FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object1), "CHECKSUM"),
+          inboundObjectMetadata))
         .thenReturn(Future.successful(SafeToContinue))
 
       when(
         scanningResultHandler
-          .handleCheckingResult(FileInfectedCheckingResult(s3object3, "infection"), inboundObjectMetadata))
+          .handleCheckingResult(
+            FileCheckingResultWithChecksum(FileInfectedCheckingResult(s3object3, "infection"), "CHECKSUM"),
+            inboundObjectMetadata))
         .thenReturn(Future.successful(ShouldTerminate))
 
       val instanceTerminator = mock[InstanceTerminator]
@@ -223,9 +234,13 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).poll()
 
       And("notification service is called only for valid messages")
-      verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object1), inboundObjectMetadata)
+      verify(scanningResultHandler).handleCheckingResult(
+        FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object1), "CHECKSUM"),
+        inboundObjectMetadata)
       verify(scanningResultHandler)
-        .handleCheckingResult(FileInfectedCheckingResult(s3object3, "infection"), inboundObjectMetadata)
+        .handleCheckingResult(
+          FileCheckingResultWithChecksum(FileInfectedCheckingResult(s3object3, "infection"), "CHECKSUM"),
+          inboundObjectMetadata)
       verifyNoMoreInteractions(scanningResultHandler)
 
       And("successfully processed messages are confirmed")
@@ -266,12 +281,13 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
       val fileCheckingService = mock[FileCheckingService]
       when(fileCheckingService.check(meq(s3object1), any()))
-        .thenReturn(Future.successful(ValidFileCheckingResult(s3object1)))
+        .thenReturn(Future.successful(FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object1), "CHECKSUM")))
       when(fileCheckingService.check(meq(s3object2), any()))
         .thenReturn(Future.failed(new Exception("Planned exception")))
 
       when(fileCheckingService.check(meq(s3object3), any()))
-        .thenReturn(Future.successful(FileInfectedCheckingResult(s3object3, "infection")))
+        .thenReturn(Future.successful(
+          FileCheckingResultWithChecksum(FileInfectedCheckingResult(s3object3, "infection"), "CHECKSUM")))
 
       val scanningResultHandler = mock[FileCheckingResultHandler]
       when(scanningResultHandler.handleCheckingResult(any(), any())).thenReturn(Future.successful(SafeToContinue))
@@ -296,9 +312,13 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).poll()
 
       And("scanning handler is called only for successfully scanned messages")
-      verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object1), inboundObjectMetadata)
+      verify(scanningResultHandler).handleCheckingResult(
+        FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object1), "CHECKSUM"),
+        inboundObjectMetadata)
       verify(scanningResultHandler)
-        .handleCheckingResult(FileInfectedCheckingResult(s3object3, "infection"), inboundObjectMetadata)
+        .handleCheckingResult(
+          FileCheckingResultWithChecksum(FileInfectedCheckingResult(s3object3, "infection"), "CHECKSUM"),
+          inboundObjectMetadata)
       verifyNoMoreInteractions(scanningResultHandler)
 
       And("successfully processed messages are confirmed")
@@ -351,14 +371,20 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
       val fileCheckingService = mock[FileCheckingService]
       when(fileCheckingService.check(meq(s3object1), any()))
-        .thenReturn(Future.successful(ValidFileCheckingResult(s3object1)))
+        .thenReturn(Future.successful(FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object1), "CHECKSUM")))
       when(fileCheckingService.check(meq(s3object3), any()))
-        .thenReturn(Future.successful(ValidFileCheckingResult(s3object3)))
+        .thenReturn(Future.successful(FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object3), "CHECKSUM")))
 
       val scanningResultHandler = mock[FileCheckingResultHandler]
-      when(scanningResultHandler.handleCheckingResult(ValidFileCheckingResult(s3object1), metadata1))
+      when(
+        scanningResultHandler.handleCheckingResult(
+          FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object1), "CHECKSUM"),
+          metadata1))
         .thenReturn(Future.successful(SafeToContinue))
-      when(scanningResultHandler.handleCheckingResult(ValidFileCheckingResult(s3object3), metadata3))
+      when(
+        scanningResultHandler.handleCheckingResult(
+          FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object3), "CHECKSUM"),
+          metadata3))
         .thenReturn(Future.successful(SafeToContinue))
 
       val instanceTerminator = mock[InstanceTerminator]
@@ -384,8 +410,10 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(fileCheckingService).check(meq(s3object1), any())
       verify(fileCheckingService).check(meq(s3object3), any())
 
-      verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object1), metadata1)
-      verify(scanningResultHandler).handleCheckingResult(ValidFileCheckingResult(s3object3), metadata3)
+      verify(scanningResultHandler)
+        .handleCheckingResult(FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object1), "CHECKSUM"), metadata1)
+      verify(scanningResultHandler)
+        .handleCheckingResult(FileCheckingResultWithChecksum(ValidFileCheckingResult(s3object3), "CHECKSUM"), metadata3)
 
       verify(queueConsumer).confirm(validMessage1)
       verify(queueConsumer).confirm(validMessage3)

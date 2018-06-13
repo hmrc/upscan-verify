@@ -29,26 +29,36 @@ import util.logging.LoggingDetails
 
 import scala.concurrent.Future
 
-trait ScanningService extends FileChecker
+trait ScanningService {
+  def scan(
+    location: S3ObjectLocation,
+    objectContent: ObjectContent,
+    objectMetadata: InboundObjectMetadata): Future[FileCheckingResultWithChecksum]
+}
 
-class ClamAvScanningService @Inject()(clamClientFactory: ClamAntiVirusFactory, metrics: Metrics)
+class ClamAvScanningService @Inject()(
+  clamClientFactory: ClamAntiVirusFactory,
+  messageDigestComputingInputStreamFactory: ChecksumComputingInputStreamFactory,
+  metrics: Metrics)
     extends ScanningService {
 
   override def scan(
     location: S3ObjectLocation,
     fileContent: ObjectContent,
-    metadata: InboundObjectMetadata): Future[FileCheckingResult] = {
+    metadata: InboundObjectMetadata): Future[FileCheckingResultWithChecksum] = {
     implicit val ld = LoggingDetails.fromS3ObjectLocation(location)
 
     val antivirusClient       = clamClientFactory.getClient()
     val startTimeMilliseconds = System.currentTimeMillis()
 
+    val inputStream = messageDigestComputingInputStreamFactory.create(fileContent.inputStream)
+
     for {
-      scanResult <- antivirusClient.sendAndCheck(fileContent.inputStream, fileContent.length.toInt) map {
-                     case result if result == Clean =>
+      scanResult <- antivirusClient.sendAndCheck(inputStream, fileContent.length.toInt) map {
+                     case Clean =>
                        metrics.defaultRegistry.counter("cleanFileUpload").inc()
                        ValidFileCheckingResult(location)
-                     case result @ Infected(message) =>
+                     case Infected(message) =>
                        Logger.warn(s"File is infected: [$message].")
                        metrics.defaultRegistry.counter("quarantineFileUpload").inc()
                        FileInfectedCheckingResult(location, message)
@@ -57,7 +67,7 @@ class ClamAvScanningService @Inject()(clamClientFactory: ClamAntiVirusFactory, m
     } yield {
       val endTimeMilliseconds = System.currentTimeMillis()
       addScanningTimeMetrics(startTimeMilliseconds, endTimeMilliseconds)
-      scanResult
+      FileCheckingResultWithChecksum(scanResult, inputStream.getChecksum())
     }
   }
 

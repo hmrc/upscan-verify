@@ -33,6 +33,6 @@ class ScannerModule extends Module {
       bind[InstanceTerminator].to[Ec2InstanceTerminator],
       bind[VirusNotifier].toInstance(LoggingVirusNotifier),
       bind[FileTypeDetector].to[TikaFileTypeDetector],
-      bind[ChecksumCalculator].to[SHA256ChecksumCalculator]
+      bind[ChecksumComputingInputStreamFactory].toInstance(SHA256ChecksumComputingInputStreamFactory)
     )
 }

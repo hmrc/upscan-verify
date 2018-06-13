@@ -36,13 +36,7 @@ sealed trait FileCheckingResult {
     }
 }
 
-object FileCheckingResult {
-
-  implicit class FutureFileCheckingResult(origin: Future[FileCheckingResult]) {
-    def andThenCheck(f: () => Future[FileCheckingResult])(implicit ec: ExecutionContext): Future[FileCheckingResult] =
-      origin.flatMap(result => result.andThen(f))
-  }
-}
+case class FileCheckingResultWithChecksum(checkingResult: FileCheckingResult, checksum: String)
 
 case class ValidFileCheckingResult(location: S3ObjectLocation) extends FileCheckingResult
 

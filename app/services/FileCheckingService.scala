@@ -27,8 +27,11 @@ class FileCheckingService @Inject()(
   virusScanningService: ScanningService,
   fileTypeCheckingService: FileTypeCheckingService)(implicit ec: ExecutionContext) {
 
-  def check(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata): Future[FileCheckingResult] =
-    scanTheFile(location, objectMetadata).andThenCheck(() => validateFileType(location, objectMetadata))
+  def check(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata): Future[FileCheckingResultWithChecksum] =
+    for {
+      FileCheckingResultWithChecksum(virusScanningResult, checksum) <- scanTheFile(location, objectMetadata)
+      fileTypeValidationResult                                      <- virusScanningResult.andThen(() => validateFileType(location, objectMetadata))
+    } yield FileCheckingResultWithChecksum(fileTypeValidationResult, checksum)
 
   private def scanTheFile(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata) =
     fileManager.withObjectContent(location) { objectContent: ObjectContent =>

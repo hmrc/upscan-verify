@@ -43,19 +43,24 @@ class MessageDigestComputingInputStream(inputStream: InputStream, digestType: St
   }
 
   override def skip(count: Long): Long = {
-    val buf            = new Array[Byte](512)
-    var totalRetrieved = 0L
-    var eof            = false
-    while (totalRetrieved < count && !eof) {
-      val toRetrieve   = count - totalRetrieved
-      val nowRetrieved = read(buf, 0, if (toRetrieve < buf.length.toLong) toRetrieve.toInt else buf.length).toLong
-      if (nowRetrieved == -1L) {
-        eof = true
+    val readBuffer = new Array[Byte](512)
+
+    @scala.annotation.tailrec
+    def skipByReading(skippedSoFar: Long): Long = {
+      val remaining = count - skippedSoFar
+      if (remaining > 0) {
+        val nowRetrieved = read(readBuffer, 0, Math.min(remaining, readBuffer.length).toInt)
+        if (nowRetrieved == -1L) {
+          skippedSoFar
+        } else {
+          skipByReading(skippedSoFar + nowRetrieved)
+        }
       } else {
-        totalRetrieved += toRetrieve
+        skippedSoFar
       }
     }
-    totalRetrieved
+
+    skipByReading(0)
   }
 
   override def reset() = {

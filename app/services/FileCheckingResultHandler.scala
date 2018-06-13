@@ -35,7 +35,7 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifie
   def handleCheckingResult(
     result: FileCheckingResultWithChecksum,
     metadata: InboundObjectMetadata): Future[InstanceSafety] = {
-    implicit val ld = LoggingDetails.fromS3ObjectLocation(result.result.location)
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(result.checkingResult.location)
 
     result match {
       case FileCheckingResultWithChecksum(ValidFileCheckingResult(location), checksum) =>

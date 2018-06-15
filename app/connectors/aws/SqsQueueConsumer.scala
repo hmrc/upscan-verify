@@ -51,6 +51,7 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS, configuration: ServiceCon
     val receiveMessageRequest = new ReceiveMessageRequest(configuration.inboundQueueUrl)
       .withMaxNumberOfMessages(configuration.processingBatchSize)
       .withWaitTimeSeconds(20)
+      .withAttributeNames("All")
 
     val receiveMessageResult: Future[ReceiveMessageResult] =
       Future(sqsClient.receiveMessage(receiveMessageRequest))

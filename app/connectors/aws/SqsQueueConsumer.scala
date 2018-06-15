@@ -51,12 +51,14 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS, configuration: ServiceCon
     val receiveMessageRequest = new ReceiveMessageRequest(configuration.inboundQueueUrl)
       .withMaxNumberOfMessages(configuration.processingBatchSize)
       .withWaitTimeSeconds(20)
+      .withAttributeNames("All")
 
     val receiveMessageResult: Future[ReceiveMessageResult] =
       Future(sqsClient.receiveMessage(receiveMessageRequest))
 
     receiveMessageResult map { result =>
       result.getMessages.asScala.toList.map { sqsMessage =>
+        sqsMessage
         if (Logger.isDebugEnabled) {
           Logger.debug(
             s"Received message with id: [${sqsMessage.getMessageId}] and receiptHandle: [${sqsMessage.getReceiptHandle}], message details:\n "

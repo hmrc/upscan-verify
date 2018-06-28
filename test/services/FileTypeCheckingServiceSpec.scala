@@ -63,10 +63,11 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       val checkingService = new FileTypeCheckingService(detector, configuration, metrics)
 
       When("the file is checked")
-      val result: FileCheckingResult = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
+      val result: Either[FileValidationFailure, FileAllowed] =
+        Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
       Then("a valid result should be returned")
-      result shouldBe ValidFileCheckingResult(location)
+      result shouldBe Right(FileAllowed(MimeType("application/pdf")))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 1
@@ -97,10 +98,10 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       val checkingService = new FileTypeCheckingService(detector, configuration, metrics)
 
       When("the file is checked")
-      val result: FileCheckingResult = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
+      val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
       Then("an incorrect file type result should be returned")
-      result shouldBe IncorrectFileType(location, fileMimeType, Some("valid-test-service"))
+      result shouldBe Left(IncorrectFileType(fileMimeType, Some("valid-test-service")))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 0
@@ -131,10 +132,10 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       val checkingService = new FileTypeCheckingService(detector, configuration, metrics)
 
       When("the file is checked")
-      val result: FileCheckingResult = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
+      val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
       Then("an incorrect file type result should be returned")
-      result shouldBe IncorrectFileType(location, fileMimeType, None)
+      result shouldBe Left(IncorrectFileType(fileMimeType, None))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 0

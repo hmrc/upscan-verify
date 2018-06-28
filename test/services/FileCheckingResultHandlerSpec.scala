@@ -45,9 +45,11 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       Given("there is a clean file")
       val file             = S3ObjectLocation("bucket", "file")
       val expectedChecksum = "1234567890"
+      val expectedMimeType = MimeType("application/xml")
 
-      val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
-      val outboundObjectMetadata = ValidOutboundObjectMetadata(inboundObjectMetadata, expectedChecksum)
+      val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
+      val outboundObjectMetadata =
+        ValidOutboundObjectMetadata(inboundObjectMetadata, expectedChecksum, expectedMimeType)
 
       when(fileManager.copyToOutboundBucket(ArgumentMatchers.eq(file), any())).thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
@@ -55,7 +57,8 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       When("when processing scanning result")
       Await.result(
         handler.handleCheckingResult(
-          FileCheckingResultWithChecksum(ValidFileCheckingResult(file), expectedChecksum),
+          file,
+          Right(FileValidationSuccess(expectedChecksum, expectedMimeType)),
           inboundObjectMetadata),
         10 seconds)
 
@@ -77,6 +80,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       Given("there is a clean file")
       val file             = S3ObjectLocation("bucket", "file")
       val expectedChecksum = "1234567890"
+      val expectedMimeType = MimeType("application/xml")
 
       And("copying the file would fail")
       when(fileManager.copyToOutboundBucket(ArgumentMatchers.eq(file), any()))
@@ -87,13 +91,16 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val result =
         Await.ready(
           handler.handleCheckingResult(
-            FileCheckingResultWithChecksum(ValidFileCheckingResult(file), expectedChecksum),
+            file,
+            Right(FileValidationSuccess(expectedChecksum, expectedMimeType)),
             inboundObjectMetadata),
           10 seconds)
 
       Then("original file shoudln't be deleted from inbound bucket")
       verify(fileManager)
-        .copyToOutboundBucket(file, ValidOutboundObjectMetadata(inboundObjectMetadata, expectedChecksum))
+        .copyToOutboundBucket(
+          file,
+          ValidOutboundObjectMetadata(inboundObjectMetadata, expectedChecksum, expectedMimeType))
       verifyNoMoreInteractions(fileManager)
 
       And("the whole process fails")
@@ -111,9 +118,11 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       Given("there is a clean file")
       val file             = S3ObjectLocation("bucket", "file")
       val expectedChecksum = "1234567890"
+      val expectedMimeType = MimeType("application/xml")
 
-      val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
-      val outboundObjectMetadata = ValidOutboundObjectMetadata(inboundObjectMetadata, expectedChecksum)
+      val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
+      val outboundObjectMetadata =
+        ValidOutboundObjectMetadata(inboundObjectMetadata, expectedChecksum, expectedMimeType)
 
       when(fileManager.copyToOutboundBucket(file, outboundObjectMetadata)).thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.failed(new RuntimeException("Expected failure")))
@@ -122,7 +131,8 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val result =
         Await.ready(
           handler.handleCheckingResult(
-            FileCheckingResultWithChecksum(ValidFileCheckingResult(file), expectedChecksum),
+            file,
+            Right(FileValidationSuccess(expectedChecksum, expectedMimeType)),
             inboundObjectMetadata),
           10 seconds)
 
@@ -152,11 +162,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
       When("scanning infected file")
-      Await.result(
-        handler.handleCheckingResult(
-          FileCheckingResultWithChecksum(FileInfectedCheckingResult(file, details), "XX"),
-          inboundObjectMetadata),
-        10 seconds)
+      Await.result(handler.handleCheckingResult(file, Left(FileInfected(details)), inboundObjectMetadata), 10 seconds)
 
       Then("notification is created")
       verify(virusNotifier).notifyFileInfected(file, details)
@@ -195,9 +201,8 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       When("scanning infected file")
       val result =
         Await.ready(
-          handler.handleCheckingResult(
-            FileCheckingResultWithChecksum(FileInfectedCheckingResult(file, "There is a virus"), expectedChecksum),
-            inboundObjectMetadata),
+          handler
+            .handleCheckingResult(file, Left(FileInfected("There is a virus")), inboundObjectMetadata),
           10 seconds
         )
 
@@ -227,9 +232,8 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       When("when processing scanning result")
       val result =
         Await.ready(
-          handler.handleCheckingResult(
-            FileCheckingResultWithChecksum(FileInfectedCheckingResult(file, "There is a virus"), "XX"),
-            inboundObjectMetadata),
+          handler
+            .handleCheckingResult(file, Left(FileInfected("There is a virus")), inboundObjectMetadata),
           10 seconds
         )
 
@@ -261,7 +265,8 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
         .result(
           handler
             .handleCheckingResult(
-              FileCheckingResultWithChecksum(IncorrectFileType(file, mimeType, Some("valid-test-service")), "XX"),
+              file,
+              Left(IncorrectFileType(mimeType, Some("valid-test-service"))),
               inboundObjectMetadata),
           10.seconds
         )
@@ -309,7 +314,8 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
         Await.ready(
           handler
             .handleCheckingResult(
-              FileCheckingResultWithChecksum(IncorrectFileType(file, mimeType, Some("valid-test-service")), "XX"),
+              file,
+              Left(IncorrectFileType(mimeType, Some("valid-test-service"))),
               inboundObjectMetadata),
           10.seconds
         )

@@ -29,11 +29,13 @@ import util.logging.LoggingDetails
 
 import scala.concurrent.Future
 
+case class NoVirusFound(checksum: String)
+
 trait ScanningService {
   def scan(
     location: S3ObjectLocation,
     objectContent: ObjectContent,
-    objectMetadata: InboundObjectMetadata): Future[FileCheckingResultWithChecksum]
+    objectMetadata: InboundObjectMetadata): Future[Either[FileValidationFailure, NoVirusFound]]
 }
 
 class ClamAvScanningService @Inject()(
@@ -45,7 +47,7 @@ class ClamAvScanningService @Inject()(
   override def scan(
     location: S3ObjectLocation,
     fileContent: ObjectContent,
-    metadata: InboundObjectMetadata): Future[FileCheckingResultWithChecksum] = {
+    metadata: InboundObjectMetadata): Future[Either[FileInfected, NoVirusFound]] = {
     implicit val ld = LoggingDetails.fromS3ObjectLocation(location)
 
     val antivirusClient       = clamClientFactory.getClient()
@@ -57,17 +59,17 @@ class ClamAvScanningService @Inject()(
       scanResult <- antivirusClient.sendAndCheck(inputStream, fileContent.length.toInt) map {
                      case Clean =>
                        metrics.defaultRegistry.counter("cleanFileUpload").inc()
-                       ValidFileCheckingResult(location)
+                       Right(NoVirusFound(inputStream.getChecksum()))
                      case Infected(message) =>
                        Logger.warn(s"File is infected: [$message].")
                        metrics.defaultRegistry.counter("quarantineFileUpload").inc()
-                       FileInfectedCheckingResult(location, message)
+                       Left(FileInfected(message))
                    }
 
     } yield {
       val endTimeMilliseconds = System.currentTimeMillis()
       addScanningTimeMetrics(startTimeMilliseconds, endTimeMilliseconds)
-      FileCheckingResultWithChecksum(scanResult, inputStream.getChecksum())
+      scanResult
     }
   }
 

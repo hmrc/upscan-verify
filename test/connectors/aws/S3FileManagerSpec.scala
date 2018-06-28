@@ -49,7 +49,7 @@ import org.mockito.{ArgumentCaptor, Mockito}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Assertions, GivenWhenThen, Matchers}
-import services.{InboundObjectMetadata, ObjectContent, ValidOutboundObjectMetadata}
+import services.{InboundObjectMetadata, MimeType, ObjectContent, ValidOutboundObjectMetadata}
 import uk.gov.hmrc.play.test.UnitSpec
 
 import scala.collection.JavaConverters._
@@ -81,7 +81,8 @@ class S3FileManagerSpec
       val fileManager = new S3FileManager(s3client, configuration)
       val metadata = ValidOutboundObjectMetadata(
         InboundObjectMetadata(items = Map.empty, uploadedTimestamp = Instant.now()),
-        "checksum")
+        "checksum",
+        MimeType("application/xml"))
 
       When("copying the file is requested")
       Await.result(
@@ -105,7 +106,11 @@ class S3FileManagerSpec
         fileManager
           .copyToOutboundBucket(
             S3ObjectLocation("inboundBucket", "file"),
-            ValidOutboundObjectMetadata(InboundObjectMetadata(items = Map.empty, Instant.now()), "CHECKSUM")),
+            ValidOutboundObjectMetadata(
+              InboundObjectMetadata(items = Map.empty, Instant.now()),
+              "CHECKSUM",
+              MimeType("application/xml"))
+          ),
         2.seconds
       )
 
@@ -275,7 +280,8 @@ class S3FileManagerSpec
         InboundObjectMetadata(
           items             = Map("callbackUrl" -> "http://some.callback.url"),
           uploadedTimestamp = Instant.now()),
-        "checksum")
+        "checksum",
+        MimeType("application/xml"))
 
       Await.result(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
 
@@ -300,7 +306,8 @@ class S3FileManagerSpec
         InboundObjectMetadata(
           items             = Map("callbackUrl" -> "http://some.callback.url"),
           uploadedTimestamp = Instant.now()),
-        "checksum")
+        "checksum",
+        MimeType("application/xml"))
 
       val result = Await.ready(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
 

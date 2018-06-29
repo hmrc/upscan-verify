@@ -70,12 +70,13 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(FileCheckingResultWithChecksum(ValidFileCheckingResult(location), "CHECKSUM")))
+        .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM"))))
+
       when(fileTypeCheckingService.scan(location, content, metadata))
-        .thenReturn(Future.successful(ValidFileCheckingResult(location)))
+        .thenReturn(Future.successful(Right(FileAllowed(MimeType("application/xml")))))
 
       Await.result(fileCheckingService.check(location, metadata), 30.seconds) shouldBe
-        FileCheckingResultWithChecksum(ValidFileCheckingResult(location), "CHECKSUM")
+        Right(FileValidationSuccess("CHECKSUM", MimeType("application/xml")))
 
     }
 
@@ -86,14 +87,11 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(
-          Future.successful(FileCheckingResultWithChecksum(FileInfectedCheckingResult(location, "Virus"), "CHECKSUM")))
+        .thenReturn(Future.successful(Left(FileInfected("Virus"))))
       when(fileTypeCheckingService.scan(location, content, metadata))
-        .thenReturn(Future.successful(ValidFileCheckingResult(location)))
+        .thenReturn(Future.successful(Right(FileAllowed(MimeType("application/xml")))))
 
-      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe FileCheckingResultWithChecksum(
-        FileInfectedCheckingResult(location, "Virus"),
-        "CHECKSUM")
+      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe Left(FileInfected("Virus"))
 
       verifyZeroInteractions(fileTypeCheckingService)
     }
@@ -105,18 +103,16 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(FileCheckingResultWithChecksum(ValidFileCheckingResult(location), "CHECKSUM")))
-      when(fileTypeCheckingService.scan(location, content, metadata))
-        .thenReturn(
-          Future.successful(IncorrectFileType(location, MimeType("application/xml"), Some("valid-test-service"))))
+        .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM"))))
 
-      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe FileCheckingResultWithChecksum(
+      when(fileTypeCheckingService.scan(location, content, metadata))
+        .thenReturn(Future.successful(Left(IncorrectFileType(MimeType("application/xml"), Some("valid-test-service")))))
+
+      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe Left(
         IncorrectFileType(
-          location,
           MimeType("application/xml"),
           Some("valid-test-service")
-        ),
-        "CHECKSUM")
+        ))
 
     }
   }

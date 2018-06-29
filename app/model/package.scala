@@ -26,24 +26,11 @@ case class Message(id: String, body: String, receiptHandle: String)
 case class S3ObjectLocation(bucket: String, objectKey: String)
 case class FileUploadEvent(location: S3ObjectLocation)
 
-sealed trait FileCheckingResult {
-  val location: S3ObjectLocation
+case class FileValidationSuccess(checksum: String, mimeType: MimeType)
 
-  def andThen(f: () => Future[FileCheckingResult]): Future[FileCheckingResult] =
-    this match {
-      case v: ValidFileCheckingResult   => f()
-      case i: InvalidFileCheckingResult => Future.successful(i)
-    }
-}
-
-case class FileCheckingResultWithChecksum(checkingResult: FileCheckingResult, checksum: String)
-
-case class ValidFileCheckingResult(location: S3ObjectLocation) extends FileCheckingResult
-
-sealed trait InvalidFileCheckingResult extends FileCheckingResult
-case class FileInfectedCheckingResult(location: S3ObjectLocation, details: String) extends InvalidFileCheckingResult
-case class IncorrectFileType(location: S3ObjectLocation, typeFound: MimeType, consumingService: Option[String])
-    extends InvalidFileCheckingResult
+sealed trait FileValidationFailure
+case class FileInfected(details: String) extends FileValidationFailure
+case class IncorrectFileType(typeFound: MimeType, consumingService: Option[String]) extends FileValidationFailure
 
 case class AllowedMimeTypes(serviceName: String, allowedMimeTypes: List[String])
 

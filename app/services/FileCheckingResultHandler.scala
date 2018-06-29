@@ -33,24 +33,28 @@ case object ShouldTerminate extends InstanceSafety
 class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifier: VirusNotifier) {
 
   def handleCheckingResult(
-    result: FileCheckingResultWithChecksum,
+    location: S3ObjectLocation,
+    result: Either[FileValidationFailure, FileValidationSuccess],
     metadata: InboundObjectMetadata): Future[InstanceSafety] = {
-    implicit val ld = LoggingDetails.fromS3ObjectLocation(result.checkingResult.location)
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(location)
 
     result match {
-      case FileCheckingResultWithChecksum(ValidFileCheckingResult(location), checksum) =>
-        handleValid(location, metadata, checksum)
-      case FileCheckingResultWithChecksum(FileInfectedCheckingResult(location, details), _) =>
+      case Right(FileValidationSuccess(checksum, mimeType)) =>
+        handleValid(location, metadata, checksum, mimeType)
+      case Left(FileInfected(details)) =>
         handleInfected(location, details, metadata)
-      case FileCheckingResultWithChecksum(IncorrectFileType(location, mime, consumingService), _) =>
+      case Left(IncorrectFileType(mime, consumingService)) =>
         handleIncorrectType(location, metadata, mime, consumingService)
     }
   }
 
-  private def handleValid(objectLocation: S3ObjectLocation, metadata: InboundObjectMetadata, checksum: String)(
-    implicit ec: ExecutionContext) =
+  private def handleValid(
+    objectLocation: S3ObjectLocation,
+    metadata: InboundObjectMetadata,
+    checksum: String,
+    mimeType: MimeType)(implicit ec: ExecutionContext) =
     for {
-      _ <- fileManager.copyToOutboundBucket(objectLocation, ValidOutboundObjectMetadata(metadata, checksum))
+      _ <- fileManager.copyToOutboundBucket(objectLocation, ValidOutboundObjectMetadata(metadata, checksum, mimeType))
       _ <- fileManager.delete(objectLocation)
     } yield SafeToContinue
 

@@ -16,8 +16,10 @@
 
 package services
 
+import cats._
+import cats.implicits._
+import cats.data.EitherT
 import javax.inject.Inject
-
 import model._
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -27,11 +29,15 @@ class FileCheckingService @Inject()(
   virusScanningService: ScanningService,
   fileTypeCheckingService: FileTypeCheckingService)(implicit ec: ExecutionContext) {
 
-  def check(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata): Future[FileCheckingResultWithChecksum] =
-    for {
-      FileCheckingResultWithChecksum(virusScanningResult, checksum) <- scanTheFile(location, objectMetadata)
-      fileTypeValidationResult                                      <- virusScanningResult.andThen(() => validateFileType(location, objectMetadata))
-    } yield FileCheckingResultWithChecksum(fileTypeValidationResult, checksum)
+  def check(
+    location: S3ObjectLocation,
+    objectMetadata: InboundObjectMetadata): Future[Either[FileValidationFailure, FileValidationSuccess]] =
+    (for {
+      virusScanningResult      <- EitherT(scanTheFile(location, objectMetadata))
+      fileTypeValidationResult <- EitherT(validateFileType(location, objectMetadata))
+    } yield {
+      FileValidationSuccess(virusScanningResult.checksum, fileTypeValidationResult.mimeType)
+    }).value
 
   private def scanTheFile(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata) =
     fileManager.withObjectContent(location) { objectContent: ObjectContent =>
@@ -42,4 +48,5 @@ class FileCheckingService @Inject()(
     fileManager.withObjectContent(location) { objectContent: ObjectContent =>
       fileTypeCheckingService.scan(location, objectContent, objectMetadata)
     }
+
 }

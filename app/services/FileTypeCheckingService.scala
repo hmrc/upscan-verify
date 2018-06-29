@@ -17,25 +17,26 @@
 package services
 
 import java.util.concurrent.TimeUnit
+
 import javax.inject.Inject
 import com.kenshoo.play.metrics.Metrics
 import play.api.Logger
-
 import config.ServiceConfiguration
-import model.{FileCheckingResult, IncorrectFileType, S3ObjectLocation, ValidFileCheckingResult}
+import model._
 
 import scala.concurrent.{ExecutionContext, Future}
+
+case class FileAllowed(mimeType: MimeType)
 
 class FileTypeCheckingService @Inject()(
   fileTypeDetector: FileTypeDetector,
   serviceConfiguration: ServiceConfiguration,
-  metrics: Metrics)(implicit ec: ExecutionContext)
-    extends FileChecker {
+  metrics: Metrics)(implicit ec: ExecutionContext) {
 
-  override def scan(
+  def scan(
     location: S3ObjectLocation,
     objectContent: ObjectContent,
-    objectMetadata: InboundObjectMetadata): Future[FileCheckingResult] = {
+    objectMetadata: InboundObjectMetadata): Future[Either[FileValidationFailure, FileAllowed]] = {
 
     val startTimeMilliseconds = System.currentTimeMillis()
 
@@ -46,10 +47,10 @@ class FileTypeCheckingService @Inject()(
 
     if (isAllowedMimeType(fileType, location, consumingService)) {
       metrics.defaultRegistry.counter("validTypeFileUpload").inc()
-      Future.successful(ValidFileCheckingResult(location))
+      Future.successful(Right(FileAllowed(fileType)))
     } else {
       metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
-      Future.successful(IncorrectFileType(location, fileType, consumingService))
+      Future.successful(Left(IncorrectFileType(fileType, consumingService)))
     }
   }
 

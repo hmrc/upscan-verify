@@ -24,6 +24,12 @@ import model.S3ObjectLocation
 
 import scala.concurrent.Future
 
+case class InboundObjectDetails(
+  metadata: InboundObjectMetadata,
+  clientIp: String,
+  location: S3ObjectLocation
+)
+
 case class InboundObjectMetadata(items: Map[String, String], uploadedTimestamp: Instant) {
   def originalFilename = items.get("original-filename")
   def consumingService = items.get("consuming-service")
@@ -33,7 +39,11 @@ sealed trait OutboundObjectMetadata {
   def items: Map[String, String]
 }
 
-case class ValidOutboundObjectMetadata(inboundMetadata: InboundObjectMetadata, checksum: String, mimeType: MimeType)
+case class ValidOutboundObjectMetadata(
+  inboundMetadata: InboundObjectMetadata,
+  checksum: String,
+  mimeType: MimeType,
+  clientIp: String)
     extends OutboundObjectMetadata {
 
   lazy val items = {
@@ -41,13 +51,15 @@ case class ValidOutboundObjectMetadata(inboundMetadata: InboundObjectMetadata, c
     inboundMetadata.items +
       ("initiate-date" -> lastModified) +
       ("checksum"      -> checksum) +
-      ("mime-type"     -> mimeType.value)
+      ("mime-type"     -> mimeType.value) +
+      ("client-ip"     -> clientIp)
   }
 
 }
 
-case class InvalidOutboundObjectMetadata(inboundMetadata: InboundObjectMetadata) extends OutboundObjectMetadata {
-  lazy val items = inboundMetadata.items
+case class InvalidOutboundObjectMetadata(inboundMetadata: InboundObjectMetadata, clientIp: String)
+    extends OutboundObjectMetadata {
+  lazy val items = inboundMetadata.items + ("client-ip" -> clientIp)
 }
 
 case class ObjectContent(inputStream: InputStream, length: Long)

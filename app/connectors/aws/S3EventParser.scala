@@ -37,13 +37,20 @@ class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessagePars
     awsRegion: String,
     eventTime: String,
     eventName: String,
+    requestParameters: RequestParameters,
     s3: S3Details)
+
+  case class RequestParameters(
+    sourceIPAddress: String
+  )
 
   case class S3Details(bucketName: String, objectKey: String)
 
   implicit val s3reads: Reads[S3Details] =
     ((JsPath \ "bucket" \ "name").read[String] and
       (JsPath \ "object" \ "key").read[String])(S3Details.apply _)
+
+  implicit val requestParametersReads: Reads[RequestParameters] = Json.reads[RequestParameters]
 
   implicit val reads: Reads[S3EventNotificationRecord] = Json.reads[S3EventNotificationRecord]
 
@@ -66,10 +73,12 @@ class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessagePars
 
   private def interpretS3EventMessage(result: S3EventNotification): Future[FileUploadEvent] =
     result.records match {
-      case S3EventNotificationRecord(_, "aws:s3", _, _, ObjectCreatedEventPattern(), s3Details) :: Nil => {
+      case S3EventNotificationRecord(_, "aws:s3", _, _, ObjectCreatedEventPattern(), requestParameters, s3Details) :: Nil => {
         import org.slf4j.MDC
 
-        val event = FileUploadEvent(S3ObjectLocation(s3Details.bucketName, s3Details.objectKey))
+        val event = FileUploadEvent(
+          S3ObjectLocation(s3Details.bucketName, s3Details.objectKey),
+          requestParameters.sourceIPAddress)
         // Can't rely on MdcLoggingExecutionContext to add file-reference to the MDC, in the code below,
         // because we don't already have the file-reference value when the thread begins executing.
         // Therefore add file-reference to the MDC manually. This should be the only part of the code where we need to

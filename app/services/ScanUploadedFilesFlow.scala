@@ -65,10 +65,11 @@ class ScanUploadedFilesFlow @Inject()(
         implicit val context = Some(MessageContext(LoggingDetails.fromS3ObjectLocation(parsedMessage.location)))
 
         for {
-          metadata       <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))
+          metadata <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))
+          inboundObjectDetails = InboundObjectDetails(metadata, parsedMessage.clientIp, parsedMessage.location)
           scanningResult <- toEitherT(fileCheckingService.check(parsedMessage.location, metadata))
           _              <- toEitherT(addMetrics(metadata.uploadedTimestamp, messageProcessingStartTime, System.currentTimeMillis))
-          instanceSafety <- toEitherT(scanningResultHandler.handleCheckingResult(parsedMessage.location, scanningResult, metadata))
+          instanceSafety <- toEitherT(scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult))
           _              <- toEitherT(consumer.confirm(message))
           _              <- toEitherT(terminateIfInstanceNotSafe(instanceSafety))
         } yield ()

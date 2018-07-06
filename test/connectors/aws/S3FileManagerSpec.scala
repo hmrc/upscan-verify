@@ -82,7 +82,8 @@ class S3FileManagerSpec
       val metadata = ValidOutboundObjectMetadata(
         InboundObjectMetadata(items = Map.empty, uploadedTimestamp = Instant.now()),
         "checksum",
-        MimeType("application/xml"))
+        MimeType("application/xml"),
+        "127.0.0.1")
 
       When("copying the file is requested")
       Await.result(
@@ -109,7 +110,8 @@ class S3FileManagerSpec
             ValidOutboundObjectMetadata(
               InboundObjectMetadata(items = Map.empty, Instant.now()),
               "CHECKSUM",
-              MimeType("application/xml"))
+              MimeType("application/xml"),
+              "127.0.0.1")
           ),
         2.seconds
       )
@@ -281,7 +283,9 @@ class S3FileManagerSpec
           items             = Map("callbackUrl" -> "http://some.callback.url"),
           uploadedTimestamp = Instant.now()),
         "checksum",
-        MimeType("application/xml"))
+        MimeType("application/xml"),
+        "127.0.0.1"
+      )
 
       Await.result(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
 
@@ -307,7 +311,9 @@ class S3FileManagerSpec
           items             = Map("callbackUrl" -> "http://some.callback.url"),
           uploadedTimestamp = Instant.now()),
         "checksum",
-        MimeType("application/xml"))
+        MimeType("application/xml"),
+        "127.0.0.1"
+      )
 
       val result = Await.ready(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
 

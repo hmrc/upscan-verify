@@ -33,56 +33,59 @@ case object ShouldTerminate extends InstanceSafety
 class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifier: VirusNotifier) {
 
   def handleCheckingResult(
-    location: S3ObjectLocation,
-    result: Either[FileValidationFailure, FileValidationSuccess],
-    metadata: InboundObjectMetadata): Future[InstanceSafety] = {
-    implicit val ld = LoggingDetails.fromS3ObjectLocation(location)
+    objectDetails: InboundObjectDetails,
+    result: Either[FileValidationFailure, FileValidationSuccess]): Future[InstanceSafety] = {
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(objectDetails.location)
 
     result match {
       case Right(FileValidationSuccess(checksum, mimeType)) =>
-        handleValid(location, metadata, checksum, mimeType)
-      case Left(FileInfected(details)) =>
-        handleInfected(location, details, metadata)
+        handleValid(objectDetails, checksum, mimeType)
+      case Left(FileInfected(errorMessage)) =>
+        handleInfected(objectDetails, errorMessage)
       case Left(IncorrectFileType(mime, consumingService)) =>
-        handleIncorrectType(location, metadata, mime, consumingService)
+        handleIncorrectType(objectDetails, mime, consumingService)
     }
   }
 
-  private def handleValid(
-    objectLocation: S3ObjectLocation,
-    metadata: InboundObjectMetadata,
-    checksum: String,
-    mimeType: MimeType)(implicit ec: ExecutionContext) =
+  private def handleValid(details: InboundObjectDetails, checksum: String, mimeType: MimeType)(
+    implicit ec: ExecutionContext) =
     for {
-      _ <- fileManager.copyToOutboundBucket(objectLocation, ValidOutboundObjectMetadata(metadata, checksum, mimeType))
-      _ <- fileManager.delete(objectLocation)
+      _ <- fileManager
+            .copyToOutboundBucket(
+              details.location,
+              ValidOutboundObjectMetadata(details.metadata, checksum, mimeType, details.clientIp))
+      _ <- fileManager.delete(details.location)
     } yield SafeToContinue
 
-  private def handleInfected(objectLocation: S3ObjectLocation, details: String, metadata: InboundObjectMetadata)(
-    implicit ec: ExecutionContext) = {
-    val fileCheckingError = ErrorMessage(Quarantine, details)
+  private def handleInfected(details: InboundObjectDetails, errorMessage: String)(implicit ec: ExecutionContext) = {
+    val fileCheckingError = ErrorMessage(Quarantine, errorMessage)
     val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
 
     for {
-      _ <- virusNotifier.notifyFileInfected(objectLocation, details)
-      _ <- fileManager.writeToQuarantineBucket(objectLocation, objectContent, InvalidOutboundObjectMetadata(metadata))
-      _ <- fileManager.delete(objectLocation)
+      _ <- virusNotifier.notifyFileInfected(details.location, errorMessage)
+      _ <- fileManager
+            .writeToQuarantineBucket(
+              details.location,
+              objectContent,
+              InvalidOutboundObjectMetadata(details.metadata, details.clientIp))
+      _ <- fileManager.delete(details.location)
     } yield ShouldTerminate
   }
 
-  private def handleIncorrectType(
-    objectLocation: S3ObjectLocation,
-    metadata: InboundObjectMetadata,
-    mimeType: MimeType,
-    serviceName: Option[String])(implicit ec: ExecutionContext) = {
-    val details =
+  private def handleIncorrectType(details: InboundObjectDetails, mimeType: MimeType, serviceName: Option[String])(
+    implicit ec: ExecutionContext) = {
+    val errorMessage =
       s"MIME type [${mimeType.value}] is not allowed for service: [${serviceName.getOrElse("No service name provided")}]"
-    val fileCheckingError = ErrorMessage(Rejected, details)
+    val fileCheckingError = ErrorMessage(Rejected, errorMessage)
     val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
 
     for {
-      _ <- fileManager.writeToQuarantineBucket(objectLocation, objectContent, InvalidOutboundObjectMetadata(metadata))
-      _ <- fileManager.delete(objectLocation)
+      _ <- fileManager
+            .writeToQuarantineBucket(
+              details.location,
+              objectContent,
+              InvalidOutboundObjectMetadata(details.metadata, details.clientIp))
+      _ <- fileManager.delete(details.location)
     } yield SafeToContinue
   }
 }

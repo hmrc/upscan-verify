@@ -32,14 +32,16 @@ class S3EventMessageParserSpec extends UnitSpec with Matchers {
     "properly parse valid S3 event message" in {
 
       Await.result(parser.parse(Message("ID", sampleMessage, "HANDLE")), 2 seconds) shouldBe FileUploadEvent(
-        S3ObjectLocation("hmrc-upscan-live-transient", "acabd94b-4d74-4b04-a0ca-1914950f9c02"))
+        S3ObjectLocation("hmrc-upscan-live-transient", "acabd94b-4d74-4b04-a0ca-1914950f9c02"),
+        "127.0.0.1")
 
     }
 
     "properly parse valid S3 event message triggered by copying object between buckets" in {
 
       Await.result(parser.parse(Message("ID", sampleCopyMessage, "HANDLE")), 2 seconds) shouldBe FileUploadEvent(
-        S3ObjectLocation("fus-outbound-759b74ce43947f5f4c91aeddc3e5bad3", "16d77f7a-1f42-4bc2-aa7c-3e1b57b75b26"))
+        S3ObjectLocation("fus-outbound-759b74ce43947f5f4c91aeddc3e5bad3", "16d77f7a-1f42-4bc2-aa7c-3e1b57b75b26"),
+        "127.0.0.1")
 
     }
 
@@ -77,7 +79,7 @@ class S3EventMessageParserSpec extends UnitSpec with Matchers {
                         |        "principalId": "AWS:AIDAIIELOEELZHP2AGCQU"
                         |      },
                         |      "requestParameters": {
-                        |        "sourceIPAddress": "someIp"
+                        |        "sourceIPAddress": "127.0.0.1"
                         |      },
                         |      "responseElements": {
                         |        "x-amz-request-id": "119DF70CC1EA8B55",
@@ -121,7 +123,7 @@ class S3EventMessageParserSpec extends UnitSpec with Matchers {
       |        "principalId": "AWS:AROAI3II5VHGEMGMCYKJ2:botocore-session-1521558860"
       |      },
       |      "requestParameters": {
-      |        "sourceIPAddress": "someIP"
+      |        "sourceIPAddress": "127.0.0.1"
       |      },
       |      "responseElements": {
       |        "x-amz-request-id": "0320AA5D161796DD",

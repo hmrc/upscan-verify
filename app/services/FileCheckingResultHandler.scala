@@ -26,15 +26,11 @@ import util.logging.LoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
 
-sealed trait InstanceSafety extends Product with Serializable
-case object SafeToContinue extends InstanceSafety
-case object ShouldTerminate extends InstanceSafety
-
 class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifier: VirusNotifier) {
 
   def handleCheckingResult(
     objectDetails: InboundObjectDetails,
-    result: Either[FileValidationFailure, FileValidationSuccess]): Future[InstanceSafety] = {
+    result: Either[FileValidationFailure, FileValidationSuccess]): Future[Unit] = {
     implicit val ld = LoggingDetails.fromS3ObjectLocation(objectDetails.location)
 
     result match {
@@ -55,7 +51,7 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifie
               details.location,
               ValidOutboundObjectMetadata(details.metadata, checksum, mimeType, details.clientIp))
       _ <- fileManager.delete(details.location)
-    } yield SafeToContinue
+    } yield ()
 
   private def handleInfected(details: InboundObjectDetails, errorMessage: String)(implicit ec: ExecutionContext) = {
     val fileCheckingError = ErrorMessage(Quarantine, errorMessage)
@@ -69,7 +65,7 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifie
               objectContent,
               InvalidOutboundObjectMetadata(details.metadata, details.clientIp))
       _ <- fileManager.delete(details.location)
-    } yield ShouldTerminate
+    } yield ()
   }
 
   private def handleIncorrectType(details: InboundObjectDetails, mimeType: MimeType, serviceName: Option[String])(
@@ -86,6 +82,6 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifie
               objectContent,
               InvalidOutboundObjectMetadata(details.metadata, details.clientIp))
       _ <- fileManager.delete(details.location)
-    } yield SafeToContinue
+    } yield ()
   }
 }

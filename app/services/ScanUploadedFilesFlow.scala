@@ -42,7 +42,6 @@ class ScanUploadedFilesFlow @Inject()(
   fileManager: FileManager,
   fileCheckingService: FileCheckingService,
   scanningResultHandler: FileCheckingResultHandler,
-  ec2InstanceTerminator: InstanceTerminator,
   metrics: Metrics)(implicit ec: ExecutionContext)
     extends PollingJob {
 
@@ -69,9 +68,8 @@ class ScanUploadedFilesFlow @Inject()(
           inboundObjectDetails = InboundObjectDetails(metadata, parsedMessage.clientIp, parsedMessage.location)
           scanningResult <- toEitherT(fileCheckingService.check(parsedMessage.location, metadata))
           _              <- toEitherT(addMetrics(metadata.uploadedTimestamp, messageProcessingStartTime, System.currentTimeMillis))
-          instanceSafety <- toEitherT(scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult))
+          _              <- toEitherT(scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult))
           _              <- toEitherT(consumer.confirm(message))
-          _              <- toEitherT(terminateIfInstanceNotSafe(instanceSafety))
         } yield ()
       }
     } yield ()
@@ -91,12 +89,6 @@ class ScanUploadedFilesFlow @Inject()(
         Logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)
     }
   }
-
-  private def terminateIfInstanceNotSafe(instanceSafety: InstanceSafety) =
-    instanceSafety match {
-      case ShouldTerminate => ec2InstanceTerminator.terminate()
-      case _               => Future.successful(())
-    }
 
   private def toEitherT[T](f: Future[T])(
     implicit context: Option[MessageContext]): EitherT[Future, ExceptionWithContext, T] = {

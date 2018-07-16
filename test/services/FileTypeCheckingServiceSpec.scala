@@ -47,7 +47,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       val allowedMimeTypes               = AllowedMimeTypes("valid-test-service", List("application/pdf"))
       val consumingServicesConfiguration = ConsumingServicesConfiguration(List(allowedMimeTypes))
 
-      val location = S3ObjectLocation("inbound-bucket", "valid-file")
+      val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
       val content  = ObjectContent(null, 1200)
       val metadata = InboundObjectMetadata(Map("consuming-service" -> "valid-test-service"), Instant.now)
 
@@ -81,7 +81,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       val allowedMimeTypes               = AllowedMimeTypes("valid-test-service", List("application/pdf"))
       val consumingServicesConfiguration = ConsumingServicesConfiguration(List(allowedMimeTypes))
 
-      val location = S3ObjectLocation("inbound-bucket", "valid-file")
+      val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
       val content  = ObjectContent(null, 1200)
       val metadata = InboundObjectMetadata(Map("consuming-service" -> "valid-test-service"), Instant.now)
 
@@ -115,7 +115,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       val allowedMimeTypes               = AllowedMimeTypes("valid-test-service", List("application/pdf"))
       val consumingServicesConfiguration = ConsumingServicesConfiguration(List(allowedMimeTypes))
 
-      val location = S3ObjectLocation("inbound-bucket", "valid-file")
+      val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
       val content  = ObjectContent(null, 1200)
       val metadata = InboundObjectMetadata(Map.empty, Instant.now)
 

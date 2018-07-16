@@ -44,11 +44,12 @@ class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessagePars
     sourceIPAddress: String
   )
 
-  case class S3Details(bucketName: String, objectKey: String)
+  case class S3Details(bucketName: String, objectKey: String, versionId: Option[String])
 
   implicit val s3reads: Reads[S3Details] =
     ((JsPath \ "bucket" \ "name").read[String] and
-      (JsPath \ "object" \ "key").read[String])(S3Details.apply _)
+      (JsPath \ "object" \ "key").read[String] and
+      (JsPath \ "object" \ "versionId").read[String].map(Some(_).filterNot(_.equals("null"))))(S3Details.apply _)
 
   implicit val requestParametersReads: Reads[RequestParameters] = Json.reads[RequestParameters]
 
@@ -77,7 +78,7 @@ class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessagePars
         import org.slf4j.MDC
 
         val event = FileUploadEvent(
-          S3ObjectLocation(s3Details.bucketName, s3Details.objectKey),
+          S3ObjectLocation(s3Details.bucketName, s3Details.objectKey, s3Details.versionId),
           requestParameters.sourceIPAddress)
         // Can't rely on MdcLoggingExecutionContext to add file-reference to the MDC, in the code below,
         // because we don't already have the file-reference value when the thread begins executing.

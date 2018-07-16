@@ -31,8 +31,17 @@ class S3EventMessageParserSpec extends UnitSpec with Matchers {
   "MessageParser" should {
     "properly parse valid S3 event message" in {
 
-      Await.result(parser.parse(Message("ID", sampleMessage, "HANDLE")), 2 seconds) shouldBe FileUploadEvent(
-        S3ObjectLocation("hmrc-upscan-live-transient", "acabd94b-4d74-4b04-a0ca-1914950f9c02"),
+      Await
+        .result(parser.parse(Message("ID", sampleMessageWithoutVersioning, "HANDLE")), 2 seconds) shouldBe FileUploadEvent(
+        S3ObjectLocation("hmrc-upscan-live-transient", "acabd94b-4d74-4b04-a0ca-1914950f9c02", None),
+        "127.0.0.1")
+
+      Await
+        .result(parser.parse(Message("ID", sampleMessageWithVersioning, "HANDLE")), 2 seconds) shouldBe FileUploadEvent(
+        S3ObjectLocation(
+          "hmrc-upscan-live-transient",
+          "acabd94b-4d74-4b04-a0ca-1914950f9c02",
+          Some("laxvaXuSOlPXfoPi_gNmg5B4_AnVuBbW")),
         "127.0.0.1")
 
     }
@@ -40,7 +49,7 @@ class S3EventMessageParserSpec extends UnitSpec with Matchers {
     "properly parse valid S3 event message triggered by copying object between buckets" in {
 
       Await.result(parser.parse(Message("ID", sampleCopyMessage, "HANDLE")), 2 seconds) shouldBe FileUploadEvent(
-        S3ObjectLocation("fus-outbound-759b74ce43947f5f4c91aeddc3e5bad3", "16d77f7a-1f42-4bc2-aa7c-3e1b57b75b26"),
+        S3ObjectLocation("fus-outbound-759b74ce43947f5f4c91aeddc3e5bad3", "16d77f7a-1f42-4bc2-aa7c-3e1b57b75b26", None),
         "127.0.0.1")
 
     }
@@ -65,7 +74,7 @@ class S3EventMessageParserSpec extends UnitSpec with Matchers {
     }
   }
 
-  val sampleMessage =
+  val sampleMessageWithoutVersioning =
     """ 
                         |{
                         |  "Records": [
@@ -99,7 +108,7 @@ class S3EventMessageParserSpec extends UnitSpec with Matchers {
                         |          "key": "acabd94b-4d74-4b04-a0ca-1914950f9c02",
                         |          "size": 1024,
                         |          "eTag": "d54fcd247258c454fc6da20eac8aee86",
-                        |          "versionId": "laxvaXuSOlPXfoPi_gNmg5B4_AnVuBbW",
+                        |          "versionId": "null",
                         |          "sequencer": "005A8FCAA6B34C4355"
                         |        }
                         |      }
@@ -107,6 +116,50 @@ class S3EventMessageParserSpec extends UnitSpec with Matchers {
                         |  ]
                         |}
                         |
+  """.stripMargin
+
+  val sampleMessageWithVersioning =
+    """ 
+      |{
+      |  "Records": [
+      |    {
+      |      "eventVersion": "2.0",
+      |      "eventSource": "aws:s3",
+      |      "awsRegion": "eu-west-2",
+      |      "eventTime": "2018-02-23T08:02:46.764Z",
+      |      "eventName": "ObjectCreated:Post",
+      |      "userIdentity": {
+      |        "principalId": "AWS:AIDAIIELOEELZHP2AGCQU"
+      |      },
+      |      "requestParameters": {
+      |        "sourceIPAddress": "127.0.0.1"
+      |      },
+      |      "responseElements": {
+      |        "x-amz-request-id": "119DF70CC1EA8B55",
+      |        "x-amz-id-2": "KVdXT87To7UrY5a1XT4hZUgmK6cOz02WTIxxnUCT3/2accPt5fpq23/Cb0i/w23J6N4btF1NaXw="
+      |      },
+      |      "s3": {
+      |        "s3SchemaVersion": "1.0",
+      |        "configurationId": "NotifyFileUploadedEvent",
+      |        "bucket": {
+      |          "name": "hmrc-upscan-live-transient",
+      |          "ownerIdentity": {
+      |            "principalId": "A2XP2K6B42LFR5"
+      |          },
+      |          "arn": "arn:aws:s3:::hmrc-upscan-live-transient"
+      |        },
+      |        "object": {
+      |          "key": "acabd94b-4d74-4b04-a0ca-1914950f9c02",
+      |          "size": 1024,
+      |          "eTag": "d54fcd247258c454fc6da20eac8aee86",
+      |          "versionId": "laxvaXuSOlPXfoPi_gNmg5B4_AnVuBbW",
+      |          "sequencer": "005A8FCAA6B34C4355"
+      |        }
+      |      }
+      |    }
+      |  ]
+      |}
+      |
   """.stripMargin
 
   val sampleCopyMessage =

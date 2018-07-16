@@ -39,7 +39,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
   val parser = new MessageParser {
     override def parse(message: Message) = message.body match {
-      case "VALID-BODY" => Future.successful(FileUploadEvent(S3ObjectLocation("bucket", message.id), "127.0.0.1"))
+      case "VALID-BODY" => Future.successful(FileUploadEvent(S3ObjectLocation("bucket", message.id, None), "127.0.0.1"))
       case _            => Future.failed(new Exception("Invalid body"))
     }
   }
@@ -54,7 +54,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
     "get messages from the queue consumer, and scan and post-process valid messages" in {
       Given("there are only valid messages in a message queue")
       val validMessage = Message("ID", "VALID-BODY", "RECEIPT-1")
-      val s3object     = S3ObjectLocation("bucket", "ID")
+      val s3object     = S3ObjectLocation("bucket", "ID", None)
 
       val queueConsumer = mock[QueueConsumer]
       when(queueConsumer.poll()).thenReturn(List(validMessage))
@@ -109,7 +109,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
     "terminate instance if virus found" in {
       Given("there are only valid messages in a message queue")
       val validMessage = Message("ID", "VALID-BODY", "RECEIPT-1")
-      val s3object     = S3ObjectLocation("bucket", "ID")
+      val s3object     = S3ObjectLocation("bucket", "ID", None)
 
       val queueConsumer = mock[QueueConsumer]
       when(queueConsumer.poll()).thenReturn(List(validMessage))
@@ -167,8 +167,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       val invalidMessage = Message("ID2", "INVALID-BODY", "RECEIPT-2")
       val validMessage2  = Message("ID3", "VALID-BODY", "RECEIPT-3")
 
-      val s3object1 = S3ObjectLocation("bucket", "ID1")
-      val s3object3 = S3ObjectLocation("bucket", "ID3")
+      val s3object1 = S3ObjectLocation("bucket", "ID1", None)
+      val s3object3 = S3ObjectLocation("bucket", "ID3", None)
 
       val queueConsumer = mock[QueueConsumer]
       when(queueConsumer.poll()).thenReturn(List(validMessage1, invalidMessage, validMessage2))
@@ -244,9 +244,9 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
     "do not confirm valid messages for which scanning has failed" in {
 
-      val s3object1 = S3ObjectLocation("bucket", "ID1")
-      val s3object2 = S3ObjectLocation("bucket", "ID2")
-      val s3object3 = S3ObjectLocation("bucket", "ID3")
+      val s3object1 = S3ObjectLocation("bucket", "ID1", None)
+      val s3object2 = S3ObjectLocation("bucket", "ID2", None)
+      val s3object3 = S3ObjectLocation("bucket", "ID3", None)
 
       Given("there are only valid messages in a message queue")
       val validMessage1 = Message("ID1", "VALID-BODY", "RECEIPT-1")
@@ -319,9 +319,9 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
     }
 
     "skip processing if file metadata is unavailable" in {
-      val s3object1 = S3ObjectLocation("bucket", "ID1")
-      val s3object2 = S3ObjectLocation("bucket", "ID2")
-      val s3object3 = S3ObjectLocation("bucket", "ID3")
+      val s3object1 = S3ObjectLocation("bucket", "ID1", None)
+      val s3object2 = S3ObjectLocation("bucket", "ID2", None)
+      val s3object3 = S3ObjectLocation("bucket", "ID3", None)
 
       val client = mock[ClamAntiVirus]
 

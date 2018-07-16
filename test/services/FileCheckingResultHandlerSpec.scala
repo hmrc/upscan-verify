@@ -43,7 +43,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val handler                      = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is a clean file")
-      val file             = S3ObjectLocation("bucket", "file")
+      val file             = S3ObjectLocation("bucket", "file", None)
       val expectedChecksum = "1234567890"
       val expectedMimeType = MimeType("application/xml")
       val clientIp         = "127.0.0.1"
@@ -79,7 +79,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is a clean file")
-      val file             = S3ObjectLocation("bucket", "file")
+      val file             = S3ObjectLocation("bucket", "file", None)
       val expectedChecksum = "1234567890"
       val expectedMimeType = MimeType("application/xml")
       val clientIp         = "127.0.0.1"
@@ -118,7 +118,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is a clean file")
-      val file             = S3ObjectLocation("bucket", "file")
+      val file             = S3ObjectLocation("bucket", "file", None)
       val expectedChecksum = "1234567890"
       val expectedMimeType = MimeType("application/xml")
       val clientIp         = "127.0.0.1"
@@ -152,7 +152,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is an infected file")
-      val file = S3ObjectLocation("bucket", "file")
+      val file = S3ObjectLocation("bucket", "file", None)
 
       val clientIp               = "127.0.0.1"
       val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
@@ -196,7 +196,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is an infected file")
-      val file             = S3ObjectLocation("bucket", "file")
+      val file             = S3ObjectLocation("bucket", "file", None)
       val expectedChecksum = "1234567890"
       val clientIp         = "127.0.0.1"
 
@@ -234,7 +234,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
       Given("there is an infected file")
       val clientIp = "127.0.0.1"
-      val file     = S3ObjectLocation("bucket", "file")
+      val file     = S3ObjectLocation("bucket", "file", None)
 
       val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
 
@@ -263,7 +263,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val handler                      = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is a file of a type that is not allowed")
-      val file     = S3ObjectLocation("bucket", "file")
+      val file     = S3ObjectLocation("bucket", "file", None)
       val mimeType = MimeType("application/pdf")
 
       val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
@@ -305,7 +305,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
     "Return failure if deleting a file if incorrect type fails" in {
       Given("there is a file of a type that is not allowed")
 
-      val file = S3ObjectLocation("bucket", "file")
+      val file = S3ObjectLocation("bucket", "file", None)
 
       val inboundObjectMetadata        = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
       val mimeType                     = MimeType("application/pdf")

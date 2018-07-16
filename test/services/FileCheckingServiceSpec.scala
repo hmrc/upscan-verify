@@ -60,7 +60,7 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
 
     }
 
-    val location = S3ObjectLocation("bucket", "file")
+    val location = S3ObjectLocation("bucket", "file", None)
     val metadata = InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)
 
     "succeed when virus and file type scanning succedded" in {

@@ -61,7 +61,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val scanningService = new ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics)
 
       Given("a file location pointing to a clean file")
-      val fileLocation = S3ObjectLocation("inboundBucket", "file")
+      val fileLocation = S3ObjectLocation("inboundBucket", "file", None)
 
       And("file content with metadata")
       val content      = "Hello World".getBytes
@@ -92,7 +92,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val scanningService = new ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics)
 
       Given("a file location pointing to a clean file")
-      val fileLocation = S3ObjectLocation("inboundBucket", "file")
+      val fileLocation = S3ObjectLocation("inboundBucket", "file", None)
 
       And("file content with metadata")
       val content      = "Hello World".getBytes

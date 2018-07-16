@@ -23,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 case class Message(id: String, body: String, receiptHandle: String)
 
-case class S3ObjectLocation(bucket: String, objectKey: String)
+case class S3ObjectLocation(bucket: String, objectKey: String, objectVersion: Option[String])
 case class FileUploadEvent(location: S3ObjectLocation, clientIp: String)
 case class FileValidationSuccess(checksum: String, mimeType: MimeType)
 

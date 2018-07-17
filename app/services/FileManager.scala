@@ -39,20 +39,18 @@ sealed trait OutboundObjectMetadata {
   def items: Map[String, String]
 }
 
-case class ValidOutboundObjectMetadata(
-  inboundMetadata: InboundObjectMetadata,
-  checksum: String,
-  mimeType: MimeType,
-  clientIp: String)
+case class ValidOutboundObjectMetadata(inboundDetails: InboundObjectDetails, checksum: String, mimeType: MimeType)
     extends OutboundObjectMetadata {
 
   lazy val items = {
-    val lastModified = DateTimeFormatter.ISO_INSTANT.format(inboundMetadata.uploadedTimestamp)
-    inboundMetadata.items +
-      ("initiate-date" -> lastModified) +
-      ("checksum"      -> checksum) +
-      ("mime-type"     -> mimeType.value) +
-      ("client-ip"     -> clientIp)
+    val lastModified = DateTimeFormatter.ISO_INSTANT.format(inboundDetails.metadata.uploadedTimestamp)
+    inboundDetails.metadata.items +
+      ("file-reference" -> inboundDetails.location.objectKey) +
+      ("initiate-date"  -> lastModified) +
+      ("checksum"       -> checksum) +
+      ("mime-type"      -> mimeType.value) +
+      ("client-ip"      -> inboundDetails.clientIp) ++
+      inboundDetails.location.objectVersion.map(value => "file-version" -> value)
   }
 
 }

@@ -49,7 +49,8 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifie
       _ <- fileManager
             .copyToOutboundBucket(
               details.location,
-              ValidOutboundObjectMetadata(details.metadata, checksum, mimeType, details.clientIp))
+              ValidOutboundObjectMetadata(details, checksum, mimeType)
+            )
       _ <- fileManager.delete(details.location)
     } yield ()
 

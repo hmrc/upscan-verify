@@ -49,7 +49,7 @@ import org.mockito.{ArgumentCaptor, Mockito}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Assertions, GivenWhenThen, Matchers}
-import services.{InboundObjectMetadata, MimeType, ObjectContent, ValidOutboundObjectMetadata}
+import services._
 import uk.gov.hmrc.play.test.UnitSpec
 
 import scala.collection.JavaConverters._
@@ -78,17 +78,21 @@ class S3FileManagerSpec
       val s3client: AmazonS3 = mock[AmazonS3]
       when(s3client.copyObject(any(): CopyObjectRequest)).thenReturn(new CopyObjectResult())
 
-      val fileManager = new S3FileManager(s3client, configuration)
-      val metadata = ValidOutboundObjectMetadata(
+      val fileManager     = new S3FileManager(s3client, configuration)
+      val inboundLocation = S3ObjectLocation("inboundBucket", "file", Some("version"))
+
+      val inboundDetails = InboundObjectDetails(
         InboundObjectMetadata(items = Map.empty, uploadedTimestamp = Instant.now()),
-        "checksum",
-        MimeType("application/xml"),
-        "127.0.0.1")
+        "127.0.0.1",
+        inboundLocation
+      )
+
+      val metadata = ValidOutboundObjectMetadata(inboundDetails, "checksum", MimeType("application/xml"))
 
       When("copying the file is requested")
       Await.result(
         fileManager
-          .copyToOutboundBucket(S3ObjectLocation("inboundBucket", "file", Some("version")), metadata),
+          .copyToOutboundBucket(inboundLocation, metadata),
         2.seconds)
 
       Then("the S3 copy method of AWS client should be called")
@@ -107,6 +111,14 @@ class S3FileManagerSpec
 
     "return error if copying the file failed" in {
 
+      val inboundLocation = S3ObjectLocation("inboundBucket", "file", Some("version"))
+
+      val inboundDetails = InboundObjectDetails(
+        InboundObjectMetadata(items = Map.empty, uploadedTimestamp = Instant.now()),
+        "127.0.0.1",
+        inboundLocation
+      )
+
       val s3client: AmazonS3 = mock[AmazonS3]
       when(s3client.copyObject(any(): CopyObjectRequest)).thenThrow(new RuntimeException("exception"))
       val fileManager = new S3FileManager(s3client, configuration)
@@ -116,11 +128,7 @@ class S3FileManagerSpec
         fileManager
           .copyToOutboundBucket(
             S3ObjectLocation("inboundBucket", "file", None),
-            ValidOutboundObjectMetadata(
-              InboundObjectMetadata(items = Map.empty, Instant.now()),
-              "CHECKSUM",
-              MimeType("application/xml"),
-              "127.0.0.1")
+            ValidOutboundObjectMetadata(inboundDetails, "CHECKSUM", MimeType("application/xml"))
           ),
         2.seconds
       )
@@ -316,20 +324,21 @@ class S3FileManagerSpec
       Given("a valid file location and details of an error")
       val fileLocation = S3ObjectLocation("inboundBucket", "file", None)
 
+      val inboundDetails = InboundObjectDetails(
+        InboundObjectMetadata(
+          items             = Map("callbackUrl" -> "http://some.callback.url"),
+          uploadedTimestamp = Instant.now()),
+        "127.0.0.1",
+        fileLocation
+      )
+
       val s3client: AmazonS3 = mock[AmazonS3]
       val fileManager        = new S3FileManager(s3client, configuration)
 
       When("a call to copy to quarantine is made")
       val content = new ByteArrayInputStream("This is a dirty file".getBytes)
 
-      val metadata = ValidOutboundObjectMetadata(
-        InboundObjectMetadata(
-          items             = Map("callbackUrl" -> "http://some.callback.url"),
-          uploadedTimestamp = Instant.now()),
-        "checksum",
-        MimeType("application/xml"),
-        "127.0.0.1"
-      )
+      val metadata = ValidOutboundObjectMetadata(inboundDetails, "checksum", MimeType("application/xml"))
 
       Await.result(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)
 
@@ -341,6 +350,13 @@ class S3FileManagerSpec
     "return failure if put to quarantine bucket fails" in {
       Given("a valid file location and details of an error")
       val fileLocation = S3ObjectLocation("inboundBucket", "file", None)
+      val inboundDetails = InboundObjectDetails(
+        InboundObjectMetadata(
+          items             = Map("callbackUrl" -> "http://some.callback.url"),
+          uploadedTimestamp = Instant.now()),
+        "127.0.0.1",
+        fileLocation
+      )
 
       val s3client: AmazonS3 = mock[AmazonS3]
       when(s3client.putObject(any(), any(), any(), any())).thenThrow(new SdkClientException("This is a put exception"))
@@ -351,12 +367,9 @@ class S3FileManagerSpec
       val content = new ByteArrayInputStream("This is a dirty file".getBytes)
 
       val metadata = ValidOutboundObjectMetadata(
-        InboundObjectMetadata(
-          items             = Map("callbackUrl" -> "http://some.callback.url"),
-          uploadedTimestamp = Instant.now()),
+        inboundDetails,
         "checksum",
-        MimeType("application/xml"),
-        "127.0.0.1"
+        MimeType("application/xml")
       )
 
       val result = Await.ready(fileManager.writeToQuarantineBucket(fileLocation, content, metadata), 2.seconds)

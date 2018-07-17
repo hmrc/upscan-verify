@@ -49,17 +49,17 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val clientIp         = "127.0.0.1"
 
       val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
+      val inboundObjectDetails  = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
       val outboundObjectMetadata =
-        ValidOutboundObjectMetadata(inboundObjectMetadata, expectedChecksum, expectedMimeType, clientIp)
+        ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)
 
       when(fileManager.copyToOutboundBucket(ArgumentMatchers.eq(file), any())).thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
       When("when processing scanning result")
       Await.result(
-        handler.handleCheckingResult(
-          InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-          Right(FileValidationSuccess(expectedChecksum, expectedMimeType))),
+        handler
+          .handleCheckingResult(inboundObjectDetails, Right(FileValidationSuccess(expectedChecksum, expectedMimeType))),
         10 seconds
       )
 
@@ -79,21 +79,23 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
 
       Given("there is a clean file")
-      val file             = S3ObjectLocation("bucket", "file", None)
-      val expectedChecksum = "1234567890"
-      val expectedMimeType = MimeType("application/xml")
-      val clientIp         = "127.0.0.1"
+      val file                  = S3ObjectLocation("bucket", "file", None)
+      val expectedChecksum      = "1234567890"
+      val expectedMimeType      = MimeType("application/xml")
+      val clientIp              = "127.0.0.1"
+      val inboundObjectMetadata = InboundObjectMetadata(Map.empty, Instant.now())
+      val inboundObjectDetails  = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
 
       And("copying the file would fail")
       when(fileManager.copyToOutboundBucket(ArgumentMatchers.eq(file), any()))
         .thenReturn(Future.failed(new Exception("Copy failed")))
 
       When("when processing scanning result")
-      val inboundObjectMetadata = InboundObjectMetadata(Map.empty, Instant.now())
+
       val result =
         Await.ready(
           handler.handleCheckingResult(
-            InboundObjectDetails(inboundObjectMetadata, clientIp, file),
+            inboundObjectDetails,
             Right(FileValidationSuccess(expectedChecksum, expectedMimeType))),
           10 seconds
         )
@@ -102,7 +104,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       verify(fileManager)
         .copyToOutboundBucket(
           file,
-          ValidOutboundObjectMetadata(inboundObjectMetadata, expectedChecksum, expectedMimeType, clientIp))
+          ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType))
       verifyNoMoreInteractions(fileManager)
 
       And("the whole process fails")
@@ -124,8 +126,9 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val clientIp         = "127.0.0.1"
 
       val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
+      val inboundObjectDetails  = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
       val outboundObjectMetadata =
-        ValidOutboundObjectMetadata(inboundObjectMetadata, expectedChecksum, expectedMimeType, clientIp)
+        ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)
 
       when(fileManager.copyToOutboundBucket(file, outboundObjectMetadata)).thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.failed(new RuntimeException("Expected failure")))
@@ -134,7 +137,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val result =
         Await.ready(
           handler.handleCheckingResult(
-            InboundObjectDetails(inboundObjectMetadata, clientIp, file),
+            inboundObjectDetails,
             Right(FileValidationSuccess(expectedChecksum, expectedMimeType))),
           10 seconds
         )

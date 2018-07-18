@@ -36,31 +36,31 @@ case class InboundObjectMetadata(items: Map[String, String], uploadedTimestamp: 
 }
 
 sealed trait OutboundObjectMetadata {
-  final def items: Map[String, String] = commonDetails ++ customMetadata
+  final def items: Map[String, String] = detailsOfSourceFile.metadata.items ++ commonMetadata ++ outcomeSpecificMetadata
 
-  def customMetadata: Map[String, String] = Map.empty
+  def detailsOfSourceFile: InboundObjectDetails
 
-  def inboundDetails: InboundObjectDetails
+  private def commonMetadata: Map[String, String] =
+    Map("file-reference" -> detailsOfSourceFile.location.objectKey, "client-ip" -> detailsOfSourceFile.clientIp) ++
+      detailsOfSourceFile.location.objectVersion.map(value => "file-version" -> value)
 
-  private def commonDetails: Map[String, String] =
-    Map("file-reference" -> inboundDetails.location.objectKey, "client-ip" -> inboundDetails.clientIp) ++
-      inboundDetails.location.objectVersion.map(value => "file-version" -> value)
+  def outcomeSpecificMetadata: Map[String, String] = Map.empty
 }
 
-case class ValidOutboundObjectMetadata(inboundDetails: InboundObjectDetails, checksum: String, mimeType: MimeType)
+case class ValidOutboundObjectMetadata(detailsOfSourceFile: InboundObjectDetails, checksum: String, mimeType: MimeType)
     extends OutboundObjectMetadata {
 
-  override lazy val customMetadata = {
-    val lastModified = DateTimeFormatter.ISO_INSTANT.format(inboundDetails.metadata.uploadedTimestamp)
-    inboundDetails.metadata.items +
-      ("initiate-date" -> lastModified) +
-      ("checksum"      -> checksum) +
-      ("mime-type"     -> mimeType.value)
+  override lazy val outcomeSpecificMetadata = {
+    Map(
+      "initiate-date" -> DateTimeFormatter.ISO_INSTANT.format(detailsOfSourceFile.metadata.uploadedTimestamp),
+      "checksum"      -> checksum,
+      "mime-type"     -> mimeType.value
+    )
   }
 
 }
 
-case class InvalidOutboundObjectMetadata(inboundDetails: InboundObjectDetails) extends OutboundObjectMetadata
+case class InvalidOutboundObjectMetadata(detailsOfSourceFile: InboundObjectDetails) extends OutboundObjectMetadata {}
 
 case class ObjectContent(inputStream: InputStream, length: Long)
 

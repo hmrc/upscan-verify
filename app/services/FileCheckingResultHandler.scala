@@ -17,8 +17,10 @@
 package services
 
 import java.io.ByteArrayInputStream
-import javax.inject.Inject
+import java.util.UUID
 
+import config.ServiceConfiguration
+import javax.inject.Inject
 import model._
 import play.api.libs.json.Json
 import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetails
@@ -26,7 +28,10 @@ import util.logging.LoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifier: VirusNotifier) {
+class FileCheckingResultHandler @Inject()(
+  fileManager: FileManager,
+  virusNotifier: VirusNotifier,
+  configuration: ServiceConfiguration) {
 
   def handleCheckingResult(
     objectDetails: InboundObjectDetails,
@@ -44,25 +49,32 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifie
   }
 
   private def handleValid(details: InboundObjectDetails, checksum: String, mimeType: MimeType)(
-    implicit ec: ExecutionContext) =
+    implicit ec: ExecutionContext) = {
+    val targetLocation =
+      S3ObjectLocation(configuration.outboundBucket, UUID.randomUUID().toString, objectVersion = None)
     for {
       _ <- fileManager
-            .copyToOutboundBucket(
+            .copyObject(
               details.location,
+              targetLocation,
               ValidOutboundObjectMetadata(details, checksum, mimeType)
             )
       _ <- fileManager.delete(details.location)
     } yield ()
+  }
 
   private def handleInfected(details: InboundObjectDetails, errorMessage: String)(implicit ec: ExecutionContext) = {
     val fileCheckingError = ErrorMessage(Quarantine, errorMessage)
     val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
+    val targetLocation =
+      S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None)
 
     for {
       _ <- virusNotifier.notifyFileInfected(details.location, errorMessage)
       _ <- fileManager
-            .writeToQuarantineBucket(
+            .writeObject(
               details.location,
+              targetLocation,
               objectContent,
               InvalidOutboundObjectMetadata(details.metadata, details.clientIp))
       _ <- fileManager.delete(details.location)
@@ -75,11 +87,14 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager, virusNotifie
       s"MIME type [${mimeType.value}] is not allowed for service: [${serviceName.getOrElse("No service name provided")}]"
     val fileCheckingError = ErrorMessage(Rejected, errorMessage)
     val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
+    val targetLocation =
+      S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None)
 
     for {
       _ <- fileManager
-            .writeToQuarantineBucket(
+            .writeObject(
               details.location,
+              targetLocation,
               objectContent,
               InvalidOutboundObjectMetadata(details.metadata, details.clientIp))
       _ <- fileManager.delete(details.location)

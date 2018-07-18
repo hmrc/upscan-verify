@@ -19,6 +19,7 @@ package services
 import java.io.InputStream
 import java.time.Instant
 
+import config.ServiceConfiguration
 import model._
 import org.apache.commons.io.IOUtils
 import org.mockito.ArgumentMatchers.any
@@ -36,11 +37,35 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
   "FileCheckingResultHandler" should {
 
+    val configuration = new ServiceConfiguration {
+      override def quarantineBucket: String = "quarantine-bucket"
+
+      override def retryInterval: FiniteDuration = ???
+
+      override def inboundQueueUrl: String = ???
+
+      override def accessKeyId: String = ???
+
+      override def secretAccessKey: String = ???
+
+      override def sessionToken: Option[String] = ???
+
+      override def outboundBucket: String = "outbound-bucket"
+
+      override def awsRegion: String = ???
+
+      override def useContainerCredentials: Boolean = ???
+
+      override def processingBatchSize: Int = ???
+
+      override def consumingServicesConfiguration: ConsumingServicesConfiguration = ???
+    }
+
     "Move clean file from inbound bucket to outbound bucket" in {
 
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
-      val handler                      = new FileCheckingResultHandler(fileManager, virusNotifier)
+      val handler                      = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
 
       Given("there is a clean file")
       val file             = S3ObjectLocation("bucket", "file", None)
@@ -53,7 +78,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val outboundObjectMetadata =
         ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)
 
-      when(fileManager.copyToOutboundBucket(ArgumentMatchers.eq(file), any())).thenReturn(Future.successful(()))
+      when(fileManager.copyObject(ArgumentMatchers.eq(file), any(), any())).thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
       When("when processing scanning result")
@@ -64,7 +89,10 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       )
 
       Then("file should be copied from inbound bucket to outbound bucket")
-      verify(fileManager).copyToOutboundBucket(file, outboundObjectMetadata)
+      val locationCaptor: ArgumentCaptor[S3ObjectLocation] = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
+      verify(fileManager)
+        .copyObject(ArgumentMatchers.eq(file), locationCaptor.capture(), ArgumentMatchers.eq(outboundObjectMetadata))
+      locationCaptor.getValue.bucket shouldBe configuration.outboundBucket
 
       And("file should be removed from inbound bucket")
       verify(fileManager).delete(file)
@@ -76,7 +104,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
 
       Given("there is a clean file")
       val file                  = S3ObjectLocation("bucket", "file", None)
@@ -87,7 +115,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val inboundObjectDetails  = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
 
       And("copying the file would fail")
-      when(fileManager.copyToOutboundBucket(ArgumentMatchers.eq(file), any()))
+      when(fileManager.copyObject(ArgumentMatchers.eq(file), any(), any()))
         .thenReturn(Future.failed(new Exception("Copy failed")))
 
       When("when processing scanning result")
@@ -102,9 +130,10 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
       Then("original file shoudln't be deleted from inbound bucket")
       verify(fileManager)
-        .copyToOutboundBucket(
-          file,
-          ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType))
+        .copyObject(
+          ArgumentMatchers.eq(file),
+          any(),
+          ArgumentMatchers.eq(ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)))
       verifyNoMoreInteractions(fileManager)
 
       And("the whole process fails")
@@ -117,7 +146,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
 
       Given("there is a clean file")
       val file             = S3ObjectLocation("bucket", "file", None)
@@ -130,7 +159,8 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val outboundObjectMetadata =
         ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)
 
-      when(fileManager.copyToOutboundBucket(file, outboundObjectMetadata)).thenReturn(Future.successful(()))
+      when(fileManager.copyObject(ArgumentMatchers.eq(file), any(), ArgumentMatchers.eq(outboundObjectMetadata)))
+        .thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.failed(new RuntimeException("Expected failure")))
 
       When("when processing scanning result")
@@ -152,7 +182,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
 
       Given("there is an infected file")
       val file = S3ObjectLocation("bucket", "file", None)
@@ -164,7 +194,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val details = "There is a virus"
 
       when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
-      when(fileManager.writeToQuarantineBucket(ArgumentMatchers.eq(file), any(), any()))
+      when(fileManager.writeObject(ArgumentMatchers.eq(file), any(), any(), any()))
         .thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
@@ -179,13 +209,17 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       verify(virusNotifier).notifyFileInfected(file, details)
 
       And("file metadata and error details are stored in the quarantine bucket")
-      val captor: ArgumentCaptor[InputStream] = ArgumentCaptor.forClass(classOf[InputStream])
+      val locationCaptor: ArgumentCaptor[S3ObjectLocation] = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
+      val contentCaptor: ArgumentCaptor[InputStream]       = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
-        .writeToQuarantineBucket(
+        .writeObject(
           ArgumentMatchers.eq(file),
-          captor.capture(),
+          locationCaptor.capture(),
+          contentCaptor.capture(),
           ArgumentMatchers.eq(outboundObjectMetadata))
-      IOUtils.toString(captor.getValue) shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
+      IOUtils.toString(contentCaptor.getValue) shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
+
+      locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 
       And("infected file is deleted")
       verify(fileManager).delete(file)
@@ -196,12 +230,11 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
 
       Given("there is an infected file")
-      val file             = S3ObjectLocation("bucket", "file", None)
-      val expectedChecksum = "1234567890"
-      val clientIp         = "127.0.0.1"
+      val file     = S3ObjectLocation("bucket", "file", None)
+      val clientIp = "127.0.0.1"
 
       val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
 
@@ -233,7 +266,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
 
       Given("there is an infected file")
       val clientIp = "127.0.0.1"
@@ -263,7 +296,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
       val clientIp                     = "127.0.0.1"
-      val handler                      = new FileCheckingResultHandler(fileManager, virusNotifier)
+      val handler                      = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
 
       Given("there is a file of a type that is not allowed")
       val file     = S3ObjectLocation("bucket", "file", None)
@@ -273,7 +306,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectMetadata, clientIp)
 
       when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
-      when(fileManager.writeToQuarantineBucket(ArgumentMatchers.eq(file), any(), any()))
+      when(fileManager.writeObject(ArgumentMatchers.eq(file), any(), any(), any()))
         .thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
@@ -291,14 +324,18 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       verifyNoMoreInteractions(virusNotifier)
 
       And("file metadata and error details are stored in the quarantine bucket")
-      val captor: ArgumentCaptor[InputStream] = ArgumentCaptor.forClass(classOf[InputStream])
+
+      val locationCaptor: ArgumentCaptor[S3ObjectLocation] = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
+      val captor: ArgumentCaptor[InputStream]              = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
-        .writeToQuarantineBucket(
+        .writeObject(
           ArgumentMatchers.eq(file),
+          locationCaptor.capture(),
           captor.capture(),
           ArgumentMatchers.eq(outboundObjectMetadata))
       IOUtils.toString(captor.getValue) shouldBe
         """{"failureReason":"REJECTED","message":"MIME type [application/pdf] is not allowed for service: [valid-test-service]"}"""
+      locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 
       And("incorrectly typed file is deleted")
       verify(fileManager).delete(file)
@@ -316,10 +353,10 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val clientIp                     = "127.0.0.1"
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, virusNotifier)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
 
       When("copying the file to outbound bucket succeeds")
-      when(fileManager.writeToQuarantineBucket(ArgumentMatchers.eq(file), any(), any()))
+      when(fileManager.writeObject(ArgumentMatchers.eq(file), any(), any(), any()))
         .thenReturn(Future.successful(()))
 
       And("a file manager that fails to delete correctly")

@@ -17,10 +17,10 @@
 package connectors.aws
 
 import java.io.InputStream
+import java.util.UUID
 
 import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.{CopyObjectRequest, GetObjectMetadataRequest, GetObjectRequest, S3Object, ObjectMetadata => S3ObjectMetadata}
-import config.ServiceConfiguration
+import com.amazonaws.services.s3.model.{CopyObjectRequest, GetObjectMetadataRequest, GetObjectRequest, ObjectMetadata => S3ObjectMetadata}
 import javax.inject.Inject
 import model.S3ObjectLocation
 import play.api.Logger
@@ -31,40 +31,43 @@ import util.logging.LoggingDetails
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
 
-class S3FileManager @Inject()(s3Client: AmazonS3, config: ServiceConfiguration) extends FileManager {
+class S3FileManager @Inject()(s3Client: AmazonS3) extends FileManager {
 
-  override def copyToOutboundBucket(
-    objectLocation: S3ObjectLocation,
+  override def copyObject(
+    sourceLocation: S3ObjectLocation,
+    targetLocation: S3ObjectLocation,
     metadata: OutboundObjectMetadata): Future[Unit] = {
-    implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(sourceLocation)
 
     val outboundMetadata = buildS3objectMetadata(metadata)
+    val newKey           = UUID.randomUUID().toString
     val request = new CopyObjectRequest(
-      objectLocation.bucket,
-      objectLocation.objectKey,
-      config.outboundBucket,
-      objectLocation.objectKey)
+      sourceLocation.bucket,
+      sourceLocation.objectKey,
+      targetLocation.bucket,
+      targetLocation.objectKey)
     request.setNewObjectMetadata(outboundMetadata)
-    objectLocation.objectVersion.foreach(request.setSourceVersionId)
+    sourceLocation.objectVersion.foreach(request.setSourceVersionId)
     Future {
       s3Client.copyObject(request)
-      Logger.debug(s"Copied object with objectKey: [${objectLocation.objectKey}], to outbound bucket.")
+      Logger.debug(s"Copied object with [$sourceLocation] to [$newKey].")
 
     }
 
   }
 
-  override def writeToQuarantineBucket(
-    objectLocation: S3ObjectLocation,
+  override def writeObject(
+    sourceLocation: S3ObjectLocation,
+    targetLocation: S3ObjectLocation,
     content: InputStream,
     metadata: OutboundObjectMetadata): Future[Unit] = {
-    implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(sourceLocation)
 
     val quarantineObjectMetadata = buildS3objectMetadata(metadata)
 
     Future {
-      s3Client.putObject(config.quarantineBucket, objectLocation.objectKey, content, quarantineObjectMetadata)
-      Logger.debug(s"Wrote object with objectKey: [${objectLocation.objectKey}], to quarantine bucket.")
+      s3Client.putObject(targetLocation.bucket, targetLocation.objectKey, content, quarantineObjectMetadata)
+      Logger.debug(s"Wrote object with objectKey: [${targetLocation.objectKey}], to quarantine bucket.")
     }
   }
 

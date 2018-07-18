@@ -72,11 +72,7 @@ class FileCheckingResultHandler @Inject()(
     for {
       _ <- virusNotifier.notifyFileInfected(details.location, errorMessage)
       _ <- fileManager
-            .writeObject(
-              details.location,
-              targetLocation,
-              objectContent,
-              InvalidOutboundObjectMetadata(details.metadata, details.clientIp))
+            .writeObject(details.location, targetLocation, objectContent, InvalidOutboundObjectMetadata(details))
       _ <- fileManager.delete(details.location)
     } yield ()
   }
@@ -92,11 +88,7 @@ class FileCheckingResultHandler @Inject()(
 
     for {
       _ <- fileManager
-            .writeObject(
-              details.location,
-              targetLocation,
-              objectContent,
-              InvalidOutboundObjectMetadata(details.metadata, details.clientIp))
+            .writeObject(details.location, targetLocation, objectContent, InvalidOutboundObjectMetadata(details))
       _ <- fileManager.delete(details.location)
     } yield ()
   }

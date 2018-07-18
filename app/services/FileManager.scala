@@ -36,29 +36,31 @@ case class InboundObjectMetadata(items: Map[String, String], uploadedTimestamp: 
 }
 
 sealed trait OutboundObjectMetadata {
-  def items: Map[String, String]
+  final def items: Map[String, String] = commonDetails ++ customMetadata
+
+  def customMetadata: Map[String, String] = Map.empty
+
+  def inboundDetails: InboundObjectDetails
+
+  private def commonDetails: Map[String, String] =
+    Map("file-reference" -> inboundDetails.location.objectKey, "client-ip" -> inboundDetails.clientIp) ++
+      inboundDetails.location.objectVersion.map(value => "file-version" -> value)
 }
 
 case class ValidOutboundObjectMetadata(inboundDetails: InboundObjectDetails, checksum: String, mimeType: MimeType)
     extends OutboundObjectMetadata {
 
-  lazy val items = {
+  override lazy val customMetadata = {
     val lastModified = DateTimeFormatter.ISO_INSTANT.format(inboundDetails.metadata.uploadedTimestamp)
     inboundDetails.metadata.items +
-      ("file-reference" -> inboundDetails.location.objectKey) +
-      ("initiate-date"  -> lastModified) +
-      ("checksum"       -> checksum) +
-      ("mime-type"      -> mimeType.value) +
-      ("client-ip"      -> inboundDetails.clientIp) ++
-      inboundDetails.location.objectVersion.map(value => "file-version" -> value)
+      ("initiate-date" -> lastModified) +
+      ("checksum"      -> checksum) +
+      ("mime-type"     -> mimeType.value)
   }
 
 }
 
-case class InvalidOutboundObjectMetadata(inboundMetadata: InboundObjectMetadata, clientIp: String)
-    extends OutboundObjectMetadata {
-  lazy val items = inboundMetadata.items + ("client-ip" -> clientIp)
-}
+case class InvalidOutboundObjectMetadata(inboundDetails: InboundObjectDetails) extends OutboundObjectMetadata
 
 case class ObjectContent(inputStream: InputStream, length: Long)
 

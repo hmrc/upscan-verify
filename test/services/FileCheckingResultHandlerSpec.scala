@@ -189,7 +189,8 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
       val clientIp               = "127.0.0.1"
       val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
-      val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectMetadata, clientIp)
+      val inboundObjectDetails   = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
+      val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectDetails)
 
       val details = "There is a virus"
 
@@ -303,7 +304,8 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val mimeType = MimeType("application/pdf")
 
       val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
-      val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectMetadata, clientIp)
+      val inboundObjectDetails   = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
+      val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectDetails)
 
       when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
       when(fileManager.writeObject(ArgumentMatchers.eq(file), any(), any(), any()))

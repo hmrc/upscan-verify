@@ -63,9 +63,13 @@ case class InvalidOutboundObjectMetadata(inboundMetadata: InboundObjectMetadata,
 case class ObjectContent(inputStream: InputStream, length: Long)
 
 trait FileManager {
-  def copyToOutboundBucket(objectLocation: S3ObjectLocation, metadata: OutboundObjectMetadata): Future[Unit]
-  def writeToQuarantineBucket(
-    objectLocation: S3ObjectLocation,
+  def copyObject(
+    sourceLocation: S3ObjectLocation,
+    targetLocation: S3ObjectLocation,
+    metadata: OutboundObjectMetadata): Future[Unit]
+  def writeObject(
+    sourceLocation: S3ObjectLocation,
+    targetLocation: S3ObjectLocation,
     content: InputStream,
     metadata: OutboundObjectMetadata): Future[Unit]
   def delete(objectLocation: S3ObjectLocation): Future[Unit]

@@ -37,14 +37,6 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
     val content = ObjectContent(new ByteArrayInputStream("TEST".getBytes), "TEST".length)
 
     val fileManager = new FileManager {
-      override def copyToOutboundBucket(
-        objectLocation: S3ObjectLocation,
-        metadata: OutboundObjectMetadata): Future[Unit] = ???
-
-      override def writeToQuarantineBucket(
-        objectLocation: S3ObjectLocation,
-        content: InputStream,
-        metadata: OutboundObjectMetadata): Future[Unit] = ???
 
       override def delete(objectLocation: S3ObjectLocation): Future[Unit] = ???
 
@@ -58,6 +50,16 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
           function(content)
         }
 
+      override def copyObject(
+        sourceLocation: S3ObjectLocation,
+        targetLocation: S3ObjectLocation,
+        metadata: OutboundObjectMetadata): Future[Unit] = ???
+
+      override def writeObject(
+        sourceLocation: S3ObjectLocation,
+        targetLocation: S3ObjectLocation,
+        content: InputStream,
+        metadata: OutboundObjectMetadata): Future[Unit] = ???
     }
 
     val location = S3ObjectLocation("bucket", "file", None)

@@ -24,7 +24,9 @@ import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.{verifyZeroInteractions, when}
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{GivenWhenThen, Matchers}
+import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.play.test.UnitSpec
+import util.logging.LoggingDetails
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -34,16 +36,19 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
 
   "File checking service" should {
 
+    implicit val ld = LoggingDetails.fromString("mock")
+
     val content = ObjectContent(new ByteArrayInputStream("TEST".getBytes), "TEST".length)
 
     val fileManager = new FileManager {
 
       override def delete(objectLocation: S3ObjectLocation): Future[Unit] = ???
 
-      override def getObjectMetadata(objectLocation: S3ObjectLocation): Future[InboundObjectMetadata] = ???
+      override def getObjectMetadata(objectLocation: S3ObjectLocation)(
+        implicit ld: LoggingDetails): Future[InboundObjectMetadata] = ???
 
-      override def withObjectContent[T](objectLocation: S3ObjectLocation)(
-        function: ObjectContent => Future[T]): Future[T] =
+      override def withObjectContent[T](objectLocation: S3ObjectLocation)(function: ObjectContent => Future[T])(
+        implicit ld: LoggingDetails): Future[T] =
         if (objectLocation.objectKey.contains("exception")) {
           Future.failed(new RuntimeException("Expected exception"))
         } else {
@@ -53,13 +58,13 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       override def copyObject(
         sourceLocation: S3ObjectLocation,
         targetLocation: S3ObjectLocation,
-        metadata: OutboundObjectMetadata): Future[Unit] = ???
+        metadata: OutboundObjectMetadata)(implicit ld: LoggingDetails): Future[Unit] = ???
 
       override def writeObject(
         sourceLocation: S3ObjectLocation,
         targetLocation: S3ObjectLocation,
         content: InputStream,
-        metadata: OutboundObjectMetadata): Future[Unit] = ???
+        metadata: OutboundObjectMetadata)(implicit ld: LoggingDetails): Future[Unit] = ???
     }
 
     val location = S3ObjectLocation("bucket", "file", None)

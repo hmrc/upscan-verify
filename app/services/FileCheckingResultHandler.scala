@@ -23,7 +23,7 @@ import config.ServiceConfiguration
 import javax.inject.Inject
 import model._
 import play.api.libs.json.Json
-import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetails
+import uk.gov.hmrc.http.logging.LoggingDetails
 import util.logging.LoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -35,7 +35,7 @@ class FileCheckingResultHandler @Inject()(
 
   def handleCheckingResult(
     objectDetails: InboundObjectDetails,
-    result: Either[FileValidationFailure, FileValidationSuccess]): Future[Unit] = {
+    result: Either[FileValidationFailure, FileValidationSuccess])(implicit ec: ExecutionContext): Future[Unit] = {
     implicit val ld = LoggingDetails.fromS3ObjectLocation(objectDetails.location)
 
     result match {
@@ -49,7 +49,8 @@ class FileCheckingResultHandler @Inject()(
   }
 
   private def handleValid(details: InboundObjectDetails, checksum: String, mimeType: MimeType)(
-    implicit ec: ExecutionContext) = {
+    implicit ec: ExecutionContext,
+    ld: LoggingDetails) = {
     val targetLocation =
       S3ObjectLocation(configuration.outboundBucket, UUID.randomUUID().toString, objectVersion = None)
     for {
@@ -63,7 +64,9 @@ class FileCheckingResultHandler @Inject()(
     } yield ()
   }
 
-  private def handleInfected(details: InboundObjectDetails, errorMessage: String)(implicit ec: ExecutionContext) = {
+  private def handleInfected(details: InboundObjectDetails, errorMessage: String)(
+    implicit ec: ExecutionContext,
+    ld: LoggingDetails) = {
     val fileCheckingError = ErrorMessage(Quarantine, errorMessage)
     val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
     val targetLocation =
@@ -78,7 +81,8 @@ class FileCheckingResultHandler @Inject()(
   }
 
   private def handleIncorrectType(details: InboundObjectDetails, mimeType: MimeType, serviceName: Option[String])(
-    implicit ec: ExecutionContext) = {
+    implicit ec: ExecutionContext,
+    ld: LoggingDetails) = {
     val errorMessage =
       s"MIME type [${mimeType.value}] is not allowed for service: [${serviceName.getOrElse("No service name provided")}]"
     val fileCheckingError = ErrorMessage(Rejected, errorMessage)

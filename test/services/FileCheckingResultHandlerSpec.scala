@@ -29,13 +29,17 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.mockito.MockitoSugar
 import uk.gov.hmrc.play.test.UnitSpec
+import util.logging.LoggingDetails
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Eventually with GivenWhenThen {
 
   "FileCheckingResultHandler" should {
+
+    implicit val ld = LoggingDetails.fromString("mock")
 
     val configuration = new ServiceConfiguration {
       override def quarantineBucket: String = "quarantine-bucket"
@@ -78,7 +82,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val outboundObjectMetadata =
         ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)
 
-      when(fileManager.copyObject(ArgumentMatchers.eq(file), any(), any())).thenReturn(Future.successful(()))
+      when(fileManager.copyObject(ArgumentMatchers.eq(file), any(), any())(any())).thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
       When("when processing scanning result")
@@ -91,7 +95,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       Then("file should be copied from inbound bucket to outbound bucket")
       val locationCaptor: ArgumentCaptor[S3ObjectLocation] = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
       verify(fileManager)
-        .copyObject(ArgumentMatchers.eq(file), locationCaptor.capture(), ArgumentMatchers.eq(outboundObjectMetadata))
+        .copyObject(ArgumentMatchers.eq(file), locationCaptor.capture(), ArgumentMatchers.eq(outboundObjectMetadata))(any())
       locationCaptor.getValue.bucket shouldBe configuration.outboundBucket
 
       And("file should be removed from inbound bucket")
@@ -115,7 +119,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val inboundObjectDetails  = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
 
       And("copying the file would fail")
-      when(fileManager.copyObject(ArgumentMatchers.eq(file), any(), any()))
+      when(fileManager.copyObject(ArgumentMatchers.eq(file), any(), any())(any()))
         .thenReturn(Future.failed(new Exception("Copy failed")))
 
       When("when processing scanning result")
@@ -133,7 +137,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
         .copyObject(
           ArgumentMatchers.eq(file),
           any(),
-          ArgumentMatchers.eq(ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)))
+          ArgumentMatchers.eq(ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)))(any())
       verifyNoMoreInteractions(fileManager)
 
       And("the whole process fails")
@@ -159,7 +163,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val outboundObjectMetadata =
         ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)
 
-      when(fileManager.copyObject(ArgumentMatchers.eq(file), any(), ArgumentMatchers.eq(outboundObjectMetadata)))
+      when(fileManager.copyObject(ArgumentMatchers.eq(file), any(), ArgumentMatchers.eq(outboundObjectMetadata))(any()))
         .thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.failed(new RuntimeException("Expected failure")))
 
@@ -195,7 +199,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val details = "There is a virus"
 
       when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
-      when(fileManager.writeObject(ArgumentMatchers.eq(file), any(), any(), any()))
+      when(fileManager.writeObject(ArgumentMatchers.eq(file), any(), any(), any())(any()))
         .thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
@@ -217,7 +221,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
           ArgumentMatchers.eq(file),
           locationCaptor.capture(),
           contentCaptor.capture(),
-          ArgumentMatchers.eq(outboundObjectMetadata))
+          ArgumentMatchers.eq(outboundObjectMetadata))(any())
       IOUtils.toString(contentCaptor.getValue) shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
 
       locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
@@ -308,7 +312,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectDetails)
 
       when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
-      when(fileManager.writeObject(ArgumentMatchers.eq(file), any(), any(), any()))
+      when(fileManager.writeObject(ArgumentMatchers.eq(file), any(), any(), any())(any()))
         .thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
 
@@ -334,7 +338,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
           ArgumentMatchers.eq(file),
           locationCaptor.capture(),
           captor.capture(),
-          ArgumentMatchers.eq(outboundObjectMetadata))
+          ArgumentMatchers.eq(outboundObjectMetadata))(any())
       IOUtils.toString(captor.getValue) shouldBe
         """{"failureReason":"REJECTED","message":"MIME type [application/pdf] is not allowed for service: [valid-test-service]"}"""
       locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
@@ -358,7 +362,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
 
       When("copying the file to outbound bucket succeeds")
-      when(fileManager.writeObject(ArgumentMatchers.eq(file), any(), any(), any()))
+      when(fileManager.writeObject(ArgumentMatchers.eq(file), any(), any(), any())(any()))
         .thenReturn(Future.successful(()))
 
       And("a file manager that fails to delete correctly")

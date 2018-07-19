@@ -61,7 +61,8 @@ class ScanUploadedFilesFlow @Inject()(
       parsedMessage <- toEitherT(parser.parse(message))(context = None)
 
       _ <- {
-        implicit val context = Some(MessageContext(LoggingDetails.fromS3ObjectLocation(parsedMessage.location)))
+        implicit val ld      = LoggingDetails.fromS3ObjectLocation(parsedMessage.location)
+        implicit val context = Some(MessageContext(ld))
 
         for {
           metadata <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))

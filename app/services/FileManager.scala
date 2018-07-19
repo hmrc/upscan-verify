@@ -21,6 +21,7 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 
 import model.S3ObjectLocation
+import uk.gov.hmrc.http.logging.LoggingDetails
 
 import scala.concurrent.Future
 
@@ -65,17 +66,17 @@ case class InvalidOutboundObjectMetadata(detailsOfSourceFile: InboundObjectDetai
 case class ObjectContent(inputStream: InputStream, length: Long)
 
 trait FileManager {
-  def copyObject(
-    sourceLocation: S3ObjectLocation,
-    targetLocation: S3ObjectLocation,
-    metadata: OutboundObjectMetadata): Future[Unit]
+  def copyObject(sourceLocation: S3ObjectLocation, targetLocation: S3ObjectLocation, metadata: OutboundObjectMetadata)(
+    implicit loggingDetails: LoggingDetails): Future[Unit]
   def writeObject(
     sourceLocation: S3ObjectLocation,
     targetLocation: S3ObjectLocation,
     content: InputStream,
-    metadata: OutboundObjectMetadata): Future[Unit]
+    metadata: OutboundObjectMetadata)(implicit loggingDetails: LoggingDetails): Future[Unit]
   def delete(objectLocation: S3ObjectLocation): Future[Unit]
-  def getObjectMetadata(objectLocation: S3ObjectLocation): Future[InboundObjectMetadata]
+  def getObjectMetadata(objectLocation: S3ObjectLocation)(
+    implicit loggingDetails: LoggingDetails): Future[InboundObjectMetadata]
 
-  def withObjectContent[T](objectLocation: S3ObjectLocation)(function: ObjectContent => Future[T]): Future[T]
+  def withObjectContent[T](objectLocation: S3ObjectLocation)(function: ObjectContent => Future[T])(
+    implicit loggingDetails: LoggingDetails): Future[T]
 }

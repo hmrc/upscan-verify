@@ -21,6 +21,8 @@ import model.{FileUploadEvent, Message, S3ObjectLocation}
 import play.api.Logger
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Reads._
+import util.logging.LoggingDetails
+import util.logging.WithLoggingDetails.withLoggingDetails
 import play.api.libs.json._
 import services._
 
@@ -75,23 +77,15 @@ class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessagePars
   private def interpretS3EventMessage(result: S3EventNotification): Future[FileUploadEvent] =
     result.records match {
       case S3EventNotificationRecord(_, "aws:s3", _, _, ObjectCreatedEventPattern(), requestParameters, s3Details) :: Nil => {
-        import org.slf4j.MDC
 
         val event = FileUploadEvent(
           S3ObjectLocation(s3Details.bucketName, s3Details.objectKey, s3Details.versionId),
           requestParameters.sourceIPAddress)
-        // Can't rely on MdcLoggingExecutionContext to add file-reference to the MDC, in the code below,
-        // because we don't already have the file-reference value when the thread begins executing.
-        // Therefore add file-reference to the MDC manually. This should be the only part of the code where we need to
-        // manually touch the MDC, since subsequent log statements will have access to the file-reference and can thus
-        // use MdcLoggingExecutionContext / LoggingDetails.
-        try {
-          MDC.put("file-reference", event.location.objectKey)
+
+        withLoggingDetails(LoggingDetails.fromString(event.location.objectKey)) {
           Logger.debug(s"Created FileUploadEvent for objectKey: [${event.location.objectKey}].")
-          Future.successful(event)
-        } finally {
-          MDC.remove("file-reference")
         }
+        Future.successful(event)
       }
       case _ => Future.failed(new Exception(s"Unexpected records in event: [${result.records.toString}]."))
     }

@@ -24,18 +24,21 @@ import com.codahale.metrics.MetricRegistry
 import com.kenshoo.play.metrics.Metrics
 import model._
 import org.mockito.ArgumentMatchers.{any, eq => meq}
-import org.mockito.Mockito
+import org.mockito.{ArgumentMatchers, Mockito}
 import org.mockito.Mockito.{never, verify, verifyNoMoreInteractions, when}
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{GivenWhenThen, Matchers}
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
 import uk.gov.hmrc.play.test.UnitSpec
+import util.logging.LoggingDetails
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThen with MockitoSugar {
+
+  implicit val ld = LoggingDetails.fromString("mock")
 
   val parser = new MessageParser {
     override def parse(message: Message) = message.body match {
@@ -65,14 +68,14 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       val inboundObjectMetadata =
         InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)
 
-      when(fileManager.getObjectMetadata(s3object)).thenReturn(Future.successful(inboundObjectMetadata))
+      when(fileManager.getObjectMetadata(ArgumentMatchers.eq(s3object))(any())).thenReturn(Future.successful(inboundObjectMetadata))
 
       val fileCheckingService = mock[FileCheckingService]
-      when(fileCheckingService.check(any(), any()))
+      when(fileCheckingService.check(any(), any())(any()))
         .thenReturn(Future.successful(Right(FileValidationSuccess("CHECKSUM", MimeType("application/xml")))))
 
       val scanningResultHandler = mock[FileCheckingResultHandler]
-      when(scanningResultHandler.handleCheckingResult(any(), any()))
+      when(scanningResultHandler.handleCheckingResult(any(), any())(any()))
         .thenReturn(Future.successful(()))
 
       val metrics = metricsStub()
@@ -106,61 +109,6 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).confirm(validMessage)
     }
 
-    "terminate instance if virus found" in {
-      Given("there are only valid messages in a message queue")
-      val validMessage = Message("ID", "VALID-BODY", "RECEIPT-1")
-      val s3object     = S3ObjectLocation("bucket", "ID", None)
-
-      val queueConsumer = mock[QueueConsumer]
-      when(queueConsumer.poll()).thenReturn(List(validMessage))
-      when(queueConsumer.confirm(any())).thenReturn(Future.successful(()))
-
-      val fileManager           = mock[FileManager]
-      val inboundObjectMetadata = InboundObjectMetadata(Map.empty, Instant.now)
-      when(fileManager.getObjectMetadata(s3object))
-        .thenReturn(Future.successful(inboundObjectMetadata))
-
-      val fileCheckingService = mock[FileCheckingService]
-      when(fileCheckingService.check(any(), any()))
-        .thenReturn(Future.successful(Left(FileInfected("Virus name"))))
-
-      val scanningResultHandler = mock[FileCheckingResultHandler]
-      when(scanningResultHandler.handleCheckingResult(any(), any()))
-        .thenReturn(Future.successful(()))
-
-      val metrics = metricsStub()
-
-      val queueOrchestrator =
-        new ScanUploadedFilesFlow(
-          queueConsumer,
-          parser,
-          fileManager,
-          fileCheckingService,
-          scanningResultHandler,
-          metrics)
-
-      When("the orchestrator is called")
-      Await.result(queueOrchestrator.run(), 30 seconds)
-
-      Then("the queue consumer should poll for messages")
-      verify(queueConsumer).poll()
-
-      And("scanning result handler is called")
-      verify(scanningResultHandler)
-        .handleCheckingResult(
-          InboundObjectDetails(inboundObjectMetadata, "127.0.0.1", s3object),
-          Left(FileInfected("Virus name")))
-
-      And("the metrics should be successfully updated")
-      metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 1
-      metrics.defaultRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 1
-      metrics.defaultRegistry.timer("upscanVerifyProcessing").getSnapshot.size()  shouldBe 1
-
-      And("successfully processed messages are confirmed")
-      verify(queueConsumer).confirm(validMessage)
-
-    }
-
     "get messages from the queue consumer, and perform scanning for valid messages and ignore invalid messages" in {
       Given("there are only valid messages in a message queue")
       val validMessage1  = Message("ID1", "VALID-BODY", "RECEIPT-1")
@@ -178,13 +126,13 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
       val fileManager           = mock[FileManager]
       val inboundObjectMetadata = InboundObjectMetadata(Map.empty, Instant.now)
-      when(fileManager.getObjectMetadata(any()))
+      when(fileManager.getObjectMetadata(any())(any()))
         .thenReturn(Future.successful(inboundObjectMetadata))
 
       val fileCheckingService = mock[FileCheckingService]
-      when(fileCheckingService.check(meq(s3object1), any()))
+      when(fileCheckingService.check(meq(s3object1), any())(any()))
         .thenReturn(Future.successful(Right(FileValidationSuccess("CHECKSUM", MimeType("application.xml")))))
-      when(fileCheckingService.check(meq(s3object3), any()))
+      when(fileCheckingService.check(meq(s3object3), any())(any()))
         .thenReturn(Future.successful(Left(FileInfected("infection"))))
 
       val scanningResultHandler = mock[FileCheckingResultHandler]
@@ -262,19 +210,19 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       val inboundObjectMetadata = InboundObjectMetadata(Map.empty, Instant.now)
 
       val fileManager = mock[FileManager]
-      when(fileManager.getObjectMetadata(any())).thenReturn(Future.successful(inboundObjectMetadata))
+      when(fileManager.getObjectMetadata(any())(any())).thenReturn(Future.successful(inboundObjectMetadata))
 
       val fileCheckingService = mock[FileCheckingService]
-      when(fileCheckingService.check(meq(s3object1), any()))
+      when(fileCheckingService.check(meq(s3object1), any())(any()))
         .thenReturn(Future.successful(Right(FileValidationSuccess("CHECKSUM", MimeType("application.xml")))))
-      when(fileCheckingService.check(meq(s3object2), any()))
+      when(fileCheckingService.check(meq(s3object2), any())(any()))
         .thenReturn(Future.failed(new Exception("Planned exception")))
 
-      when(fileCheckingService.check(meq(s3object3), any()))
+      when(fileCheckingService.check(meq(s3object3), any())(any()))
         .thenReturn(Future.successful(Left(FileInfected("infection"))))
 
       val scanningResultHandler = mock[FileCheckingResultHandler]
-      when(scanningResultHandler.handleCheckingResult(any(), any()))
+      when(scanningResultHandler.handleCheckingResult(any(), any())(any()))
         .thenReturn(Future.successful(()))
 
       val metrics = metricsStub()
@@ -345,17 +293,17 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
       And("the fileManager fails to return file metadata for the 2nd message")
       val fileManager = mock[FileManager]
-      when(fileManager.getObjectMetadata(s3object1))
+      when(fileManager.getObjectMetadata(ArgumentMatchers.eq(s3object1))(any()))
         .thenReturn(Future.successful(metadata1))
-      when(fileManager.getObjectMetadata(s3object2))
+      when(fileManager.getObjectMetadata(ArgumentMatchers.eq(s3object2))(any()))
         .thenReturn(Future.failed(new AmazonServiceException("Expected exception")))
-      when(fileManager.getObjectMetadata(s3object3))
+      when(fileManager.getObjectMetadata(ArgumentMatchers.eq(s3object3))(any()))
         .thenReturn(Future.successful(metadata3))
 
       val fileCheckingService = mock[FileCheckingService]
-      when(fileCheckingService.check(meq(s3object1), any()))
+      when(fileCheckingService.check(meq(s3object1), any())(any()))
         .thenReturn(Future.successful(Right(FileValidationSuccess("CHECKSUM", MimeType("application/xml")))))
-      when(fileCheckingService.check(meq(s3object3), any()))
+      when(fileCheckingService.check(meq(s3object3), any())(any()))
         .thenReturn(Future.successful(Right(FileValidationSuccess("CHECKSUM", MimeType("application/xml")))))
 
       val scanningResultHandler = mock[FileCheckingResultHandler]
@@ -388,8 +336,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).poll()
 
       And("the subsequent components should be invoked for 1st and 3rd messages")
-      verify(fileCheckingService).check(meq(s3object1), any())
-      verify(fileCheckingService).check(meq(s3object3), any())
+      verify(fileCheckingService).check(meq(s3object1), any())(any())
+      verify(fileCheckingService).check(meq(s3object3), any())(any())
 
       verify(scanningResultHandler)
         .handleCheckingResult(
@@ -404,7 +352,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(queueConsumer).confirm(validMessage3)
 
       And("the subsequent components should not be invoked for the 2nd message")
-      verify(fileCheckingService, never()).check(meq(s3object2), any())
+      verify(fileCheckingService, never()).check(meq(s3object2), any())(any())
       verify(queueConsumer, never()).confirm(validMessage2)
 
       verifyNoMoreInteractions(fileCheckingService, scanningResultHandler, queueConsumer)

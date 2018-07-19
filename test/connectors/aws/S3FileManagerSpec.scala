@@ -32,6 +32,7 @@ package connectors.aws
  * limitations under the License.
  */
 
+import util.logging.LoggingDetails
 import java.io.ByteArrayInputStream
 import java.time.Instant
 import java.util
@@ -65,6 +66,8 @@ class S3FileManagerSpec
 
   private val awsLastModified      = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
   private val metadataLastModified = awsLastModified.toInstant
+
+  implicit val ld = LoggingDetails.fromString("mock")
 
   "S3FileManager" should {
     "allow to copy file from inbound bucket to outbound bucket" in {

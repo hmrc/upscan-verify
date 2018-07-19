@@ -26,7 +26,7 @@ object LoggingDetails {
   def fromS3ObjectLocation(s3ObjectLocation: S3ObjectLocation): HeaderCarrier =
     fromString(s3ObjectLocation.objectKey)
 
-  private def fromString(reference: String): HeaderCarrier =
+  def fromString(reference: String): HeaderCarrier =
     new HeaderCarrier() {
       override lazy val mdcData: Map[String, String] = super.mdcData + ("file-reference" -> reference)
     }

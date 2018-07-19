@@ -18,11 +18,14 @@ package services
 
 import java.util.concurrent.TimeUnit
 
-import javax.inject.Inject
 import com.kenshoo.play.metrics.Metrics
-import play.api.Logger
 import config.ServiceConfiguration
+import javax.inject.Inject
 import model._
+import play.api.Logger
+import uk.gov.hmrc.http.logging.LoggingDetails
+import util.logging.LoggingDetails
+import util.logging.WithLoggingDetails.withLoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -37,6 +40,8 @@ class FileTypeCheckingService @Inject()(
     location: S3ObjectLocation,
     objectContent: ObjectContent,
     objectMetadata: InboundObjectMetadata): Future[Either[FileValidationFailure, FileAllowed]] = {
+
+    implicit val ld = LoggingDetails.fromS3ObjectLocation(location)
 
     val startTimeMilliseconds = System.currentTimeMillis()
 
@@ -57,19 +62,23 @@ class FileTypeCheckingService @Inject()(
   private def isAllowedMimeType(
     mimeType: MimeType,
     location: S3ObjectLocation,
-    consumingService: Option[String]): Boolean =
+    consumingService: Option[String])(implicit ld : LoggingDetails): Boolean =
     consumingService match {
       case Some(service) => isAllowedForService(mimeType, service)
       case None =>
-        Logger.error(s"No x-amz-meta-consuming-service metadata for [${location.objectKey}]")
+        withLoggingDetails(ld) {
+          Logger.error(s"No x-amz-meta-consuming-service metadata for [${location.objectKey}]")
+        }
         false
     }
 
-  private def isAllowedForService(mimeType: MimeType, consumingService: String): Boolean = {
+  private def isAllowedForService(mimeType: MimeType, consumingService: String)(implicit ld : LoggingDetails): Boolean = {
     val allowedMimeTypes = serviceConfiguration.consumingServicesConfiguration.allowedMimeTypes(consumingService)
     if (allowedMimeTypes.contains(mimeType.value)) true
     else {
-      Logger.error(s"Consuming service [$consumingService] does not allow MIME type: [${mimeType.value}]")
+      withLoggingDetails(ld) {
+        Logger.error(s"Consuming service [$consumingService] does not allow MIME type: [${mimeType.value}]")
+      }
       false
     }
   }

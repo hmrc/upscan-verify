@@ -24,18 +24,16 @@ import model._
 import play.api.Logger
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
+import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetails
-import util.logging.LoggingDetails
 
 import scala.concurrent.Future
 
 case class NoVirusFound(checksum: String)
 
 trait ScanningService {
-  def scan(
-    location: S3ObjectLocation,
-    objectContent: ObjectContent,
-    objectMetadata: InboundObjectMetadata): Future[Either[FileValidationFailure, NoVirusFound]]
+  def scan(location: S3ObjectLocation, objectContent: ObjectContent, objectMetadata: InboundObjectMetadata)(
+    implicit ld: LoggingDetails): Future[Either[FileValidationFailure, NoVirusFound]]
 }
 
 class ClamAvScanningService @Inject()(
@@ -44,11 +42,8 @@ class ClamAvScanningService @Inject()(
   metrics: Metrics)
     extends ScanningService {
 
-  override def scan(
-    location: S3ObjectLocation,
-    fileContent: ObjectContent,
-    metadata: InboundObjectMetadata): Future[Either[FileInfected, NoVirusFound]] = {
-    implicit val ld = LoggingDetails.fromS3ObjectLocation(location)
+  override def scan(location: S3ObjectLocation, fileContent: ObjectContent, metadata: InboundObjectMetadata)(
+    implicit ld: LoggingDetails): Future[Either[FileInfected, NoVirusFound]] = {
 
     val antivirusClient       = clamClientFactory.getClient()
     val startTimeMilliseconds = System.currentTimeMillis()

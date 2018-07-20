@@ -82,7 +82,7 @@ class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessagePars
           S3ObjectLocation(s3Details.bucketName, s3Details.objectKey, s3Details.versionId),
           requestParameters.sourceIPAddress)
 
-        withLoggingDetails(LoggingDetails.fromString(event.location.objectKey)) {
+        withLoggingDetails(LoggingDetails.fromMessageContext(MessageContext(event.location.objectKey))) {
           Logger.debug(s"Created FileUploadEvent for objectKey: [${event.location.objectKey}].")
         }
         Future.successful(event)

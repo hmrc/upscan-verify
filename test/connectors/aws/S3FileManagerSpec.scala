@@ -32,9 +32,10 @@ package connectors.aws
  * limitations under the License.
  */
 
-import util.logging.LoggingDetails
 import java.io.ByteArrayInputStream
 import java.time.Instant
+
+import util.logging.LoggingDetails
 import java.util
 import java.util.{Calendar, GregorianCalendar}
 
@@ -52,6 +53,7 @@ import org.scalatest.{Assertions, GivenWhenThen, Matchers}
 import services._
 import uk.gov.hmrc.play.test.UnitSpec
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -67,7 +69,7 @@ class S3FileManagerSpec
   private val awsLastModified      = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
   private val metadataLastModified = awsLastModified.toInstant
 
-  implicit val ld = LoggingDetails.fromString("mock")
+  implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   "S3FileManager" should {
     "allow to copy file from inbound bucket to outbound bucket" in {

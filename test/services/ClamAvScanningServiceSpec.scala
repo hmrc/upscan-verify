@@ -29,11 +29,14 @@ import org.scalatest.{Assertions, GivenWhenThen, Matchers}
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
 import uk.gov.hmrc.play.test.UnitSpec
+import util.logging.LoggingDetails
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen with MockitoSugar {
+
+  implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   "ClamAvScanningService" should {
 

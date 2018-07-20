@@ -31,13 +31,13 @@ import scala.concurrent.{ExecutionContext, Future}
 class FileCheckingResultHandler @Inject()(
   fileManager: FileManager,
   virusNotifier: VirusNotifier,
-  configuration: ServiceConfiguration) {
+  configuration: ServiceConfiguration)(implicit ec: ExecutionContext) {
 
   def handleCheckingResult(
     objectDetails: InboundObjectDetails,
-    result: Either[FileValidationFailure, FileValidationSuccess])(implicit ec: ExecutionContext): Future[Unit] = {
-    implicit val ld = LoggingDetails.fromS3ObjectLocation(objectDetails.location)
-
+    result: Either[FileValidationFailure, FileValidationSuccess])(
+    implicit
+    ld: LoggingDetails): Future[Unit] =
     result match {
       case Right(FileValidationSuccess(checksum, mimeType)) =>
         handleValid(objectDetails, checksum, mimeType)
@@ -46,7 +46,6 @@ class FileCheckingResultHandler @Inject()(
       case Left(IncorrectFileType(mime, consumingService)) =>
         handleIncorrectType(objectDetails, mime, consumingService)
     }
-  }
 
   private def handleValid(details: InboundObjectDetails, checksum: String, mimeType: MimeType)(
     implicit ec: ExecutionContext,

@@ -36,13 +36,13 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
 
   "File checking service" should {
 
-    implicit val ld = LoggingDetails.fromString("mock")
+    implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
     val content = ObjectContent(new ByteArrayInputStream("TEST".getBytes), "TEST".length)
 
     val fileManager = new FileManager {
 
-      override def delete(objectLocation: S3ObjectLocation): Future[Unit] = ???
+      override def delete(objectLocation: S3ObjectLocation)(implicit ld: LoggingDetails): Future[Unit] = ???
 
       override def getObjectMetadata(objectLocation: S3ObjectLocation)(
         implicit ld: LoggingDetails): Future[InboundObjectMetadata] = ???

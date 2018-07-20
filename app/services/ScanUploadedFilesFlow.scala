@@ -20,110 +20,60 @@ import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 import cats.implicits._
-import cats.data.EitherT
-import javax.inject.Inject
-
 import com.kenshoo.play.metrics.Metrics
+import javax.inject.Inject
 import model.Message
-import play.api.Logger
-import uk.gov.hmrc.http.logging.LoggingDetails
 import util.logging.LoggingDetails
-import util.logging.WithLoggingDetails.withLoggingDetails
+import utils.MonadicUtils._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
-case class MessageContext(ld: LoggingDetails)
+case class MessageContext(fileReference: String)
 
 case class ExceptionWithContext(e: Exception, context: Option[MessageContext])
 
 class ScanUploadedFilesFlow @Inject()(
-  consumer: QueueConsumer,
   parser: MessageParser,
   fileManager: FileManager,
   fileCheckingService: FileCheckingService,
   scanningResultHandler: FileCheckingResultHandler,
   metrics: Metrics)(implicit ec: ExecutionContext)
-    extends PollingJob {
+    extends MessageProcessor {
 
-  def run(): Future[Unit] = {
-    val outcomes = for {
-      messages        <- consumer.poll()
-      messageOutcomes <- Future.sequence { messages.map(processMessage) }
-    } yield messageOutcomes
-
-    outcomes.map(_ => ())
-  }
-
-  private def processMessage(message: Message): Future[Unit] = {
+  def processMessage(message: Message): FutureEitherWithContext[MessageContext] = {
     val messageProcessingStartTime = System.currentTimeMillis
 
-    val outcome = for {
-      parsedMessage <- toEitherT(parser.parse(message))(context = None)
-
-      _ <- {
-        implicit val ld      = LoggingDetails.fromS3ObjectLocation(parsedMessage.location)
-        implicit val context = Some(MessageContext(ld))
-
-        for {
-          metadata <- toEitherT(fileManager.getObjectMetadata(parsedMessage.location))
-          inboundObjectDetails = InboundObjectDetails(metadata, parsedMessage.clientIp, parsedMessage.location)
-          scanningResult <- toEitherT(fileCheckingService.check(parsedMessage.location, metadata))
-          _              <- toEitherT(addMetrics(metadata.uploadedTimestamp, messageProcessingStartTime, System.currentTimeMillis))
-          _              <- toEitherT(scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult))
-          _              <- toEitherT(consumer.confirm(message))
-        } yield ()
-      }
-    } yield ()
-
-    outcome.value.map {
-      case Right(_) =>
-        ()
-      case Left(ExceptionWithContext(exception, Some(context))) =>
-        withLoggingDetails(context.ld) {
-          Logger.error(
-            s"Failed to process message '${message.id}' for file '${context.ld.mdcData
-              .getOrElse("file-reference", "???")}', cause ${exception.getMessage}",
-            exception
-          )
-        }
-      case Left(ExceptionWithContext(exception, None)) =>
-        Logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)
-    }
-  }
-
-  private def toEitherT[T](f: Future[T])(
-    implicit context: Option[MessageContext]): EitherT[Future, ExceptionWithContext, T] = {
-    val futureEither: Future[Either[ExceptionWithContext, T]] =
-      f.map(Right(_))
-        .recover { case error: Exception => Left(ExceptionWithContext(error, context)) }
-    EitherT(futureEither)
-  }
-
-  private def addMetrics(
-    uploadedTimestamp: Instant,
-    startTimeMilliseconds: Long,
-    endTimeMilliseconds: Long): Future[Unit] =
     for {
-      _ <- addUploadToStartProcessMetrics(uploadedTimestamp, startTimeMilliseconds)
-      _ <- addUploadToEndScanMetrics(uploadedTimestamp, endTimeMilliseconds)
-      _ <- addInternalProcessMetrics(startTimeMilliseconds, endTimeMilliseconds)
-    } yield ()
+      parsedMessage <- withoutContext(parser.parse(message))
+      context = MessageContext(parsedMessage.location.objectKey)
+      ld      = LoggingDetails.fromMessageContext(context)
+      metadata <- withContext(fileManager.getObjectMetadata(parsedMessage.location)(ld), context)
+      inboundObjectDetails = InboundObjectDetails(metadata, parsedMessage.clientIp, parsedMessage.location)
+      scanningResult <- withContext(fileCheckingService.check(parsedMessage.location, metadata)(ld), context)
+      _ = addMetrics(metadata.uploadedTimestamp, messageProcessingStartTime, System.currentTimeMillis)
+      _ <- withContext(scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult)(ld), context)
+    } yield context
 
-  private def addInternalProcessMetrics(startTimeMilliseconds: Long, endTimeMilliseconds: Long): Future[Unit] =
-    Future.successful {
-      val interval = endTimeMilliseconds - startTimeMilliseconds
-      metrics.defaultRegistry.timer("upscanVerifyProcessing").update(interval, TimeUnit.MILLISECONDS)
-    }
+  }
 
-  private def addUploadToStartProcessMetrics(uploadedTimestamp: Instant, startTimeMilliseconds: Long): Future[Unit] =
-    Future.successful {
-      val interval = startTimeMilliseconds - uploadedTimestamp.toEpochMilli
-      metrics.defaultRegistry.timer("uploadToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
-    }
+  private def addMetrics(uploadedTimestamp: Instant, startTimeMilliseconds: Long, endTimeMilliseconds: Long): Unit = {
+    addUploadToStartProcessMetrics(uploadedTimestamp, startTimeMilliseconds)
+    addUploadToEndScanMetrics(uploadedTimestamp, endTimeMilliseconds)
+    addInternalProcessMetrics(startTimeMilliseconds, endTimeMilliseconds)
+  }
 
-  private def addUploadToEndScanMetrics(uploadedTimestamp: Instant, endTimeMilliseconds: Long): Future[Unit] =
-    Future.successful {
-      val interval = endTimeMilliseconds - uploadedTimestamp.toEpochMilli
-      metrics.defaultRegistry.timer("uploadToScanComplete").update(interval, TimeUnit.MILLISECONDS)
-    }
+  private def addInternalProcessMetrics(startTimeMilliseconds: Long, endTimeMilliseconds: Long): Unit = {
+    val interval = endTimeMilliseconds - startTimeMilliseconds
+    metrics.defaultRegistry.timer("upscanVerifyProcessing").update(interval, TimeUnit.MILLISECONDS)
+  }
+
+  private def addUploadToStartProcessMetrics(uploadedTimestamp: Instant, startTimeMilliseconds: Long): Unit = {
+    val interval = startTimeMilliseconds - uploadedTimestamp.toEpochMilli
+    metrics.defaultRegistry.timer("uploadToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
+  }
+
+  private def addUploadToEndScanMetrics(uploadedTimestamp: Instant, endTimeMilliseconds: Long): Unit = {
+    val interval = endTimeMilliseconds - uploadedTimestamp.toEpochMilli
+    metrics.defaultRegistry.timer("uploadToScanComplete").update(interval, TimeUnit.MILLISECONDS)
+  }
 }

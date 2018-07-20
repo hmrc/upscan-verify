@@ -27,12 +27,15 @@ import org.scalatest.mockito.MockitoSugar
 import uk.gov.hmrc.play.test.UnitSpec
 import com.kenshoo.play.metrics.Metrics
 import com.codahale.metrics.MetricRegistry
+import util.logging.LoggingDetails
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with MockitoSugar {
+
+  implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   def metricsStub() = new Metrics {
     override val defaultRegistry: MetricRegistry = new MetricRegistry

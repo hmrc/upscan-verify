@@ -36,12 +36,8 @@ class FileTypeCheckingService @Inject()(
   serviceConfiguration: ServiceConfiguration,
   metrics: Metrics)(implicit ec: ExecutionContext) {
 
-  def scan(
-    location: S3ObjectLocation,
-    objectContent: ObjectContent,
-    objectMetadata: InboundObjectMetadata): Future[Either[FileValidationFailure, FileAllowed]] = {
-
-    implicit val ld = LoggingDetails.fromS3ObjectLocation(location)
+  def scan(location: S3ObjectLocation, objectContent: ObjectContent, objectMetadata: InboundObjectMetadata)(
+    implicit ld: LoggingDetails): Future[Either[FileValidationFailure, FileAllowed]] = {
 
     val startTimeMilliseconds = System.currentTimeMillis()
 
@@ -59,10 +55,8 @@ class FileTypeCheckingService @Inject()(
     }
   }
 
-  private def isAllowedMimeType(
-    mimeType: MimeType,
-    location: S3ObjectLocation,
-    consumingService: Option[String])(implicit ld : LoggingDetails): Boolean =
+  private def isAllowedMimeType(mimeType: MimeType, location: S3ObjectLocation, consumingService: Option[String])(
+    implicit ld: LoggingDetails): Boolean =
     consumingService match {
       case Some(service) => isAllowedForService(mimeType, service)
       case None =>
@@ -72,7 +66,8 @@ class FileTypeCheckingService @Inject()(
         false
     }
 
-  private def isAllowedForService(mimeType: MimeType, consumingService: String)(implicit ld : LoggingDetails): Boolean = {
+  private def isAllowedForService(mimeType: MimeType, consumingService: String)(
+    implicit ld: LoggingDetails): Boolean = {
     val allowedMimeTypes = serviceConfiguration.consumingServicesConfiguration.allowedMimeTypes(consumingService)
     if (allowedMimeTypes.contains(mimeType.value)) true
     else {

@@ -51,7 +51,7 @@ sealed trait OutboundObjectMetadata {
 case class ValidOutboundObjectMetadata(detailsOfSourceFile: InboundObjectDetails, checksum: String, mimeType: MimeType)
     extends OutboundObjectMetadata {
 
-  override lazy val outcomeSpecificMetadata = {
+  override lazy val outcomeSpecificMetadata: Map[String, String] = {
     Map(
       "initiate-date" -> DateTimeFormatter.ISO_INSTANT.format(detailsOfSourceFile.metadata.uploadedTimestamp),
       "checksum"      -> checksum,
@@ -73,7 +73,7 @@ trait FileManager {
     targetLocation: S3ObjectLocation,
     content: InputStream,
     metadata: OutboundObjectMetadata)(implicit loggingDetails: LoggingDetails): Future[Unit]
-  def delete(objectLocation: S3ObjectLocation): Future[Unit]
+  def delete(objectLocation: S3ObjectLocation)(implicit loggingDetails: LoggingDetails): Future[Unit]
   def getObjectMetadata(objectLocation: S3ObjectLocation)(
     implicit loggingDetails: LoggingDetails): Future[InboundObjectMetadata]
 

@@ -26,14 +26,12 @@ import model.S3ObjectLocation
 import play.api.Logger
 import services.{FileManager, InboundObjectMetadata, ObjectContent, OutboundObjectMetadata}
 import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetails
-import util.logging.LoggingDetails
 import util.logging.WithLoggingDetails.withLoggingDetails
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class S3FileManager @Inject()(s3Client: AmazonS3) extends FileManager {
+class S3FileManager @Inject()(s3Client: AmazonS3)(implicit ec: ExecutionContext) extends FileManager {
 
   override def copyObject(
     sourceLocation: S3ObjectLocation,
@@ -80,16 +78,13 @@ class S3FileManager @Inject()(s3Client: AmazonS3) extends FileManager {
     awsMetadata
   }
 
-  override def delete(objectLocation: S3ObjectLocation) = {
-    implicit val ld = LoggingDetails.fromS3ObjectLocation(objectLocation)
-
+  override def delete(objectLocation: S3ObjectLocation)(implicit loggingDetails: LoggingDetails) =
     Future {
       objectLocation.objectVersion match {
         case Some(versionId) => s3Client.deleteVersion(objectLocation.bucket, objectLocation.objectKey, versionId)
         case None            => s3Client.deleteObject(objectLocation.bucket, objectLocation.objectKey)
       }
     }
-  }
 
   override def withObjectContent[T](objectLocation: S3ObjectLocation)(function: ObjectContent => Future[T])(
     implicit loggingDetails: LoggingDetails): Future[T] =

@@ -14,19 +14,12 @@
  * limitations under the License.
  */
 
-package util.logging
+package services
 
-import services.MessageContext
-import uk.gov.hmrc.http.HeaderCarrier
+import model.Message
+import utils.MonadicUtils.FutureEitherWithContext
 
-/**
-  * Convenience methods to create a [[uk.gov.hmrc.http.logging.LoggingDetails]] instance, required by [[uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext]].
-  */
-object LoggingDetails {
-  def fromMessageContext(messageContext: MessageContext): HeaderCarrier =
-    new HeaderCarrier() {
-      override lazy val mdcData
-        : Map[String, String] = super.mdcData + ("file-reference" -> messageContext.fileReference)
-    }
+trait MessageProcessor {
+  def processMessage(message: Message): FutureEitherWithContext[MessageContext]
 
 }

@@ -39,7 +39,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
   "FileCheckingResultHandler" should {
 
-    implicit val ld = LoggingDetails.fromString("mock")
+    implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
     val configuration = new ServiceConfiguration {
       override def quarantineBucket: String = "quarantine-bucket"
@@ -95,7 +95,8 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       Then("file should be copied from inbound bucket to outbound bucket")
       val locationCaptor: ArgumentCaptor[S3ObjectLocation] = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
       verify(fileManager)
-        .copyObject(ArgumentMatchers.eq(file), locationCaptor.capture(), ArgumentMatchers.eq(outboundObjectMetadata))(any())
+        .copyObject(ArgumentMatchers.eq(file), locationCaptor.capture(), ArgumentMatchers.eq(outboundObjectMetadata))(
+          any())
       locationCaptor.getValue.bucket shouldBe configuration.outboundBucket
 
       And("file should be removed from inbound bucket")
@@ -137,7 +138,8 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
         .copyObject(
           ArgumentMatchers.eq(file),
           any(),
-          ArgumentMatchers.eq(ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)))(any())
+          ArgumentMatchers.eq(ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)))(
+          any())
       verifyNoMoreInteractions(fileManager)
 
       And("the whole process fails")

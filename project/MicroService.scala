@@ -4,7 +4,6 @@ import play.sbt.routes.RoutesKeys.routesGenerator
 import sbt.Keys._
 import sbt.Tests.{Group, SubProcess}
 import sbt._
-import uk.gov.hmrc.SbtArtifactory.autoImport.makePublicallyAvailableOnBintray
 import uk.gov.hmrc.sbtdistributables.SbtDistributablesPlugin
 import uk.gov.hmrc.versioning.SbtGitVersioning
 import uk.gov.hmrc.versioning.SbtGitVersioning.autoImport.majorVersion
@@ -51,7 +50,7 @@ trait MicroService {
       retrieveManaged := true,
       routesGenerator := StaticRoutesGenerator
     )
-    .settings(majorVersion := 1, makePublicallyAvailableOnBintray := true)
+    .settings(majorVersion := 1)
     .configs(IntegrationTest)
     .settings(inConfig(IntegrationTest)(Defaults.itSettings): _*)
     .settings(SbtDistributablesPlugin.publishingSettings: _*)

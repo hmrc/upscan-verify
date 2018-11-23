@@ -17,6 +17,7 @@
 package connectors.aws
 
 import java.io.InputStream
+import java.time.{Clock, Instant}
 import java.util.UUID
 
 import com.amazonaws.services.s3.AmazonS3
@@ -31,7 +32,7 @@ import util.logging.WithLoggingDetails.withLoggingDetails
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 
-class S3FileManager @Inject()(s3Client: AmazonS3)(implicit ec: ExecutionContext) extends FileManager {
+class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: ExecutionContext) extends FileManager {
 
   override def copyObject(
     sourceLocation: S3ObjectLocation,

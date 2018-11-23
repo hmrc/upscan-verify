@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import java.time.Clock
+
 import config.{PlayBasedServiceConfiguration, ServiceConfiguration}
 import connectors.aws.{S3EventParser, S3FileManager, SqsQueueConsumer}
 import play.api.inject.{Binding, Module}
@@ -33,6 +35,7 @@ class ScannerModule extends Module {
       bind[FileManager].to[S3FileManager],
       bind[VirusNotifier].toInstance(LoggingVirusNotifier),
       bind[FileTypeDetector].to[TikaFileTypeDetector],
-      bind[ChecksumComputingInputStreamFactory].toInstance(SHA256ChecksumComputingInputStreamFactory)
+      bind[ChecksumComputingInputStreamFactory].toInstance(SHA256ChecksumComputingInputStreamFactory),
+      bind[Clock].toInstance(Clock.systemDefaultZone())
     )
 }

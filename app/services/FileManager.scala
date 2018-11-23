@@ -48,20 +48,30 @@ sealed trait OutboundObjectMetadata {
   def outcomeSpecificMetadata: Map[String, String] = Map.empty
 }
 
-case class ValidOutboundObjectMetadata(detailsOfSourceFile: InboundObjectDetails, checksum: String, mimeType: MimeType)
-    extends OutboundObjectMetadata {
+case class ValidOutboundObjectMetadata(detailsOfSourceFile: InboundObjectDetails,
+                                       checksum: String,
+                                       mimeType: MimeType,
+                                       additionalOutboundMetadata: Map[String,String])
+  extends OutboundObjectMetadata {
 
   override lazy val outcomeSpecificMetadata: Map[String, String] = {
     Map(
       "initiate-date" -> DateTimeFormatter.ISO_INSTANT.format(detailsOfSourceFile.metadata.uploadedTimestamp),
       "checksum"      -> checksum,
       "mime-type"     -> mimeType.value
-    )
+    ) ++ additionalOutboundMetadata
   }
 
 }
 
-case class InvalidOutboundObjectMetadata(detailsOfSourceFile: InboundObjectDetails) extends OutboundObjectMetadata {}
+case class InvalidOutboundObjectMetadata(detailsOfSourceFile: InboundObjectDetails,
+                                         additionalOutboundMetadata: Map[String,String]) extends OutboundObjectMetadata {
+  override lazy val outcomeSpecificMetadata: Map[String, String] = {
+    Map(
+      "initiate-date" -> DateTimeFormatter.ISO_INSTANT.format(detailsOfSourceFile.metadata.uploadedTimestamp)
+    ) ++ additionalOutboundMetadata
+  }
+}
 
 case class ObjectContent(inputStream: InputStream, length: Long)
 

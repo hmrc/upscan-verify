@@ -16,6 +16,7 @@
 
 package services
 
+import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
 
 import com.kenshoo.play.metrics.Metrics
@@ -29,29 +30,30 @@ import util.logging.WithLoggingDetails.withLoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
 
-case class FileAllowed(mimeType: MimeType)
+case class FileAllowed(mimeType: MimeType, fileTypeTimings: Timings)
 
 class FileTypeCheckingService @Inject()(
   fileTypeDetector: FileTypeDetector,
   serviceConfiguration: ServiceConfiguration,
-  metrics: Metrics)(implicit ec: ExecutionContext) {
+  metrics: Metrics,
+  clock: Clock)(implicit ec: ExecutionContext) {
 
   def scan(location: S3ObjectLocation, objectContent: ObjectContent, objectMetadata: InboundObjectMetadata)(
     implicit ld: LoggingDetails): Future[Either[FileValidationFailure, FileAllowed]] = {
 
-    val startTimeMilliseconds = System.currentTimeMillis()
+    val startTime = clock.instant()
 
     val consumingService = objectMetadata.items.get("consuming-service")
     val fileType         = fileTypeDetector.detectType(objectContent.inputStream, objectMetadata.originalFilename)
 
-    addCheckingTimeMetrics(startTimeMilliseconds)
+    addCheckingTimeMetrics(startTime)
 
     if (isAllowedMimeType(fileType, location, consumingService)) {
       metrics.defaultRegistry.counter("validTypeFileUpload").inc()
-      Future.successful(Right(FileAllowed(fileType)))
+      Future.successful(Right(FileAllowed(fileType, Timings(startTime, clock.instant()))))
     } else {
       metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
-      Future.successful(Left(IncorrectFileType(fileType, consumingService)))
+      Future.successful(Left(IncorrectFileType(fileType, consumingService, Timings(startTime, clock.instant()))))
     }
   }
 
@@ -78,9 +80,8 @@ class FileTypeCheckingService @Inject()(
     }
   }
 
-  private def addCheckingTimeMetrics(startTimeMilliseconds: Long) = {
-    val endTimeMilliseconds = System.currentTimeMillis()
-    val interval            = endTimeMilliseconds - startTimeMilliseconds
+  private def addCheckingTimeMetrics(startTime: Instant) = {
+    val interval = clock.instant().toEpochMilli() - startTime.toEpochMilli()
     metrics.defaultRegistry.timer("fileTypeCheckingTime").update(interval, TimeUnit.MILLISECONDS)
   }
 }

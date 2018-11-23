@@ -20,19 +20,21 @@ import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
 
 import model._
-import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.{verifyZeroInteractions, when}
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{GivenWhenThen, Matchers}
 import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.play.test.UnitSpec
 import util.logging.LoggingDetails
+import utils.WithIncrementingClock
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen with MockitoSugar {
+class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen with MockitoSugar with WithIncrementingClock {
+
+  override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
   "File checking service" should {
 
@@ -68,22 +70,24 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
     }
 
     val location = S3ObjectLocation("bucket", "file", None)
-    val metadata = InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)
+    val metadata = InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clock.instant())
 
-    "succeed when virus and file type scanning succedded" in {
+    "succeed when virus and file type scanning succeeded" in {
 
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
-      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
+      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService, clock)
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM"))))
+        .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant())))))
 
       when(fileTypeCheckingService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Right(FileAllowed(MimeType("application/xml")))))
+        .thenReturn(Future.successful(Right(FileAllowed(MimeType("application/xml"), Timings(clock.instant(), clock.instant())))))
 
       Await.result(fileCheckingService.check(location, metadata), 30.seconds) shouldBe
-        Right(FileValidationSuccess("CHECKSUM", MimeType("application/xml")))
+        Right(FileValidationSuccess("CHECKSUM", MimeType("application/xml"),
+          Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1)),
+          Timings(clockStart.plusSeconds(2), clockStart.plusSeconds(3))))
 
     }
 
@@ -91,14 +95,15 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
 
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
-      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
+      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService, clock)
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Left(FileInfected("Virus"))))
+        .thenReturn(Future.successful(Left(FileInfected("Virus", Timings(clock.instant(), clock.instant())))))
       when(fileTypeCheckingService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Right(FileAllowed(MimeType("application/xml")))))
+        .thenReturn(Future.successful(Right(FileAllowed(MimeType("application/xml"), Timings(clock.instant(), clock.instant())))))
 
-      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe Left(FileInfected("Virus"))
+      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe
+        Left(FileRejected(Left(FileInfected("Virus", Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))))))
 
       verifyZeroInteractions(fileTypeCheckingService)
     }
@@ -107,20 +112,25 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
 
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
-      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
+      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService, clock)
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM"))))
+        .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant())))))
 
       when(fileTypeCheckingService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Left(IncorrectFileType(MimeType("application/xml"), Some("valid-test-service")))))
+        .thenReturn(Future.successful(Left(IncorrectFileType(MimeType("application/xml"), Some("valid-test-service"), Timings(clock.instant(), clock.instant())))))
 
       Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe Left(
-        IncorrectFileType(
-          MimeType("application/xml"),
-          Some("valid-test-service")
-        ))
 
+        FileRejected(
+          Right(NoVirusFound("CHECKSUM", Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1)))),
+          Some(IncorrectFileType(
+            MimeType("application/xml"),
+            Some("valid-test-service"),
+            Timings(clockStart.plusSeconds(2), clockStart.plusSeconds(3))
+          )
+        ))
+      )
     }
   }
 }

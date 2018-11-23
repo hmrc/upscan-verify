@@ -16,6 +16,8 @@
 
 package connectors.aws
 
+import java.time.Instant
+
 import model.{FileUploadEvent, Message, S3ObjectLocation}
 import org.scalatest.Matchers
 import uk.gov.hmrc.play.test.UnitSpec
@@ -32,12 +34,12 @@ class S3EventMessageParserSpec extends UnitSpec with Matchers {
     "properly parse valid S3 event message" in {
 
       Await
-        .result(parser.parse(Message("ID", sampleMessageWithoutVersioning, "HANDLE")), 2 seconds) shouldBe FileUploadEvent(
+        .result(parser.parse(Message("ID", sampleMessageWithoutVersioning, "HANDLE", Instant.now())), 2 seconds) shouldBe FileUploadEvent(
         S3ObjectLocation("hmrc-upscan-live-transient", "acabd94b-4d74-4b04-a0ca-1914950f9c02", None),
         "127.0.0.1")
 
       Await
-        .result(parser.parse(Message("ID", sampleMessageWithVersioning, "HANDLE")), 2 seconds) shouldBe FileUploadEvent(
+        .result(parser.parse(Message("ID", sampleMessageWithVersioning, "HANDLE", Instant.now())), 2 seconds) shouldBe FileUploadEvent(
         S3ObjectLocation(
           "hmrc-upscan-live-transient",
           "acabd94b-4d74-4b04-a0ca-1914950f9c02",
@@ -48,27 +50,26 @@ class S3EventMessageParserSpec extends UnitSpec with Matchers {
 
     "properly parse valid S3 event message triggered by copying object between buckets" in {
 
-      Await.result(parser.parse(Message("ID", sampleCopyMessage, "HANDLE")), 2 seconds) shouldBe FileUploadEvent(
+      Await.result(parser.parse(Message("ID", sampleCopyMessage, "HANDLE", Instant.now())), 2 seconds) shouldBe FileUploadEvent(
         S3ObjectLocation("fus-outbound-759b74ce43947f5f4c91aeddc3e5bad3", "16d77f7a-1f42-4bc2-aa7c-3e1b57b75b26", None),
         "127.0.0.1")
 
     }
 
     "return failure for test message" in {
-
-      val result: Future[FileUploadEvent] = parser.parse(Message("ID1", testMessage, "HANDLE"))
+      val result: Future[FileUploadEvent] = parser.parse(Message("ID1", testMessage, "HANDLE", Instant.now()))
       Await.ready(result, 2 seconds)
       result.value.get.isSuccess shouldBe false
     }
 
     "return unparseable message for S3 message other than upload" in {
-      val result: Future[FileUploadEvent] = parser.parse(Message("ID1", others3message, "HANDLE"))
+      val result: Future[FileUploadEvent] = parser.parse(Message("ID1", others3message, "HANDLE", Instant.now()))
       Await.ready(result, 2 seconds)
       result.value.get.isSuccess shouldBe false
     }
 
     "return unparseable message for S3 message with invalid JSON" in {
-      val result: Future[FileUploadEvent] = parser.parse(Message("ID1", "$>>>>", "HANDLE"))
+      val result: Future[FileUploadEvent] = parser.parse(Message("ID1", "$>>>>", "HANDLE", Instant.now()))
       Await.ready(result, 2 seconds)
       result.value.get.isSuccess shouldBe false
     }

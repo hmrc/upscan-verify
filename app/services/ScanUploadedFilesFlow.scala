@@ -16,7 +16,7 @@
 
 package services
 
-import java.time.Instant
+import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
 
 import cats.implicits._
@@ -37,43 +37,42 @@ class ScanUploadedFilesFlow @Inject()(
   fileManager: FileManager,
   fileCheckingService: FileCheckingService,
   scanningResultHandler: FileCheckingResultHandler,
-  metrics: Metrics)(implicit ec: ExecutionContext)
+  metrics: Metrics,
+  clock: Clock)(implicit ec: ExecutionContext)
     extends MessageProcessor {
 
   def processMessage(message: Message): FutureEitherWithContext[MessageContext] = {
-    val messageProcessingStartTime = System.currentTimeMillis
 
     for {
-      parsedMessage <- withoutContext(parser.parse(message))
-      context = MessageContext(parsedMessage.location.objectKey)
-      ld      = LoggingDetails.fromMessageContext(context)
-      metadata <- withContext(fileManager.getObjectMetadata(parsedMessage.location)(ld), context)
-      inboundObjectDetails = InboundObjectDetails(metadata, parsedMessage.clientIp, parsedMessage.location)
-      scanningResult <- withContext(fileCheckingService.check(parsedMessage.location, metadata)(ld), context)
-      _ = addMetrics(metadata.uploadedTimestamp, messageProcessingStartTime, System.currentTimeMillis)
-      _ <- withContext(scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult)(ld), context)
+      parsedMessage        <- withoutContext(parser.parse(message))
+      context               = MessageContext(parsedMessage.location.objectKey)
+      ld                    = LoggingDetails.fromMessageContext(context)
+      metadata             <- withContext(fileManager.getObjectMetadata(parsedMessage.location)(ld), context)
+      inboundObjectDetails  = InboundObjectDetails(metadata, parsedMessage.clientIp, parsedMessage.location)
+      scanningResult       <- withContext(fileCheckingService.check(parsedMessage.location, metadata)(ld), context)
+      _                    <- withContext(scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult, message.receivedAt)(ld), context)
+      _                     = addMetrics(metadata.uploadedTimestamp, message.receivedAt, clock.instant())
     } yield context
-
   }
 
-  private def addMetrics(uploadedTimestamp: Instant, startTimeMilliseconds: Long, endTimeMilliseconds: Long): Unit = {
-    addUploadToStartProcessMetrics(uploadedTimestamp, startTimeMilliseconds)
-    addUploadToEndScanMetrics(uploadedTimestamp, endTimeMilliseconds)
-    addInternalProcessMetrics(startTimeMilliseconds, endTimeMilliseconds)
+  private def addMetrics(uploadedTimestamp: Instant, startTime: Instant, endTime: Instant): Unit = {
+    addUploadToStartProcessMetrics(uploadedTimestamp, startTime)
+    addUploadToEndScanMetrics(uploadedTimestamp, endTime)
+    addInternalProcessMetrics(startTime, endTime)
   }
 
-  private def addInternalProcessMetrics(startTimeMilliseconds: Long, endTimeMilliseconds: Long): Unit = {
-    val interval = endTimeMilliseconds - startTimeMilliseconds
+  private def addInternalProcessMetrics(startTime: Instant, endTime: Instant): Unit = {
+    val interval = endTime.toEpochMilli() - startTime.toEpochMilli()
     metrics.defaultRegistry.timer("upscanVerifyProcessing").update(interval, TimeUnit.MILLISECONDS)
   }
 
-  private def addUploadToStartProcessMetrics(uploadedTimestamp: Instant, startTimeMilliseconds: Long): Unit = {
-    val interval = startTimeMilliseconds - uploadedTimestamp.toEpochMilli
+  private def addUploadToStartProcessMetrics(uploadedTimestamp: Instant, startTime: Instant): Unit = {
+    val interval = startTime.toEpochMilli() - uploadedTimestamp.toEpochMilli()
     metrics.defaultRegistry.timer("uploadToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
   }
 
-  private def addUploadToEndScanMetrics(uploadedTimestamp: Instant, endTimeMilliseconds: Long): Unit = {
-    val interval = endTimeMilliseconds - uploadedTimestamp.toEpochMilli
+  private def addUploadToEndScanMetrics(uploadedTimestamp: Instant, endTime: Instant): Unit = {
+    val interval = endTime.toEpochMilli() - uploadedTimestamp.toEpochMilli()
     metrics.defaultRegistry.timer("uploadToScanComplete").update(interval, TimeUnit.MILLISECONDS)
   }
 }

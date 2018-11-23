@@ -16,20 +16,58 @@
 
 package model
 
+import java.time.Instant
+
 import play.api.libs.json._
-import services.MimeType
+import services.{MimeType, NoVirusFound}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
-case class Message(id: String, body: String, receiptHandle: String)
+case class Message(id: String, body: String, receiptHandle: String, receivedAt: Instant)
 
 case class S3ObjectLocation(bucket: String, objectKey: String, objectVersion: Option[String])
 case class FileUploadEvent(location: S3ObjectLocation, clientIp: String)
-case class FileValidationSuccess(checksum: String, mimeType: MimeType)
+
+case class Timings(start: Instant,
+                   end: Instant
+) {
+  def asMetadata(checkpoint: String): Map[String,String] = {
+    Map(
+      s"x-amz-meta-upscan-verify-${checkpoint}-started" -> start.toString,
+      s"x-amz-meta-upscan-verify-${checkpoint}-ended"   -> end.toString
+    )
+  }
+}
+
+case class FileValidationSuccess(checksum: String, mimeType: MimeType, virusScanTimings: Timings, fileTypeTimings: Timings)
 
 sealed trait FileValidationFailure
-case class FileInfected(details: String) extends FileValidationFailure
-case class IncorrectFileType(typeFound: MimeType, consumingService: Option[String]) extends FileValidationFailure
+
+case class FileInfected(details: String,
+                        virusScanTimings: Timings) extends FileValidationFailure
+
+case class IncorrectFileType(typeFound: MimeType,
+                             consumingService: Option[String],
+                             fileTypeTimings: Timings) extends FileValidationFailure
+
+
+case class FileRejected(virusScanResult: Either[FileInfected, NoVirusFound],
+                                 fileTypeResultOpt: Option[IncorrectFileType] = None
+                                ) extends FileValidationFailure
+
+object FileRejected {
+  def futureLeft(fi: FileInfected): Future[Either[FileRejected, FileValidationSuccess]] = {
+    Future.successful(Left(FileRejected(Left(fi))))
+  }
+
+  def left(fi: NoVirusFound, ift: IncorrectFileType): Either[FileRejected, FileValidationSuccess] = {
+    Left(FileRejected(Right(fi), Some(ift)))
+  }
+
+  def right(fvs: FileValidationSuccess): Either[FileRejected, FileValidationSuccess] = {
+    Right(fvs)
+  }
+}
 
 case class AllowedMimeTypes(serviceName: String, allowedMimeTypes: List[String])
 

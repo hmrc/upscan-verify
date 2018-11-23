@@ -17,7 +17,7 @@
 package services
 
 import java.io.InputStream
-import java.time.Instant
+import java.time.{Clock, Instant, ZoneId}
 
 import config.ServiceConfiguration
 import model._
@@ -28,12 +28,15 @@ import uk.gov.hmrc.play.test.UnitSpec
 import com.kenshoo.play.metrics.Metrics
 import com.codahale.metrics.MetricRegistry
 import util.logging.LoggingDetails
+import utils.WithIncrementingClock
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with MockitoSugar {
+class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with MockitoSugar with WithIncrementingClock {
+
+  override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
   implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
@@ -63,14 +66,14 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       when(configuration.consumingServicesConfiguration).thenReturn(consumingServicesConfiguration)
 
       val metrics         = metricsStub()
-      val checkingService = new FileTypeCheckingService(detector, configuration, metrics)
+      val checkingService = new FileTypeCheckingService(detector, configuration, metrics, clock)
 
       When("the file is checked")
       val result: Either[FileValidationFailure, FileAllowed] =
         Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
       Then("a valid result should be returned")
-      result shouldBe Right(FileAllowed(MimeType("application/pdf")))
+      result shouldBe Right(FileAllowed(MimeType("application/pdf"), Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:32Z"))))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 1
@@ -98,13 +101,13 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       when(configuration.consumingServicesConfiguration).thenReturn(consumingServicesConfiguration)
 
       val metrics         = metricsStub()
-      val checkingService = new FileTypeCheckingService(detector, configuration, metrics)
+      val checkingService = new FileTypeCheckingService(detector, configuration, metrics, clock)
 
       When("the file is checked")
       val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
       Then("an incorrect file type result should be returned")
-      result shouldBe Left(IncorrectFileType(fileMimeType, Some("valid-test-service")))
+      result shouldBe Left(IncorrectFileType(fileMimeType, Some("valid-test-service"), Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:32Z"))))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 0
@@ -132,13 +135,13 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       when(configuration.consumingServicesConfiguration).thenReturn(consumingServicesConfiguration)
 
       val metrics         = metricsStub()
-      val checkingService = new FileTypeCheckingService(detector, configuration, metrics)
+      val checkingService = new FileTypeCheckingService(detector, configuration, metrics, clock)
 
       When("the file is checked")
       val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
       Then("an incorrect file type result should be returned")
-      result shouldBe Left(IncorrectFileType(fileMimeType, None))
+      result shouldBe Left(IncorrectFileType(fileMimeType, None, new Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:32Z"))))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 0

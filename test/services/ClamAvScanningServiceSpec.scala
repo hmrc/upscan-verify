@@ -17,11 +17,11 @@
 package services
 
 import java.io.{ByteArrayInputStream, FilterInputStream, InputStream}
-import java.time.{LocalDateTime, ZoneOffset}
+import java.time.{Duration => _, _}
 
 import com.codahale.metrics.MetricRegistry
 import com.kenshoo.play.metrics.Metrics
-import model.{FileInfected, S3ObjectLocation}
+import model.{FileInfected, S3ObjectLocation, Timings}
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
 import org.scalatest.mockito.MockitoSugar
@@ -30,13 +30,16 @@ import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
 import uk.gov.hmrc.play.test.UnitSpec
 import util.logging.LoggingDetails
+import utils.WithIncrementingClock
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen with MockitoSugar {
+class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen with MockitoSugar with WithIncrementingClock {
 
   implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
+
+  override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
   "ClamAvScanningService" should {
 
@@ -61,7 +64,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       Mockito.when(factory.getClient()).thenReturn(client)
 
       val metrics         = metricsStub()
-      val scanningService = new ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics)
+      val scanningService = new ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics, clock)
 
       Given("a file location pointing to a clean file")
       val fileLocation = S3ObjectLocation("inboundBucket", "file", None)
@@ -76,7 +79,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val result = Await.result(scanningService.scan(fileLocation, fileContent, fileMetadata), 2.seconds)
 
       Then("a scanning clean result should be returned")
-      result shouldBe Right(NoVirusFound("CHECKSUM"))
+      result shouldBe Right(NoVirusFound("CHECKSUM", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z"))))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 1
@@ -92,7 +95,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       Mockito.when(factory.getClient()).thenReturn(client)
 
       val metrics         = metricsStub()
-      val scanningService = new ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics)
+      val scanningService = new ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics, clock)
 
       Given("a file location pointing to a clean file")
       val fileLocation = S3ObjectLocation("inboundBucket", "file", None)
@@ -107,7 +110,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val result = Await.result(scanningService.scan(fileLocation, fileContent, fileMetadata), 2.seconds)
 
       Then("a scanning infected result should be returned")
-      result shouldBe Left(FileInfected("File dirty"))
+      result shouldBe Left(FileInfected("File dirty", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z"))))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 0

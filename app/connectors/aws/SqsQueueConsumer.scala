@@ -32,6 +32,8 @@ package connectors.aws
  * limitations under the License.
  */
 
+import java.time.Clock
+
 import javax.inject.Inject
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest, ReceiveMessageResult}
@@ -43,7 +45,7 @@ import services.QueueConsumer
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 
-class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS, configuration: ServiceConfiguration)(
+class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS, configuration: ServiceConfiguration, clock: Clock)(
   implicit ec: ExecutionContext)
     extends QueueConsumer {
 
@@ -57,13 +59,16 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS, configuration: ServiceCon
       Future(sqsClient.receiveMessage(receiveMessageRequest))
 
     receiveMessageResult map { result =>
+      val receivedAt = clock.instant()
+
       result.getMessages.asScala.toList.map { sqsMessage =>
         if (Logger.isDebugEnabled) {
           Logger.debug(
             s"Received message with id: [${sqsMessage.getMessageId}] and receiptHandle: [${sqsMessage.getReceiptHandle}], message details:\n "
               + sqsMessage.toString)
         }
-        Message(sqsMessage.getMessageId, sqsMessage.getBody, sqsMessage.getReceiptHandle)
+
+        Message(sqsMessage.getMessageId, sqsMessage.getBody, sqsMessage.getReceiptHandle, receivedAt)
       }
     }
   }

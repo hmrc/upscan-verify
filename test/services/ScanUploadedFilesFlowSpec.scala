@@ -16,7 +16,7 @@
 
 package services
 
-import java.time.Instant
+import java.time.{Clock, Instant}
 
 import com.amazonaws.AmazonServiceException
 import com.codahale.metrics.MetricRegistry
@@ -30,12 +30,15 @@ import org.scalatest.{GivenWhenThen, Matchers}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.test.UnitSpec
 import util.logging.LoggingDetails
+import utils.WithIncrementingClock
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThen with MockitoSugar {
+class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThen with MockitoSugar with WithIncrementingClock {
+
+  override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
   implicit val ld: HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
@@ -55,11 +58,12 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
   "ScanUploadedFilesFlow" should {
     "scan and post-process valid message" in {
       Given("there is a valid message in the queue")
-      val message          = Message("ID", "VALID-BODY", "RECEIPT-1")
+      val message          = Message("ID", "VALID-BODY", "RECEIPT-1", clock.instant())
       val location         = S3ObjectLocation("bucket", "ID", None)
-      val processingResult = Right(FileValidationSuccess("CHECKSUM", MimeType("application/xml")))
+      val processingResult = Right(FileValidationSuccess("CHECKSUM", MimeType("application/xml"),
+        Timings(clock.instant(), clock.instant()), Timings(clock.instant(), clock.instant())))
       val inboundObjectMetadata =
-        InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)
+        InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clockStart.minusSeconds(1))
 
       val fileManager           = mock[FileManager]
       val scanningResultHandler = mock[FileCheckingResultHandler]
@@ -71,7 +75,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          metrics
+          metrics,
+          clock
         )
 
       when(fileManager.getObjectMetadata(ArgumentMatchers.eq(location))(any()))
@@ -80,7 +85,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       when(fileCheckingService.check(any(), any())(any()))
         .thenReturn(Future.successful(processingResult))
 
-      when(scanningResultHandler.handleCheckingResult(any(), any())(any()))
+      when(scanningResultHandler.handleCheckingResult(any(), any(), any())(any()))
         .thenReturn(Future.successful(()))
 
       When("message is handled")
@@ -93,7 +98,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       verify(scanningResultHandler)
         .handleCheckingResult(
           ArgumentMatchers.eq(InboundObjectDetails(inboundObjectMetadata, "127.0.0.1", location)),
-          ArgumentMatchers.eq(processingResult))(any())
+          ArgumentMatchers.eq(processingResult),
+          ArgumentMatchers.any[Instant]())(any())
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 1
@@ -109,7 +115,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
       Given("there is a valid message")
       val location            = S3ObjectLocation("bucket", "ID2", None)
-      val message             = Message("ID2", "VALID-BODY", "RECEIPT-2")
+      val message             = Message("ID2", "VALID-BODY", "RECEIPT-2", clock.instant())
       val fileCheckingService = mock[FileCheckingService]
       val metrics: Metrics    = metricsStub()
       val flow =
@@ -118,7 +124,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          metrics
+          metrics,
+          clock
         )
 
       And("the fileManager fails to return file metadata for the message")
@@ -147,18 +154,19 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
       Given("there is a valid message")
       val location            = S3ObjectLocation("bucket", "ID2", None)
-      val message             = Message("ID2", "INVALID-BODY", "RECEIPT-2")
+      val message             = Message("ID2", "INVALID-BODY", "RECEIPT-2", clock.instant())
       val fileCheckingService = mock[FileCheckingService]
       val metrics: Metrics    = metricsStub()
       val inboundObjectMetadata =
-        InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)
+        InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clockStart.minusSeconds(1))
       val flow =
         new ScanUploadedFilesFlow(
           parser,
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          metrics
+          metrics,
+          clock
         )
 
       when(fileManager.getObjectMetadata(ArgumentMatchers.eq(location))(any()))
@@ -181,10 +189,10 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
 
     "return error if scanning failed" in {
       Given("there is a valid message in the queue")
-      val message  = Message("ID", "VALID-BODY", "RECEIPT-1")
+      val message  = Message("ID", "VALID-BODY", "RECEIPT-1", clock.instant())
       val location = S3ObjectLocation("bucket", "ID", None)
       val inboundObjectMetadata =
-        InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), Instant.now)
+        InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clockStart.minusSeconds(1))
 
       val fileManager           = mock[FileManager]
       val scanningResultHandler = mock[FileCheckingResultHandler]
@@ -196,7 +204,8 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          metrics
+          metrics,
+          clock
         )
 
       when(fileManager.getObjectMetadata(ArgumentMatchers.eq(location))(any()))

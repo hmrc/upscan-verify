@@ -17,7 +17,7 @@
 package services
 
 import java.io.InputStream
-import java.time.Instant
+import java.time.{Clock, Duration, Instant}
 
 import config.ServiceConfiguration
 import model._
@@ -28,14 +28,55 @@ import org.mockito.{ArgumentCaptor, ArgumentMatchers}
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.mockito.MockitoSugar
+import play.api.test
 import uk.gov.hmrc.play.test.UnitSpec
 import util.logging.LoggingDetails
+import utils.WithIncrementingClock
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Eventually with GivenWhenThen {
+class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Eventually with GivenWhenThen with WithIncrementingClock {
+
+  val uploadedAt     = Instant.parse("2018-12-04T17:48:29Z")
+  val receivedAt     = Instant.parse("2018-12-04T17:48:30Z")
+  val virusScanStart = Instant.parse("2018-12-04T17:48:31Z")
+  val virusScanEnd   = Instant.parse("2018-12-04T17:48:32Z")
+  val fileTypeStart  = Instant.parse("2018-12-04T17:48:33Z")
+  val fileTypeEnd    = Instant.parse("2018-12-04T17:48:34Z")
+
+  // Clock starts after above processing checkpoints...
+  override lazy val clockStart = Instant.parse("2018-12-04T17:48:35Z")
+
+  val virusScanTimings = Timings(virusScanStart, virusScanEnd)
+  val fileTypeTimings  = Timings(fileTypeStart, fileTypeEnd)
+
+
+  val allExpectedCheckpoints = Map(
+    "x-amz-meta-upscan-verify-received"          -> receivedAt.toString,
+    "x-amz-meta-upscan-verify-virusscan-started" -> virusScanStart.toString,
+    "x-amz-meta-upscan-verify-virusscan-ended"   -> virusScanEnd.toString,
+    "x-amz-meta-upscan-verify-filetype-started"  -> fileTypeStart.toString,
+    "x-amz-meta-upscan-verify-filetype-ended"    -> fileTypeEnd.toString,
+    "x-amz-meta-upscan-verify-outbound-queued"   -> "2018-12-04T17:48:35Z"
+  )
+
+  val virusFoundExpectedCheckpoints = Map(
+    "x-amz-meta-upscan-verify-received"          -> receivedAt.toString,
+    "x-amz-meta-upscan-verify-virusscan-started" -> virusScanStart.toString,
+    "x-amz-meta-upscan-verify-virusscan-ended"   -> virusScanEnd.toString,
+    "x-amz-meta-upscan-verify-rejected-queued"   -> "2018-12-04T17:48:35Z"
+  )
+
+  val fileTypeRejectedExpectedCheckpoints = Map(
+    "x-amz-meta-upscan-verify-received"          -> receivedAt.toString,
+    "x-amz-meta-upscan-verify-virusscan-started" -> virusScanStart.toString,
+    "x-amz-meta-upscan-verify-virusscan-ended"   -> virusScanEnd.toString,
+    "x-amz-meta-upscan-verify-filetype-started"  -> fileTypeStart.toString,
+    "x-amz-meta-upscan-verify-filetype-ended"    -> fileTypeEnd.toString,
+    "x-amz-meta-upscan-verify-rejected-queued"   -> "2018-12-04T17:48:35Z"
+  )
 
   "FileCheckingResultHandler" should {
 
@@ -69,7 +110,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
-      val handler                      = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
+      val handler                      = new FileCheckingResultHandler(fileManager, virusNotifier, configuration, clock)
 
       Given("there is a clean file")
       val file             = S3ObjectLocation("bucket", "file", None)
@@ -77,10 +118,10 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val expectedMimeType = MimeType("application/xml")
       val clientIp         = "127.0.0.1"
 
-      val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
+      val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt)
       val inboundObjectDetails  = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
       val outboundObjectMetadata =
-        ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)
+        ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType, allExpectedCheckpoints)
 
       when(fileManager.copyObject(ArgumentMatchers.eq(file), any(), any())(any())).thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.successful(()))
@@ -88,14 +129,17 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       When("when processing scanning result")
       Await.result(
         handler
-          .handleCheckingResult(inboundObjectDetails, Right(FileValidationSuccess(expectedChecksum, expectedMimeType))),
+          .handleCheckingResult(inboundObjectDetails,
+            Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)), receivedAt),
         10 seconds
       )
 
       Then("file should be copied from inbound bucket to outbound bucket")
       val locationCaptor: ArgumentCaptor[S3ObjectLocation] = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
       verify(fileManager)
-        .copyObject(ArgumentMatchers.eq(file), locationCaptor.capture(), ArgumentMatchers.eq(outboundObjectMetadata))(
+        .copyObject(ArgumentMatchers.eq(file),
+          locationCaptor.capture(),
+          ArgumentMatchers.eq(outboundObjectMetadata))(
           any())
       locationCaptor.getValue.bucket shouldBe configuration.outboundBucket
 
@@ -109,14 +153,14 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration, clock)
 
       Given("there is a clean file")
       val file                  = S3ObjectLocation("bucket", "file", None)
       val expectedChecksum      = "1234567890"
       val expectedMimeType      = MimeType("application/xml")
       val clientIp              = "127.0.0.1"
-      val inboundObjectMetadata = InboundObjectMetadata(Map.empty, Instant.now())
+      val inboundObjectMetadata = InboundObjectMetadata(Map.empty, uploadedAt)
       val inboundObjectDetails  = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
 
       And("copying the file would fail")
@@ -129,16 +173,16 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
         Await.ready(
           handler.handleCheckingResult(
             inboundObjectDetails,
-            Right(FileValidationSuccess(expectedChecksum, expectedMimeType))),
+            Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)), receivedAt),
           10 seconds
         )
 
-      Then("original file shoudln't be deleted from inbound bucket")
+      Then("original file should not be deleted from inbound bucket")
       verify(fileManager)
         .copyObject(
           ArgumentMatchers.eq(file),
           any(),
-          ArgumentMatchers.eq(ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)))(
+          ArgumentMatchers.eq(ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType, allExpectedCheckpoints)))(
           any())
       verifyNoMoreInteractions(fileManager)
 
@@ -152,7 +196,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration, clock)
 
       Given("there is a clean file")
       val file             = S3ObjectLocation("bucket", "file", None)
@@ -160,10 +204,10 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val expectedMimeType = MimeType("application/xml")
       val clientIp         = "127.0.0.1"
 
-      val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
+      val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt)
       val inboundObjectDetails  = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
       val outboundObjectMetadata =
-        ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType)
+        ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType, allExpectedCheckpoints)
 
       when(fileManager.copyObject(ArgumentMatchers.eq(file), any(), ArgumentMatchers.eq(outboundObjectMetadata))(any()))
         .thenReturn(Future.successful(()))
@@ -174,7 +218,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
         Await.ready(
           handler.handleCheckingResult(
             inboundObjectDetails,
-            Right(FileValidationSuccess(expectedChecksum, expectedMimeType))),
+            Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)), receivedAt),
           10 seconds
         )
 
@@ -188,15 +232,15 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration, clock)
 
       Given("there is an infected file")
       val file = S3ObjectLocation("bucket", "file", None)
 
       val clientIp               = "127.0.0.1"
-      val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
+      val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt)
       val inboundObjectDetails   = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
-      val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectDetails)
+      val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectDetails, virusFoundExpectedCheckpoints)
 
       val details = "There is a virus"
 
@@ -209,7 +253,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       Await.result(
         handler.handleCheckingResult(
           InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-          Left(FileInfected(details))),
+          Left(FileRejected(Left(FileInfected(details, virusScanTimings)))), receivedAt),
         10 seconds)
 
       Then("notification is created")
@@ -237,13 +281,13 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration, clock)
 
       Given("there is an infected file")
       val file     = S3ObjectLocation("bucket", "file", None)
       val clientIp = "127.0.0.1"
 
-      val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
+      val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt)
 
       Given("notification service fails")
       when(virusNotifier.notifyFileInfected(any(), any()))
@@ -256,7 +300,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
           handler
             .handleCheckingResult(
               InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-              Left(FileInfected("There is a virus"))),
+              Left(FileRejected(Left(FileInfected("There is a virus", virusScanTimings)))), receivedAt),
           10 seconds
         )
 
@@ -265,7 +309,6 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
       And("the whole process fails")
       result.value.get.isFailure shouldBe true
-
     }
 
     "Return failure if deleting a infected file fails" in {
@@ -273,13 +316,13 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration, clock)
 
       Given("there is an infected file")
       val clientIp = "127.0.0.1"
       val file     = S3ObjectLocation("bucket", "file", None)
 
-      val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
+      val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt)
 
       when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
       when(fileManager.delete(file)).thenReturn(Future.failed(new RuntimeException("Expected failure")))
@@ -290,28 +333,27 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
           handler
             .handleCheckingResult(
               InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-              Left(FileInfected("There is a virus"))),
+              Left(FileRejected(Left(FileInfected("There is a virus", virusScanTimings)))), receivedAt),
           10 seconds
         )
 
       Then("the process fails")
       result.value.get.isFailure shouldBe true
-
     }
 
     "Add error and metadata to quarantine bucket, and delete incorrect file in case of invalid file types" in {
       val fileManager: FileManager     = mock[FileManager]
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
       val clientIp                     = "127.0.0.1"
-      val handler                      = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
+      val handler                      = new FileCheckingResultHandler(fileManager, virusNotifier, configuration, clock)
 
       Given("there is a file of a type that is not allowed")
       val file     = S3ObjectLocation("bucket", "file", None)
       val mimeType = MimeType("application/pdf")
 
-      val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
+      val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt)
       val inboundObjectDetails   = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
-      val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectDetails)
+      val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectDetails, fileTypeRejectedExpectedCheckpoints)
 
       when(virusNotifier.notifyFileInfected(any(), any())).thenReturn(Future.successful(()))
       when(fileManager.writeObject(ArgumentMatchers.eq(file), any(), any(), any())(any()))
@@ -324,7 +366,9 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
           handler
             .handleCheckingResult(
               InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-              Left(IncorrectFileType(mimeType, Some("valid-test-service")))),
+              Left(FileRejected(Right(NoVirusFound("1234567890", virusScanTimings)),
+                                Some(IncorrectFileType(mimeType, Some("valid-test-service"), fileTypeTimings)))), receivedAt
+            ),
           10.seconds
         )
 
@@ -355,13 +399,13 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
       val file = S3ObjectLocation("bucket", "file", None)
 
-      val inboundObjectMetadata        = InboundObjectMetadata(Map("someKey" -> "someValue"), Instant.now())
+      val inboundObjectMetadata        = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt)
       val mimeType                     = MimeType("application/pdf")
       val fileManager: FileManager     = mock[FileManager]
       val clientIp                     = "127.0.0.1"
       val virusNotifier: VirusNotifier = mock[VirusNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration)
+      val handler = new FileCheckingResultHandler(fileManager, virusNotifier, configuration, clock)
 
       When("copying the file to outbound bucket succeeds")
       when(fileManager.writeObject(ArgumentMatchers.eq(file), any(), any(), any())(any()))
@@ -376,7 +420,9 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
           handler
             .handleCheckingResult(
               InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-              Left(IncorrectFileType(mimeType, Some("valid-test-service")))),
+              Left(FileRejected(Right(NoVirusFound("1234567890", virusScanTimings)),
+                   Some(IncorrectFileType(mimeType, Some("valid-test-service"), fileTypeTimings)))), receivedAt
+            ),
           10.seconds
         )
 

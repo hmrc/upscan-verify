@@ -16,6 +16,8 @@
 
 package services
 
+import java.time.Instant
+
 import model.Message
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when}
@@ -38,9 +40,9 @@ class QueueProcessingFlowSpec extends UnitSpec with Matchers with GivenWhenThen 
       new QueueProcessingJob(queueConsumer, messageProcessor)
 
     Given("there are three message in a message queue")
-    val validMessage1  = Message("ID1", "VALID-BODY", "RECEIPT-1")
-    val invalidMessage = Message("ID2", "INVALID-BODY", "RECEIPT-2")
-    val validMessage2  = Message("ID3", "VALID-BODY", "RECEIPT-3")
+    val validMessage1  = Message("ID1", "VALID-BODY", "RECEIPT-1", Instant.now())
+    val invalidMessage = Message("ID2", "INVALID-BODY", "RECEIPT-2", Instant.now())
+    val validMessage2  = Message("ID3", "VALID-BODY", "RECEIPT-3", Instant.now())
 
     when(queueConsumer.poll()).thenReturn(List(validMessage1, invalidMessage, validMessage2))
     when(queueConsumer.confirm(any()))

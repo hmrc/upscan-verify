@@ -16,6 +16,7 @@
 
 package services
 
+import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
 
 import com.kenshoo.play.metrics.Metrics
@@ -29,7 +30,7 @@ import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetai
 
 import scala.concurrent.Future
 
-case class NoVirusFound(checksum: String)
+case class NoVirusFound(checksum: String, virusScanTimings: Timings)
 
 trait ScanningService {
   def scan(location: S3ObjectLocation, objectContent: ObjectContent, objectMetadata: InboundObjectMetadata)(
@@ -39,37 +40,37 @@ trait ScanningService {
 class ClamAvScanningService @Inject()(
   clamClientFactory: ClamAntiVirusFactory,
   messageDigestComputingInputStreamFactory: ChecksumComputingInputStreamFactory,
-  metrics: Metrics)
+  metrics: Metrics,
+  clock: Clock)
     extends ScanningService {
 
   override def scan(location: S3ObjectLocation, fileContent: ObjectContent, metadata: InboundObjectMetadata)(
     implicit ld: LoggingDetails): Future[Either[FileInfected, NoVirusFound]] = {
 
-    val antivirusClient       = clamClientFactory.getClient()
-    val startTimeMilliseconds = System.currentTimeMillis()
+    val startTime       = clock.instant()
+    val antivirusClient = clamClientFactory.getClient()
 
     val inputStream = messageDigestComputingInputStreamFactory.create(fileContent.inputStream)
 
     for {
-      scanResult <- antivirusClient.sendAndCheck(inputStream, fileContent.length.toInt) map {
+      scanResult <- antivirusClient.sendAndCheck(inputStream, fileContent.length.toInt).map {
                      case Clean =>
                        metrics.defaultRegistry.counter("cleanFileUpload").inc()
-                       Right(NoVirusFound(inputStream.getChecksum()))
+                       Right(NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
                      case Infected(message) =>
                        Logger.warn(s"File is infected: [$message].")
                        metrics.defaultRegistry.counter("quarantineFileUpload").inc()
-                       Left(FileInfected(message))
+                       Left(FileInfected(message, Timings(startTime, clock.instant())))
                    }
-
     } yield {
-      val endTimeMilliseconds = System.currentTimeMillis()
-      addScanningTimeMetrics(startTimeMilliseconds, endTimeMilliseconds)
+      addScanningTimeMetrics(startTime, clock.instant())
       scanResult
     }
   }
 
-  private def addScanningTimeMetrics(startTimeMilliseconds: Long, endTimeMilliseconds: Long) = {
-    val interval = endTimeMilliseconds - startTimeMilliseconds
-    metrics.defaultRegistry.timer("scanningTime").update(interval, TimeUnit.MILLISECONDS)
+  private def addScanningTimeMetrics(startTime: Instant, endTime: Instant): Unit = {
+    metrics.defaultRegistry
+      .timer("scanningTime")
+      .update(endTime.toEpochMilli() - startTime.toEpochMilli(), TimeUnit.MILLISECONDS)
   }
 }

@@ -55,7 +55,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
       val content  = ObjectContent(null, 1200)
-      val metadata = InboundObjectMetadata(Map("consuming-service" -> "valid-test-service"), Instant.now)
+      val metadata = InboundObjectMetadata(Map("consuming-service" -> "valid-test-service"), Instant.now, 0)
 
       val detector = new FileTypeDetector {
         override def detectType(inputStream: InputStream, fileName: Option[String]): MimeType =
@@ -89,7 +89,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
       val content  = ObjectContent(null, 1200)
-      val metadata = InboundObjectMetadata(Map("consuming-service" -> "valid-test-service"), Instant.now)
+      val metadata = InboundObjectMetadata(Map("consuming-service" -> "valid-test-service"), Instant.now, 0)
 
       val fileMimeType = MimeType("image/jpeg")
       val detector = new FileTypeDetector {
@@ -123,7 +123,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
       val content  = ObjectContent(null, 1200)
-      val metadata = InboundObjectMetadata(Map.empty, Instant.now)
+      val metadata = InboundObjectMetadata(Map.empty, Instant.now, 0)
 
       val fileMimeType = MimeType("application/pdf")
       val detector = new FileTypeDetector {

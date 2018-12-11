@@ -31,7 +31,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class FileCheckingResultHandler @Inject()(
   fileManager: FileManager,
-  virusNotifier: VirusNotifier,
+  rejectionNotifier: RejectionNotifier,
   configuration: ServiceConfiguration,
   clock: Clock)(implicit ec: ExecutionContext) {
 
@@ -45,11 +45,11 @@ class FileCheckingResultHandler @Inject()(
       case Right(FileValidationSuccess(checksum, mimeType, virusScanTimings, fileTypeTimings)) =>
         handleValid(objectDetails, checksum, mimeType)(messageReceivedAt, virusScanTimings, fileTypeTimings)
 
-      case Left(FileRejected(Left(FileInfected(errorMessage, virusScanTimings)), None)) =>
-        handleInfected(objectDetails, errorMessage)(messageReceivedAt, virusScanTimings)
+      case Left(FileRejected(Left(FileInfected(errorMessage, checksum, virusScanTimings)), None)) =>
+        handleInfected(objectDetails, errorMessage)(checksum, messageReceivedAt, virusScanTimings)
 
-      case Left(FileRejected(Right(NoVirusFound(_, virusScanTimings)), Some(IncorrectFileType(mime, consumingService, fileTypeTimings)))) =>
-        handleIncorrectType(objectDetails, mime, consumingService)(messageReceivedAt, virusScanTimings, fileTypeTimings)
+      case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(IncorrectFileType(mime, consumingService, fileTypeTimings)))) =>
+        handleIncorrectType(objectDetails, mime, consumingService)(checksum, messageReceivedAt, virusScanTimings, fileTypeTimings)
 
       case _ => Future.successful(Logger.error(s"Unexpected match result for result: [$result]."))
     }
@@ -80,7 +80,7 @@ class FileCheckingResultHandler @Inject()(
   }
 
   private def handleInfected(details: InboundObjectDetails, errorMessage: String)
-                            (messageReceivedAt: Instant, virusScanTimings: Timings)
+                            (checksum: String, messageReceivedAt: Instant, virusScanTimings: Timings)
                             (implicit ec: ExecutionContext, ld: LoggingDetails) = {
 
     def metadata(key: String): Option[(String,String)] = details.metadata.items.get(key).map(s"x-amz-meta-${key}" -> _)
@@ -91,7 +91,7 @@ class FileCheckingResultHandler @Inject()(
       S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None)
 
     for {
-      _ <- virusNotifier.notifyFileInfected(details.location, errorMessage)
+      _ <- rejectionNotifier.notifyFileInfected(details.location, checksum, details.metadata.fileSize, details.metadata.uploadedTimestamp, errorMessage, None)
       _ <- fileManager.writeObject(details.location, targetLocation, objectContent,
                                    InvalidOutboundObjectMetadata(details,
                                      timingsMetadata("x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings)
@@ -104,7 +104,7 @@ class FileCheckingResultHandler @Inject()(
   }
 
   private def handleIncorrectType(details: InboundObjectDetails, mimeType: MimeType, serviceName: Option[String])
-                                 (messageReceivedAt: Instant, virusScanTimings: Timings, fileTypeTimings: Timings)
+                                 (checksum: String, messageReceivedAt: Instant, virusScanTimings: Timings, fileTypeTimings: Timings)
                                  (implicit ec: ExecutionContext, ld: LoggingDetails) = {
 
     def metadata(key: String): Option[(String,String)] = details.metadata.items.get(key).map(s"x-amz-meta-${key}" -> _)
@@ -117,6 +117,7 @@ class FileCheckingResultHandler @Inject()(
       S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None)
 
     for {
+      _ <- rejectionNotifier.notifyInvalidFileType(details.location, checksum, details.metadata.fileSize, details.metadata.uploadedTimestamp, errorMessage, serviceName)
       _ <- fileManager
             .writeObject(details.location, targetLocation, objectContent, InvalidOutboundObjectMetadata(
               details,

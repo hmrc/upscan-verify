@@ -60,7 +60,7 @@ class ClamAvScanningService @Inject()(
                      case Infected(message) =>
                        Logger.warn(s"File is infected: [$message].")
                        metrics.defaultRegistry.counter("quarantineFileUpload").inc()
-                       Left(FileInfected(message, Timings(startTime, clock.instant())))
+                       Left(FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant())))
                    }
     } yield {
       addScanningTimeMetrics(startTime, clock.instant())

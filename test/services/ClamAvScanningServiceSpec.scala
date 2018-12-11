@@ -73,7 +73,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val content      = "Hello World".getBytes
       val fileContent  = ObjectContent(new ByteArrayInputStream(content), content.length)
       val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
-      val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified)
+      val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified, content.length)
 
       When("scanning service is called")
       val result = Await.result(scanningService.scan(fileLocation, fileContent, fileMetadata), 2.seconds)
@@ -104,13 +104,13 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
       val content      = "Hello World".getBytes
       val fileContent  = ObjectContent(new ByteArrayInputStream(content), content.length)
       val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
-      val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified)
+      val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified, content.length)
 
       When("scanning service is called")
       val result = Await.result(scanningService.scan(fileLocation, fileContent, fileMetadata), 2.seconds)
 
       Then("a scanning infected result should be returned")
-      result shouldBe Left(FileInfected("File dirty", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z"))))
+      result shouldBe Left(FileInfected("File dirty", "CHECKSUM", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z"))))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 0

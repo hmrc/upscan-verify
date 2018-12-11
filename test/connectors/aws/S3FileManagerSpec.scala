@@ -86,7 +86,7 @@ class S3FileManagerSpec
       val outboundLocation = S3ObjectLocation("outboundBucket", "outboundLocation", None)
 
       val inboundDetails = InboundObjectDetails(
-        InboundObjectMetadata(items = Map.empty, uploadedTimestamp = Instant.now()),
+        InboundObjectMetadata(items = Map.empty, uploadedTimestamp = Instant.now(), fileSize = 0),
         "127.0.0.1",
         inboundLocation
       )
@@ -121,7 +121,7 @@ class S3FileManagerSpec
       val outboundLocation = S3ObjectLocation("outboundBucket", "outboundLocation", None)
 
       val inboundDetails = InboundObjectDetails(
-        InboundObjectMetadata(items = Map.empty, uploadedTimestamp = Instant.now()),
+        InboundObjectMetadata(items = Map.empty, uploadedTimestamp = Instant.now(), fileSize = 0),
         "127.0.0.1",
         inboundLocation
       )
@@ -195,7 +195,7 @@ class S3FileManagerSpec
 
       Then("metadata is properly returned")
       metadata shouldBe services
-        .InboundObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified)
+        .InboundObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified, fileSize = 0)
 
       And("proper version of the file has been downloaded")
       val argumentCaptor: ArgumentCaptor[GetObjectMetadataRequest] =
@@ -336,7 +336,9 @@ class S3FileManagerSpec
       val inboundDetails = InboundObjectDetails(
         InboundObjectMetadata(
           items             = Map("callbackUrl" -> "http://some.callback.url"),
-          uploadedTimestamp = Instant.now()),
+          uploadedTimestamp = Instant.now(),
+          fileSize          = 0
+        ),
         "127.0.0.1",
         inboundLocation
       )
@@ -363,7 +365,9 @@ class S3FileManagerSpec
       val inboundDetails = InboundObjectDetails(
         InboundObjectMetadata(
           items             = Map("callbackUrl" -> "http://some.callback.url"),
-          uploadedTimestamp = Instant.now()),
+          uploadedTimestamp = Instant.now(),
+          fileSize          = 0
+        ),
         "127.0.0.1",
         inboundLocation
       )

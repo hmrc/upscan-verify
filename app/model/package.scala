@@ -44,6 +44,7 @@ case class FileValidationSuccess(checksum: String, mimeType: MimeType, virusScan
 sealed trait FileValidationFailure
 
 case class FileInfected(details: String,
+                        checksum: String,
                         virusScanTimings: Timings) extends FileValidationFailure
 
 case class IncorrectFileType(typeFound: MimeType,

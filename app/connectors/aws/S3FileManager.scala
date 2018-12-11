@@ -116,7 +116,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
       withLoggingDetails(loggingDetails) {
         Logger.debug(s"Fetched metadata for objectKey: [${objectLocation.objectKey}].")
       }
-      InboundObjectMetadata(metadata.getUserMetadata.asScala.toMap, metadata.getLastModified.toInstant)
+      InboundObjectMetadata(metadata.getUserMetadata.asScala.toMap, metadata.getLastModified.toInstant, metadata.getContentLength)
     }
   }
 }

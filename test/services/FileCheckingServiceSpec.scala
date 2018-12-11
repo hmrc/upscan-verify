@@ -70,7 +70,7 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
     }
 
     val location = S3ObjectLocation("bucket", "file", None)
-    val metadata = InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clock.instant())
+    val metadata = InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clock.instant(), 0)
 
     "succeed when virus and file type scanning succeeded" in {
 
@@ -96,14 +96,15 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
       val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService, clock)
+      val checksum: String        = "CHECKSUM"
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Left(FileInfected("Virus", Timings(clock.instant(), clock.instant())))))
+        .thenReturn(Future.successful(Left(FileInfected("Virus", checksum, Timings(clock.instant(), clock.instant())))))
       when(fileTypeCheckingService.scan(location, content, metadata))
         .thenReturn(Future.successful(Right(FileAllowed(MimeType("application/xml"), Timings(clock.instant(), clock.instant())))))
 
       Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe
-        Left(FileRejected(Left(FileInfected("Virus", Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))))))
+        Left(FileRejected(Left(FileInfected("Virus", checksum, Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))))))
 
       verifyZeroInteractions(fileTypeCheckingService)
     }

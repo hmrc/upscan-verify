@@ -31,12 +31,13 @@ case class InboundObjectDetails(
   location: S3ObjectLocation
 )
 
-case class InboundObjectMetadata(items: Map[String, String], uploadedTimestamp: Instant) {
-  def originalFilename = items.get("original-filename")
-  def consumingService = items.get("consuming-service")
+case class InboundObjectMetadata(items: Map[String, String], uploadedTimestamp: Instant, fileSize: Long) {
+  def originalFilename: Option[String] = items.get("original-filename")
+  def consumingService: Option[String] = items.get("consuming-service")
 }
 
 sealed trait OutboundObjectMetadata {
+
   final def items: Map[String, String] = detailsOfSourceFile.metadata.items ++ commonMetadata ++ outcomeSpecificMetadata
 
   def detailsOfSourceFile: InboundObjectDetails

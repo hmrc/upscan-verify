@@ -33,7 +33,7 @@ class ScannerModule extends Module {
       bind[ContinuousPoller].toSelf.eagerly(),
       bind[ScanningService].to[ClamAvScanningService],
       bind[FileManager].to[S3FileManager],
-      bind[VirusNotifier].toInstance(LoggingVirusNotifier),
+      bind[RejectionNotifier].toInstance(LoggingRejectionNotifier),
       bind[FileTypeDetector].to[TikaFileTypeDetector],
       bind[ChecksumComputingInputStreamFactory].toInstance(SHA256ChecksumComputingInputStreamFactory),
       bind[Clock].toInstance(Clock.systemDefaultZone())

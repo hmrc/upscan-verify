@@ -25,7 +25,7 @@ import scala.concurrent.Future
 
 trait RejectionNotifier {
 
-  def notifyRejection(file: S3ObjectLocation,
+  def notifyRejection(fileProperties: S3ObjectLocation,
                       checksum: String,
                       fileSize: Long,
                       fileUploadDatetime: Instant,
@@ -33,34 +33,43 @@ trait RejectionNotifier {
                       serviceName: Option[String],
                       customMessagePrefix: String): Future[Unit]
 
-  def notifyFileInfected(file: S3ObjectLocation,
+  def notifyFileInfected(fileProperties: S3ObjectLocation,
                          checksum: String,
                          fileSize: Long,
                          fileUploadDatetime: Instant,
                          details: String,
                          serviceName: Option[String]
-                        ): Future[Unit] = notifyRejection(file, checksum, fileSize, fileUploadDatetime, details, serviceName, "Virus detected in file.")
+                        ): Future[Unit] = notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "Virus detected in file.")
 
-  def notifyInvalidFileType(file: S3ObjectLocation,
+  def notifyInvalidFileType(fileProperties: S3ObjectLocation,
                             checksum: String,
                             fileSize: Long,
                             fileUploadDatetime: Instant,
                             details: String,
                             serviceName: Option[String]
-                           ): Future[Unit] = notifyRejection(file, checksum, fileSize, fileUploadDatetime, details, serviceName, "Invalid file type uploaded for service.")
+                           ): Future[Unit] = notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "Invalid file type uploaded, which is not whitelisted for this service.")
 }
 
 
 object LoggingRejectionNotifier extends RejectionNotifier {
 
-  override def notifyRejection(file: S3ObjectLocation,
+  override def notifyRejection(fileProperties: S3ObjectLocation,
                                checksum: String,
                                fileSize: Long,
                                fileUploadDatetime: Instant,
                                details: String,
                                serviceName: Option[String],
                                customMessagePrefix: String): Future[Unit] = {
-    Logger.warn(s"$customMessagePrefix ${serviceName.fold("")(service => s"Service name: [$service]. ")}Checksum: [$checksum]. File size: [$fileSize B]. File upload datetime: [$fileUploadDatetime]. Details: [$details].")
+    Logger.warn(
+      s"""$customMessagePrefix${serviceName.fold("")(service => s"\nService name: [$service]")}
+         |File ID: [${fileProperties.objectKey}]${fileProperties.objectVersion.fold("")(version => s"\nVersion: [$version]")}
+         |Checksum: [$checksum]
+         |File size: [$fileSize B]
+         |File upload datetime: [$fileUploadDatetime]
+         |Bucket: [${fileProperties.bucket}]
+         |Details: [$details].
+       """.stripMargin
+    )
     Future.successful(())
   }
 }

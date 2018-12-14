@@ -47,7 +47,7 @@ trait RejectionNotifier {
                             fileUploadDatetime: Instant,
                             details: String,
                             serviceName: Option[String]
-                           ): Future[Unit] = notifyRejection(file, checksum, fileSize, fileUploadDatetime, details, serviceName, "Invalid file type uploaded for service.")
+                           ): Future[Unit] = notifyRejection(file, checksum, fileSize, fileUploadDatetime, details, serviceName, "Invalid file type uploaded, which is not whitelisted for this service.")
 }
 
 
@@ -60,7 +60,15 @@ object LoggingRejectionNotifier extends RejectionNotifier {
                                details: String,
                                serviceName: Option[String],
                                customMessagePrefix: String): Future[Unit] = {
-    Logger.warn(s"$customMessagePrefix ${serviceName.fold("")(service => s"Service name: [$service]. ")}Checksum: [$checksum]. File size: [$fileSize B]. File upload datetime: [$fileUploadDatetime]. Details: [$details].")
+    Logger.warn(
+      s"""$customMessagePrefix${serviceName.fold("")(service => s"\nService name: [$service].")}
+         |File: [$file].
+         |Checksum: [$checksum].
+         |File size: [$fileSize B].
+         |File upload datetime: [$fileUploadDatetime].
+         |Details: [$details]."
+       """.stripMargin
+    )
     Future.successful(())
   }
 }

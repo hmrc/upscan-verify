@@ -95,8 +95,8 @@ class FileCheckingResultHandler @Inject()(
       _ <- fileManager.writeObject(details.location, targetLocation, objectContent,
                                    InvalidOutboundObjectMetadata(details,
                                      timingsMetadata("x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings)
-                                       ++ metadata("x-amz-meta-upscan-initiate-received")
-                                       ++ metadata("x-amz-meta-upscan-initiate-response")
+                                       ++ metadata("upscan-initiate-received")
+                                       ++ metadata("upscan-initiate-response")
                                    )
            )
       _ <- fileManager.delete(details.location)
@@ -122,8 +122,8 @@ class FileCheckingResultHandler @Inject()(
             .writeObject(details.location, targetLocation, objectContent, InvalidOutboundObjectMetadata(
               details,
               timingsMetadata("x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings, Some(fileTypeTimings))
-                ++ metadata("x-amz-meta-upscan-initiate-received")
-                ++ metadata("x-amz-meta-upscan-initiate-response")
+                ++ metadata("upscan-initiate-received")
+                ++ metadata("upscan-initiate-response")
             ))
       _ <- fileManager.delete(details.location)
     } yield ()

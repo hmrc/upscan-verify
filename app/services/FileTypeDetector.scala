@@ -42,7 +42,6 @@ class TikaFileTypeDetector extends FileTypeDetector {
     val detectionResult = detector.detect(tikaInputStream, new Metadata())
 
     tikaInputStream.close()
-    inputStream.close()
 
     MimeType(s"${detectionResult.getType}/${detectionResult.getSubtype}")
   }

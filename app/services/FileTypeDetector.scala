@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 HM Revenue & Customs
+ * Copyright 2019 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import java.io.InputStream
 
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.metadata.{Metadata, TikaMetadataKeys}
+import org.apache.tika.mime.MediaType
 
 case class MimeType(value: String) extends AnyVal
 
@@ -29,8 +30,11 @@ trait FileTypeDetector {
 
 class TikaFileTypeDetector extends FileTypeDetector {
 
+
+
   private val config   = TikaConfig.getDefaultConfig
   private val detector = config.getDetector
+  private val plainTextMimeType = MediaType.TEXT_PLAIN
 
   def detectType(inputStream: InputStream, fileName: Option[String]): MimeType = {
     import org.apache.tika.io.TikaInputStream
@@ -39,7 +43,7 @@ class TikaFileTypeDetector extends FileTypeDetector {
 
     val metadata = new Metadata()
     fileName.foreach(metadata.add(TikaMetadataKeys.RESOURCE_NAME_KEY, _))
-    val detectionResult = detector.detect(tikaInputStream, new Metadata())
+    val detectionResult = detector.detect(tikaInputStream, metadata)
 
     tikaInputStream.close()
 

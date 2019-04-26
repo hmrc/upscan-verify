@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 HM Revenue & Customs
+ * Copyright 2019 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,11 @@ class TikaFileTypeCheckingSpec extends UnitSpec with Matchers with Assertions wi
 
     "properly detect XML file" in {
       tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test.xml"), None) shouldBe MimeType(
+        "application/xml")
+    }
+
+    "properly detect XML file without XML declaration" in {
+      tikaFileTypeDetector.detectType(this.getClass.getResourceAsStream("/test2.xml"), None) shouldBe MimeType(
         "application/xml")
     }
 

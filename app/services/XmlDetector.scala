@@ -16,11 +16,24 @@
 
 package services
 
-import model.{FileUploadEvent, Message}
+import java.io.InputStream
 
-import scala.concurrent.Future
+import org.apache.tika.detect.{Detector, XmlRootExtractor}
+import org.apache.tika.metadata.Metadata
+import org.apache.tika.mime.MediaType
 
-trait MessageParser {
+class XmlDetector extends Detector  {
 
-  def parse(message: Message): Future[FileUploadEvent]
+  val extractor = new XmlRootExtractor
+
+  override def detect(input: InputStream, metadata: Metadata): MediaType = {
+    input.mark(1024)
+    try {
+      Option(extractor.extractRootElement(input))
+        .fold(MediaType.OCTET_STREAM)(_ => MediaType.APPLICATION_XML)
+    } finally {
+      input.reset()
+    }
+
+  }
 }

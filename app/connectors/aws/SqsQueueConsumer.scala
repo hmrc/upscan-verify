@@ -18,10 +18,10 @@ package connectors.aws
 
 import java.time.Clock
 
-import javax.inject.Inject
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest, ReceiveMessageResult}
 import config.ServiceConfiguration
+import javax.inject.Inject
 import model.Message
 import play.api.Logger
 import services.QueueConsumer
@@ -29,9 +29,10 @@ import services.QueueConsumer
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 
-class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS, configuration: ServiceConfiguration, clock: Clock)(
-  implicit ec: ExecutionContext)
-    extends QueueConsumer {
+class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS,
+                                 configuration: ServiceConfiguration,
+                                 clock: Clock)
+                                (implicit ec: ExecutionContext) extends QueueConsumer {
 
   override def poll(): Future[List[Message]] = {
     val receiveMessageRequest = new ReceiveMessageRequest(configuration.inboundQueueUrl)

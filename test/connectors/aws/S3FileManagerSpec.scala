@@ -236,11 +236,11 @@ class S3FileManagerSpec
 
       When("the bytes are requested")
       def readingFunction(f: ObjectContent) =
-        Future.successful(IOUtils.toString(f.inputStream, "UTF-8"), f.length)
+        Future.successful((IOUtils.toString(f.inputStream, "UTF-8"), f.length))
       val result = Await.result(fileManager.withObjectContent(fileLocation)(readingFunction), 2.seconds)
 
       Then("expected byte array is returned")
-      result shouldBe (fileContent, fileContent.length)
+      result shouldBe ((fileContent, fileContent.length))
 
       And("stream has been closed")
       eventually {

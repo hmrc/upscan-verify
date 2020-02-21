@@ -29,18 +29,16 @@ import uk.gov.hmrc.http.logging.LoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class FileCheckingResultHandler @Inject()(
-  fileManager: FileManager,
-  rejectionNotifier: RejectionNotifier,
-  configuration: ServiceConfiguration,
-  clock: Clock)(implicit ec: ExecutionContext) {
+class FileCheckingResultHandler @Inject()(fileManager: FileManager,
+                                          rejectionNotifier: RejectionNotifier,
+                                          configuration: ServiceConfiguration,
+                                          clock: Clock)
+                                         (implicit ec: ExecutionContext) {
 
-  def handleCheckingResult(
-    objectDetails: InboundObjectDetails,
-    result: Either[FileValidationFailure, FileValidationSuccess],
-    messageReceivedAt: Instant)(
-    implicit
-    ld: LoggingDetails): Future[Unit] =
+  def handleCheckingResult(objectDetails: InboundObjectDetails,
+                           result: Either[FileValidationFailure, FileValidationSuccess],
+                           messageReceivedAt: Instant)
+                          (implicit ld: LoggingDetails): Future[Unit] =
     result match {
       case Right(FileValidationSuccess(checksum, mimeType, virusScanTimings, fileTypeTimings)) =>
         handleValid(objectDetails, checksum, mimeType)(messageReceivedAt, virusScanTimings, fileTypeTimings)
@@ -54,8 +52,12 @@ class FileCheckingResultHandler @Inject()(
       case _ => Future.successful(Logger.error(s"Unexpected match result for result: [$result]."))
     }
 
-  private def handleValid(details: InboundObjectDetails, checksum: String, mimeType: MimeType)
-                         (messageReceivedAt: Instant, virusScanTimings: Timings, fileTypeTimings: Timings)
+  private def handleValid(details: InboundObjectDetails,
+                          checksum: String,
+                          mimeType: MimeType)
+                         (messageReceivedAt: Instant,
+                          virusScanTimings: Timings,
+                          fileTypeTimings: Timings)
                          (implicit ec: ExecutionContext, ld: LoggingDetails) = {
 
     def metadata(key: String): Option[(String,String)] = details.metadata.items.get(key).map(s"x-amz-meta-${key}" -> _)

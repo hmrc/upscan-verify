@@ -26,9 +26,9 @@ import utils.MonadicUtils
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class QueueProcessingJob @Inject()(consumer: QueueConsumer, messageProcessor: MessageProcessor)(
-  implicit ec: ExecutionContext)
-    extends PollingJob {
+class QueueProcessingJob @Inject()(consumer: QueueConsumer,
+                                   messageProcessor: MessageProcessor)
+                                  (implicit ec: ExecutionContext) extends PollingJob {
 
   def run(): Future[Unit] = {
     val outcomes = for {

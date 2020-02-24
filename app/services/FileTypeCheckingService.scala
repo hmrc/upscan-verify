@@ -45,12 +45,12 @@ class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector,
 
     val startTime = clock.instant()
 
-    val consumingService = objectMetadata.items.get("consuming-service")
+    val consumingService = objectMetadata.consumingService
     val fileType         = fileTypeDetector.detectType(objectContent.inputStream, objectMetadata.originalFilename)
 
     addCheckingTimeMetrics(startTime)
 
-    if (isAllowedMimeType(fileType, location, consumingService)) {
+    if (isAllowedForService(fileType, consumingService)) {
       metrics.defaultRegistry.counter("validTypeFileUpload").inc()
       Future.successful(Right(FileAllowed(fileType, Timings(startTime, clock.instant()))))
     } else {
@@ -59,20 +59,14 @@ class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector,
     }
   }
 
-  private def isAllowedMimeType(mimeType: MimeType, location: S3ObjectLocation, consumingService: Option[String])
-                               (implicit ld: LoggingDetails): Boolean =
-    consumingService match {
-      case Some(service) => isAllowedForService(mimeType, service)
-      case None =>
-        withLoggingDetails(ld) {
-          Logger.error(s"No x-amz-meta-consuming-service metadata for [${location.objectKey}]")
-        }
-        false
-    }
-
-  private def isAllowedForService(mimeType: MimeType, consumingService: String)
+  private def isAllowedForService(mimeType: MimeType, consumingService: Option[String])
                                  (implicit ld: LoggingDetails): Boolean = {
-    val allowedMimeTypes = serviceConfiguration.consumingServicesConfiguration.allowedMimeTypes(consumingService)
+
+    val allowedMimeTypes =
+      consumingService
+        .flatMap(serviceConfiguration.allowedMimeTypes)
+        .getOrElse(serviceConfiguration.defaultAllowedMimeTypes)
+
     if (allowedMimeTypes.contains(mimeType.value)) true
     else {
       withLoggingDetails(ld) {

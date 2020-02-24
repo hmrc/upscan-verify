@@ -104,7 +104,9 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
 
       override def processingBatchSize: Int = ???
 
-      override def consumingServicesConfiguration: ConsumingServicesConfiguration = ???
+      override def allowedMimeTypes(serviceName: String): Option[List[String]] = ???
+
+      override def defaultAllowedMimeTypes: List[String] = ???
     }
 
     "Move clean file from inbound bucket to outbound bucket" in {

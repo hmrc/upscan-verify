@@ -18,7 +18,6 @@ package connectors.aws
 
 import com.amazonaws.auth.{AWSCredentialsProvider, AWSSessionCredentials, EC2ContainerCredentialsProviderWrapper}
 import config.ServiceConfiguration
-import model.ConsumingServicesConfiguration
 import org.scalatest.Matchers
 import uk.gov.hmrc.play.test.UnitSpec
 
@@ -49,7 +48,9 @@ class ProviderOfAWSCredentialsSpec extends UnitSpec with Matchers {
 
         override def processingBatchSize: Int = ???
 
-        override def consumingServicesConfiguration: ConsumingServicesConfiguration = ???
+        override def allowedMimeTypes(serviceName: String): Option[List[String]] = ???
+
+        override def defaultAllowedMimeTypes: List[String] = ???
       }
 
       val credentials: AWSCredentialsProvider = new ProviderOfAWSCredentials(configuration).get()
@@ -83,7 +84,9 @@ class ProviderOfAWSCredentialsSpec extends UnitSpec with Matchers {
 
         override def processingBatchSize: Int = ???
 
-        override def consumingServicesConfiguration: ConsumingServicesConfiguration = ???
+        override def allowedMimeTypes(serviceName: String): Option[List[String]] = ???
+
+        override def defaultAllowedMimeTypes: List[String] = ???
       }
 
       val credentials: AWSCredentialsProvider = new ProviderOfAWSCredentials(configuration).get()
@@ -116,7 +119,9 @@ class ProviderOfAWSCredentialsSpec extends UnitSpec with Matchers {
 
         override def processingBatchSize: Int = ???
 
-        override def consumingServicesConfiguration: ConsumingServicesConfiguration = ???
+        override def allowedMimeTypes(serviceName: String): Option[List[String]] = ???
+
+        override def defaultAllowedMimeTypes: List[String] = ???
       }
 
       val credentials: AWSCredentialsProvider = new ProviderOfAWSCredentials(configuration).get()

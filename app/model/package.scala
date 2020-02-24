@@ -70,16 +70,6 @@ object FileRejected {
   }
 }
 
-case class AllowedMimeTypes(serviceName: String, allowedMimeTypes: List[String])
-
-case class ConsumingServicesConfiguration(serviceConfigurations: List[AllowedMimeTypes]) {
-  def allowedMimeTypes(consumingService: String): List[String] =
-    serviceConfigurations
-      .find(_.serviceName == consumingService)
-      .map(_.allowedMimeTypes)
-      .getOrElse(Nil)
-}
-
 sealed trait FileCheckingError {
   def value: String
 }

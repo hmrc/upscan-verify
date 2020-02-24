@@ -20,7 +20,6 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.ActorSystem
 import config.ServiceConfiguration
-import model.ConsumingServicesConfiguration
 import org.scalatest.concurrent.Eventually
 import org.scalatest.mockito.MockitoSugar
 import play.api.inject.DefaultApplicationLifecycle
@@ -55,7 +54,9 @@ class ContinuousPollerSpec extends UnitSpec with MockitoSugar with Eventually {
 
     override def processingBatchSize: Int = ???
 
-    override def consumingServicesConfiguration: ConsumingServicesConfiguration = ???
+    override def allowedMimeTypes(serviceName: String): Option[List[String]] = ???
+
+    override def defaultAllowedMimeTypes: List[String] = ???
   }
 
   "QueuePollingJob" should {

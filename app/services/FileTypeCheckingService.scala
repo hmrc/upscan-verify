@@ -32,23 +32,25 @@ import scala.concurrent.{ExecutionContext, Future}
 
 case class FileAllowed(mimeType: MimeType, fileTypeTimings: Timings)
 
-class FileTypeCheckingService @Inject()(
-  fileTypeDetector: FileTypeDetector,
-  serviceConfiguration: ServiceConfiguration,
-  metrics: Metrics,
-  clock: Clock)(implicit ec: ExecutionContext) {
+class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector,
+                                        serviceConfiguration: ServiceConfiguration,
+                                        metrics: Metrics,
+                                        clock: Clock)
+                                       (implicit ec: ExecutionContext) {
 
-  def scan(location: S3ObjectLocation, objectContent: ObjectContent, objectMetadata: InboundObjectMetadata)(
-    implicit ld: LoggingDetails): Future[Either[FileValidationFailure, FileAllowed]] = {
+  def scan(location: S3ObjectLocation,
+           objectContent: ObjectContent,
+           objectMetadata: InboundObjectMetadata)
+          (implicit ld: LoggingDetails): Future[Either[FileValidationFailure, FileAllowed]] = {
 
     val startTime = clock.instant()
 
-    val consumingService = objectMetadata.items.get("consuming-service")
+    val consumingService = objectMetadata.consumingService
     val fileType         = fileTypeDetector.detectType(objectContent.inputStream, objectMetadata.originalFilename)
 
     addCheckingTimeMetrics(startTime)
 
-    if (isAllowedMimeType(fileType, location, consumingService)) {
+    if (isAllowedForService(fileType, consumingService)) {
       metrics.defaultRegistry.counter("validTypeFileUpload").inc()
       Future.successful(Right(FileAllowed(fileType, Timings(startTime, clock.instant()))))
     } else {
@@ -57,20 +59,14 @@ class FileTypeCheckingService @Inject()(
     }
   }
 
-  private def isAllowedMimeType(mimeType: MimeType, location: S3ObjectLocation, consumingService: Option[String])(
-    implicit ld: LoggingDetails): Boolean =
-    consumingService match {
-      case Some(service) => isAllowedForService(mimeType, service)
-      case None =>
-        withLoggingDetails(ld) {
-          Logger.error(s"No x-amz-meta-consuming-service metadata for [${location.objectKey}]")
-        }
-        false
-    }
+  private def isAllowedForService(mimeType: MimeType, consumingService: Option[String])
+                                 (implicit ld: LoggingDetails): Boolean = {
 
-  private def isAllowedForService(mimeType: MimeType, consumingService: String)(
-    implicit ld: LoggingDetails): Boolean = {
-    val allowedMimeTypes = serviceConfiguration.consumingServicesConfiguration.allowedMimeTypes(consumingService)
+    val allowedMimeTypes =
+      consumingService
+        .flatMap(serviceConfiguration.allowedMimeTypes)
+        .getOrElse(serviceConfiguration.defaultAllowedMimeTypes)
+
     if (allowedMimeTypes.contains(mimeType.value)) true
     else {
       withLoggingDetails(ld) {
@@ -80,8 +76,8 @@ class FileTypeCheckingService @Inject()(
     }
   }
 
-  private def addCheckingTimeMetrics(startTime: Instant) = {
-    val interval = clock.instant().toEpochMilli() - startTime.toEpochMilli()
+  private def addCheckingTimeMetrics(startTime: Instant) {
+    val interval = clock.instant().toEpochMilli - startTime.toEpochMilli
     metrics.defaultRegistry.timer("fileTypeCheckingTime").update(interval, TimeUnit.MILLISECONDS)
   }
 }

@@ -31,8 +31,8 @@ object MonadicUtils {
   def withoutContext[T](f: Future[T])(implicit ec: ExecutionContext): FutureEitherWithContext[T] =
     toFutureEitherWithContext(f, None)
 
-  private def toFutureEitherWithContext[T](f: Future[T], context: Option[MessageContext])(
-    implicit ec: ExecutionContext): FutureEitherWithContext[T] = {
+  private def toFutureEitherWithContext[T](f: Future[T], context: Option[MessageContext])
+                                          (implicit ec: ExecutionContext): FutureEitherWithContext[T] = {
     val futureEither: Future[Either[ExceptionWithContext, T]] =
       f.map(Right(_))
         .recover { case error: Exception => Left(ExceptionWithContext(error, context)) }

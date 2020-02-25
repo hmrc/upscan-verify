@@ -50,12 +50,12 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
     "return valid result for whitelisted mime type for service" in {
 
       Given("an uploaded file with a valid MIME type for the service")
-      val allowedMimeTypes               = AllowedMimeTypes("valid-test-service", List("application/pdf"))
-      val consumingServicesConfiguration = ConsumingServicesConfiguration(List(allowedMimeTypes))
+      val serviceName                    = "valid-test-service"
+      val allowedMimeTypes               = List("application/pdf")
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
       val content  = ObjectContent(null, 1200)
-      val metadata = InboundObjectMetadata(Map("consuming-service" -> "valid-test-service"), Instant.now, 0)
+      val metadata = InboundObjectMetadata(Map("consuming-service" -> serviceName), Instant.now, 0)
 
       val detector = new FileTypeDetector {
         override def detectType(inputStream: InputStream, fileName: Option[String]): MimeType =
@@ -63,7 +63,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       }
 
       val configuration = mock[ServiceConfiguration]
-      when(configuration.consumingServicesConfiguration).thenReturn(consumingServicesConfiguration)
+      when(configuration.allowedMimeTypes(serviceName)).thenReturn(Some(allowedMimeTypes))
 
       val metrics         = metricsStub()
       val checkingService = new FileTypeCheckingService(detector, configuration, metrics, clock)
@@ -81,11 +81,11 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
     }
 
-    "return invalid result when mime type not listed for service" in {
+    "return invalid result when mime type not valid for service" in {
 
       Given("an uploaded file with a valid MIME type for the service")
-      val allowedMimeTypes               = AllowedMimeTypes("valid-test-service", List("application/pdf"))
-      val consumingServicesConfiguration = ConsumingServicesConfiguration(List(allowedMimeTypes))
+      val serviceName                    = "valid-test-service"
+      val allowedMimeTypes               = List("application/pdf")
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
       val content  = ObjectContent(null, 1200)
@@ -98,7 +98,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       }
 
       val configuration = mock[ServiceConfiguration]
-      when(configuration.consumingServicesConfiguration).thenReturn(consumingServicesConfiguration)
+      when(configuration.allowedMimeTypes(serviceName)).thenReturn(Some(allowedMimeTypes))
 
       val metrics         = metricsStub()
       val checkingService = new FileTypeCheckingService(detector, configuration, metrics, clock)
@@ -115,11 +115,11 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
     }
 
-    "return invalid result when file does not have service name" in {
+    "return valid result when file meets default allowed mime types" in {
 
       Given("an uploaded file with a valid MIME type for the service")
-      val allowedMimeTypes               = AllowedMimeTypes("valid-test-service", List("application/pdf"))
-      val consumingServicesConfiguration = ConsumingServicesConfiguration(List(allowedMimeTypes))
+      val serviceName                    = "valid-test-service"
+      val defaultAllowedMimeTypes        = List("application/pdf")
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
       val content  = ObjectContent(null, 1200)
@@ -132,7 +132,8 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       }
 
       val configuration = mock[ServiceConfiguration]
-      when(configuration.consumingServicesConfiguration).thenReturn(consumingServicesConfiguration)
+      when(configuration.allowedMimeTypes(serviceName)).thenReturn(None)
+      when(configuration.defaultAllowedMimeTypes).thenReturn(defaultAllowedMimeTypes)
 
       val metrics         = metricsStub()
       val checkingService = new FileTypeCheckingService(detector, configuration, metrics, clock)
@@ -140,13 +141,14 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
       When("the file is checked")
       val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
-      Then("an incorrect file type result should be returned")
-      result shouldBe Left(IncorrectFileType(fileMimeType, None, new Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:32Z"))))
+      Then("a valid result should be returned")
+      result shouldBe Right(FileAllowed(MimeType("application/pdf"), Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:32Z"))))
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 0
-      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount        shouldBe 1
+      metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 1
+      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount        shouldBe 0
       metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
+
     }
   }
 }

@@ -27,14 +27,15 @@ import uk.gov.hmrc.http.logging.LoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class FileCheckingService @Inject()(
-  fileManager: FileManager,
-  virusScanningService: ScanningService,
-  fileTypeCheckingService: FileTypeCheckingService,
-  clock: Clock)(implicit ec: ExecutionContext) {
+class FileCheckingService @Inject()(fileManager: FileManager,
+                                    virusScanningService: ScanningService,
+                                    fileTypeCheckingService: FileTypeCheckingService,
+                                    clock: Clock)
+                                   (implicit ec: ExecutionContext) {
 
-  def check(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata)(
-    implicit ld: LoggingDetails): Future[Either[FileRejected, FileValidationSuccess]] = {
+  def check(location: S3ObjectLocation,
+            objectMetadata: InboundObjectMetadata)
+           (implicit ld: LoggingDetails): Future[Either[FileRejected, FileValidationSuccess]] = {
 
     virusScan(location, objectMetadata) flatMap {
       case Left(fi: FileInfected)                => FileRejected.futureLeft(fi)
@@ -47,15 +48,17 @@ class FileCheckingService @Inject()(
     }
   }
 
-  private def virusScan(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata)(
-    implicit ld: LoggingDetails): Future[Either[FileValidationFailure, NoVirusFound]] =
+  private def virusScan(location: S3ObjectLocation,
+                        objectMetadata: InboundObjectMetadata)
+                       (implicit ld: LoggingDetails): Future[Either[FileValidationFailure, NoVirusFound]] =
 
     fileManager.withObjectContent(location) { objectContent: ObjectContent =>
       virusScanningService.scan(location, objectContent, objectMetadata)
     }
 
-  private def fileType(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata)(
-    implicit ld: LoggingDetails): Future[Either[FileValidationFailure, FileAllowed]] =
+  private def fileType(location: S3ObjectLocation,
+                       objectMetadata: InboundObjectMetadata)
+                      (implicit ld: LoggingDetails): Future[Either[FileValidationFailure, FileAllowed]] =
 
     fileManager.withObjectContent(location) { objectContent: ObjectContent =>
       fileTypeCheckingService.scan(location, objectContent, objectMetadata)

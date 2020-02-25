@@ -16,11 +16,9 @@
 
 package config
 
-import java.util
 import javax.inject.Inject
 
-import com.typesafe.config.{ConfigObject, ConfigValue}
-import model.{AllowedMimeTypes, ConsumingServicesConfiguration}
+import com.typesafe.config.ConfigObject
 import play.api.Configuration
 
 import scala.collection.JavaConversions._
@@ -47,7 +45,9 @@ trait ServiceConfiguration {
 
   def processingBatchSize: Int
 
-  def consumingServicesConfiguration: ConsumingServicesConfiguration
+  def allowedMimeTypes(serviceName: String): Option[List[String]]
+
+  def defaultAllowedMimeTypes: List[String]
 
 }
 
@@ -77,7 +77,17 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
 
   override def processingBatchSize: Int = getRequired(configuration.getInt, "processingBatchSize")
 
-  override def consumingServicesConfiguration: ConsumingServicesConfiguration = {
+  override def allowedMimeTypes(serviceName: String): Option[List[String]] = {
+    consumingServicesConfiguration.serviceConfigurations
+      .find(_.serviceName == serviceName)
+      .map(_.allowedMimeTypes)
+  }
+
+  private case class AllowedMimeTypes(serviceName: String, allowedMimeTypes: List[String])
+  private case class ConsumingServicesConfiguration(serviceConfigurations: List[AllowedMimeTypes])
+
+  private val consumingServicesConfiguration: ConsumingServicesConfiguration = {
+
     def toPerServiceConfiguration(consumingServiceConfig: ConfigObject): Either[String, AllowedMimeTypes] = {
       val serviceAsMap = consumingServiceConfig.unwrapped.toMap
       (serviceAsMap.get("user-agent"), serviceAsMap.get("mime-types")) match {
@@ -90,9 +100,10 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
     val key = "fileTypesFilter.allowedMimeTypes"
     val servicesConfigArray = configuration
       .getObjectList(key)
-      .getOrElse(throw new Exception(s"Configuration key not found: $key"))
+      .map(_.toList)
+      .getOrElse(Nil)
 
-    val serviceAllowedMimeTypes = servicesConfigArray.toList.map(toPerServiceConfiguration)
+    val serviceAllowedMimeTypes = servicesConfigArray.map(toPerServiceConfiguration)
 
     serviceAllowedMimeTypes.collect({ case Left(error) => error }) match {
       case Nil =>
@@ -102,4 +113,9 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
         throw new Exception(s"Configuration key not correctly configured: $key, errors: ${errors.mkString(", ")}")
     }
   }
+
+  override def defaultAllowedMimeTypes: List[String] =
+    configuration.getString("fileTypesFilter.defaultAllowedMimeTypes")
+      .map(_.split(",").toList)
+      .getOrElse(Nil)
 }

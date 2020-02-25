@@ -30,11 +30,8 @@ trait FileTypeDetector {
 
 class TikaFileTypeDetector extends FileTypeDetector {
 
-
-
   private val config   = TikaConfig.getDefaultConfig
   private val detector = config.getDetector
-  private val plainTextMimeType = MediaType.TEXT_PLAIN
 
   def detectType(inputStream: InputStream, fileName: Option[String]): MimeType = {
     import org.apache.tika.io.TikaInputStream

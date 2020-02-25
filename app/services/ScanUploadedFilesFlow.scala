@@ -32,14 +32,13 @@ case class MessageContext(fileReference: String)
 
 case class ExceptionWithContext(e: Exception, context: Option[MessageContext])
 
-class ScanUploadedFilesFlow @Inject()(
-  parser: MessageParser,
-  fileManager: FileManager,
-  fileCheckingService: FileCheckingService,
-  scanningResultHandler: FileCheckingResultHandler,
-  metrics: Metrics,
-  clock: Clock)(implicit ec: ExecutionContext)
-    extends MessageProcessor {
+class ScanUploadedFilesFlow @Inject()(parser: MessageParser,
+                                      fileManager: FileManager,
+                                      fileCheckingService: FileCheckingService,
+                                      scanningResultHandler: FileCheckingResultHandler,
+                                      metrics: Metrics,
+                                      clock: Clock)
+                                     (implicit ec: ExecutionContext) extends MessageProcessor {
 
   def processMessage(message: Message): FutureEitherWithContext[MessageContext] = {
 
@@ -61,18 +60,18 @@ class ScanUploadedFilesFlow @Inject()(
     addInternalProcessMetrics(startTime, endTime)
   }
 
-  private def addInternalProcessMetrics(startTime: Instant, endTime: Instant): Unit = {
-    val interval = endTime.toEpochMilli() - startTime.toEpochMilli()
-    metrics.defaultRegistry.timer("upscanVerifyProcessing").update(interval, TimeUnit.MILLISECONDS)
-  }
-
   private def addUploadToStartProcessMetrics(uploadedTimestamp: Instant, startTime: Instant): Unit = {
-    val interval = startTime.toEpochMilli() - uploadedTimestamp.toEpochMilli()
+    val interval = startTime.toEpochMilli - uploadedTimestamp.toEpochMilli
     metrics.defaultRegistry.timer("uploadToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
   }
 
   private def addUploadToEndScanMetrics(uploadedTimestamp: Instant, endTime: Instant): Unit = {
-    val interval = endTime.toEpochMilli() - uploadedTimestamp.toEpochMilli()
+    val interval = endTime.toEpochMilli - uploadedTimestamp.toEpochMilli
     metrics.defaultRegistry.timer("uploadToScanComplete").update(interval, TimeUnit.MILLISECONDS)
+  }
+
+  private def addInternalProcessMetrics(startTime: Instant, endTime: Instant): Unit = {
+    val interval = endTime.toEpochMilli - startTime.toEpochMilli
+    metrics.defaultRegistry.timer("upscanVerifyProcessing").update(interval, TimeUnit.MILLISECONDS)
   }
 }

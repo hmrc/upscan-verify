@@ -1,3 +1,4 @@
+import com.typesafe.sbt.packager.Keys.{dockerBaseImage, dockerRepository, dockerUpdateLatest}
 import play.routes.compiler.StaticRoutesGenerator
 import play.sbt.PlayImport.PlayKeys
 import play.sbt.routes.RoutesKeys.routesGenerator
@@ -18,9 +19,13 @@ trait MicroService {
 
   lazy val appDependencies: Seq[ModuleID] = ???
   lazy val plugins: Seq[Plugins] = Seq(
-    play.sbt.PlayScala, SbtAutoBuildPlugin, SbtGitVersioning, SbtDistributablesPlugin, SbtArtifactory
+    play.sbt.PlayScala,
+    SbtAutoBuildPlugin,
+    SbtGitVersioning,
+    SbtDistributablesPlugin,
+    SbtArtifactory
   )
-  lazy val playSettings: Seq[Setting[_]]  = Seq.empty
+  lazy val playSettings: Seq[Setting[_]] = Seq.empty
 
   lazy val scoverageSettings = {
     Seq(
@@ -67,6 +72,10 @@ trait MicroService {
       Resolver.bintrayRepo("hmrc", "releases"),
       Resolver.jcenterRepo
     ))
+    .settings(Seq(
+      dockerUpdateLatest := true,
+      dockerBaseImage := "artefacts.tax.service.gov.uk/hmrc-jre:latest",
+      dockerRepository := Some("artefacts.tax.service.gov.uk")))
 }
 
 private object TestPhases {

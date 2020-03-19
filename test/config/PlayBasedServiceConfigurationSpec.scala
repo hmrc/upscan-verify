@@ -45,6 +45,20 @@ class PlayBasedServiceConfigurationSpec extends UnitSpec with Matchers with Asse
       config.allowedMimeTypes("anything") shouldBe None
     }
 
+    "parse missing consuming service configuration" in {
+      parseConfig("").allowedMimeTypes("anything") shouldBe None
+    }
+
+    /*
+     * This is a change of behaviour introduced during the Play 2.6 upgrade.
+     * Previously we would have thrown the exception:
+     * 'Configuration error[String: 1: Configuration key 'fileTypesFilter.allowedMimeTypes' is set to null but expected LIST]'.
+     * We now interpret 'null' the same as 'empty' or 'missing'.
+     */
+    "parse null consuming service configuration" in {
+      parseConfig("fileTypesFilter.allowedMimeTypes = null").allowedMimeTypes("anything") shouldBe None
+    }
+
     "parse defaultAllowedMimeTypes if specified" in {
       val config = parseConfig(
         """

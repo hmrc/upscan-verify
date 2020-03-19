@@ -20,9 +20,9 @@ import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
 
 import model._
-import org.mockito.Mockito.{verifyZeroInteractions, when}
-import org.scalatest.mockito.MockitoSugar
+import org.mockito.Mockito.{verifyNoInteractions, when}
 import org.scalatest.{GivenWhenThen, Matchers}
+import org.scalatestplus.mockito.MockitoSugar
 import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.play.test.UnitSpec
 import util.logging.LoggingDetails
@@ -106,7 +106,7 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
       Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe
         Left(FileRejected(Left(FileInfected("Virus", checksum, Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))))))
 
-      verifyZeroInteractions(fileTypeCheckingService)
+      verifyNoInteractions(fileTypeCheckingService)
     }
 
     "return failed file type scanning if virus not found but invalid file type" in {

@@ -17,17 +17,18 @@
 package services
 
 import java.io.InputStream
+import java.nio.charset.StandardCharsets.UTF_8
 import java.time.Instant
 
 import config.ServiceConfiguration
 import model._
 import org.apache.commons.io.IOUtils
+import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.{any, eq => meq}
 import org.mockito.Mockito._
-import org.mockito.ArgumentCaptor
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
-import org.scalatest.mockito.MockitoSugar
+import org.scalatestplus.mockito.MockitoSugar
 import uk.gov.hmrc.play.test.UnitSpec
 import util.logging.LoggingDetails
 import utils.WithIncrementingClock
@@ -272,7 +273,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
           locationCaptor.capture(),
           contentCaptor.capture(),
           meq(outboundObjectMetadata))(any())
-      IOUtils.toString(contentCaptor.getValue) shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
+      IOUtils.toString(contentCaptor.getValue, UTF_8) shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
 
       locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 
@@ -310,7 +311,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
         )
 
       Then("file is not deleted")
-      verifyZeroInteractions(fileManager)
+      verifyNoInteractions(fileManager)
 
       And("the whole process fails")
       result.value.get.isFailure shouldBe true
@@ -393,7 +394,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Even
           locationCaptor.capture(),
           captor.capture(),
           meq(outboundObjectMetadata))(any())
-      IOUtils.toString(captor.getValue) shouldBe
+      IOUtils.toString(captor.getValue, UTF_8) shouldBe
         """{"failureReason":"REJECTED","message":"MIME type [application/pdf] is not allowed for service: [valid-test-service]"}"""
       locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 

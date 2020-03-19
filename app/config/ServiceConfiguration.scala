@@ -16,12 +16,11 @@
 
 package config
 
-import javax.inject.Inject
-
 import com.typesafe.config.ConfigObject
-import play.api.Configuration
+import javax.inject.Inject
+import play.api.{ConfigLoader, Configuration}
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 trait ServiceConfiguration {
@@ -53,29 +52,25 @@ trait ServiceConfiguration {
 
 class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) extends ServiceConfiguration {
 
-  override def inboundQueueUrl: String =
-    getRequired(configuration.getString(_), "aws.sqs.queue.inbound")
+  override def inboundQueueUrl: String = getRequired(configuration.getOptional[String](_), "aws.sqs.queue.inbound")
 
-  override def awsRegion = getRequired(configuration.getString(_), "aws.s3.region")
+  override def awsRegion = getRequired(configuration.getOptional[String](_), "aws.s3.region")
 
-  override def useContainerCredentials = configuration.getBoolean("aws.useContainerCredentials").getOrElse(true)
+  override def useContainerCredentials = configuration.getOptional[Boolean]("aws.useContainerCredentials").getOrElse(true)
 
-  override def accessKeyId = getRequired(configuration.getString(_), "aws.accessKeyId")
+  override def accessKeyId = getRequired(configuration.getOptional[String](_), "aws.accessKeyId")
 
-  override def secretAccessKey = getRequired(configuration.getString(_), "aws.secretAccessKey")
+  override def secretAccessKey = getRequired(configuration.getOptional[String](_), "aws.secretAccessKey")
 
-  override def sessionToken = configuration.getString("aws.sessionToken")
+  override def sessionToken = configuration.getOptional[String]("aws.sessionToken")
 
-  override def retryInterval = getRequired(configuration.getMilliseconds, "aws.sqs.retry.interval").milliseconds
+  override def retryInterval = getRequired(readDurationAsMillis, "aws.sqs.retry.interval").milliseconds
 
-  def getRequired[T](function: String => Option[T], key: String) =
-    function(key).getOrElse(throw new IllegalStateException(s"Configuration key not found: $key"))
+  override def outboundBucket = getRequired(configuration.getOptional[String](_), "aws.s3.bucket.outbound")
 
-  override def outboundBucket = getRequired(configuration.getString(_), "aws.s3.bucket.outbound")
+  override def quarantineBucket: String = getRequired(configuration.getOptional[String](_), "aws.s3.bucket.quarantine")
 
-  override def quarantineBucket: String = getRequired(configuration.getString(_), "aws.s3.bucket.quarantine")
-
-  override def processingBatchSize: Int = getRequired(configuration.getInt, "processingBatchSize")
+  override def processingBatchSize: Int = getRequired(configuration.getOptional[Int](_), "processingBatchSize")
 
   override def allowedMimeTypes(serviceName: String): Option[List[String]] = {
     consumingServicesConfiguration.serviceConfigurations
@@ -83,13 +78,24 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
       .map(_.allowedMimeTypes)
   }
 
+  override def defaultAllowedMimeTypes: List[String] =
+    configuration.getOptional[String]("fileTypesFilter.defaultAllowedMimeTypes")
+      .map(_.split(",").toList)
+      .getOrElse(Nil)
+
+  private def getRequired[T](function: String => Option[T], key: String) =
+    function(key).getOrElse(throw new IllegalStateException(s"Configuration key not found: $key"))
+
+  private def readDurationAsMillis(key: String): Option[Long] =
+    configuration.getOptional[scala.concurrent.duration.Duration](key).map(_.toMillis)
+
   private case class AllowedMimeTypes(serviceName: String, allowedMimeTypes: List[String])
   private case class ConsumingServicesConfiguration(serviceConfigurations: List[AllowedMimeTypes])
 
   private val consumingServicesConfiguration: ConsumingServicesConfiguration = {
 
     def toPerServiceConfiguration(consumingServiceConfig: ConfigObject): Either[String, AllowedMimeTypes] = {
-      val serviceAsMap = consumingServiceConfig.unwrapped.toMap
+      val serviceAsMap = consumingServiceConfig.unwrapped.asScala
       (serviceAsMap.get("user-agent"), serviceAsMap.get("mime-types")) match {
         case (Some(service: String), Some(mimeTypes: String)) =>
           Right(AllowedMimeTypes(service, mimeTypes.split(",").toList))
@@ -97,12 +103,10 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
       }
     }
 
-    val key = "fileTypesFilter.allowedMimeTypes"
-    val servicesConfigArray = configuration
-      .getObjectList(key)
-      .map(_.toList)
-      .getOrElse(Nil)
+    implicit val configObjectListConfigLoader: ConfigLoader[List[ConfigObject]] = ConfigLoader(_.getObjectList).map(_.asScala.toList)
 
+    val key = "fileTypesFilter.allowedMimeTypes"
+    val servicesConfigArray = configuration.getOptional[List[ConfigObject]](key).getOrElse(Nil)
     val serviceAllowedMimeTypes = servicesConfigArray.map(toPerServiceConfiguration)
 
     serviceAllowedMimeTypes.collect({ case Left(error) => error }) match {
@@ -113,9 +117,4 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
         throw new Exception(s"Configuration key not correctly configured: $key, errors: ${errors.mkString(", ")}")
     }
   }
-
-  override def defaultAllowedMimeTypes: List[String] =
-    configuration.getString("fileTypesFilter.defaultAllowedMimeTypes")
-      .map(_.split(",").toList)
-      .getOrElse(Nil)
 }

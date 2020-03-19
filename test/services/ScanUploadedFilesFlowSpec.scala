@@ -25,8 +25,8 @@ import model._
 import org.mockito.ArgumentMatchers.{any, eq => meq}
 import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when}
 import org.mockito.{ArgumentMatchers, Mockito}
-import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{GivenWhenThen, Matchers}
+import org.scalatestplus.mockito.MockitoSugar
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.test.UnitSpec
 import util.logging.LoggingDetails
@@ -221,7 +221,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThe
       Await.result(result.value, 10 seconds).isLeft shouldBe true
 
       And("scanning result handler is not invoked")
-      Mockito.verifyZeroInteractions(scanningResultHandler)
+      Mockito.verifyNoInteractions(scanningResultHandler)
 
       And("the metrics should not be updated")
       metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 0

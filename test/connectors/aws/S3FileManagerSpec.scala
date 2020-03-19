@@ -17,6 +17,7 @@
 package connectors.aws
 
 import java.io.ByteArrayInputStream
+import java.nio.charset.StandardCharsets.UTF_8
 import java.time.{Clock, Instant}
 
 import util.logging.LoggingDetails
@@ -32,13 +33,13 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{doThrow, verify, verifyNoMoreInteractions, when}
 import org.mockito.{ArgumentCaptor, Mockito}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Assertions, GivenWhenThen, Matchers}
+import org.scalatestplus.mockito.MockitoSugar
 import services._
 import uk.gov.hmrc.play.test.UnitSpec
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
@@ -236,7 +237,7 @@ class S3FileManagerSpec
 
       When("the bytes are requested")
       def readingFunction(f: ObjectContent) =
-        Future.successful((IOUtils.toString(f.inputStream, "UTF-8"), f.length))
+        Future.successful((IOUtils.toString(f.inputStream, UTF_8), f.length))
       val result = Await.result(fileManager.withObjectContent(fileLocation)(readingFunction), 2.seconds)
 
       Then("expected byte array is returned")

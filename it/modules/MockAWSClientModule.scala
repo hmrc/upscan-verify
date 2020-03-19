@@ -4,7 +4,7 @@ import com.amazonaws.services.ec2.AmazonEC2
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.sqs.AmazonSQS
 import javax.inject.Provider
-import org.scalatest.mockito.MockitoSugar.mock
+import org.scalatestplus.mockito.MockitoSugar.mock
 import play.api.{Configuration, Environment}
 import play.api.inject.{Binding, Module}
 

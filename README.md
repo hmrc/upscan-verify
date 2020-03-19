@@ -33,9 +33,25 @@ In order to run the service against one of HMRC accounts (labs, live) you will n
 role. See [UpScan Accounts/roles](https://github.com/hmrc/aws-users/blob/master/AccountLinks.md) for details.
 The service also requires ClamAV virus scanning software running locally.
 
-## Running ClamAV
+## Integration with a running ClamAV
 
-ClamAv Version 0.99 or later - the [clam-av client ReadMe](https://github.com/hmrc/clamav-client) provides documentation on how to install or alternatively you can download and run the [docker-clamav image](https://hub.docker.com/r/mkodockx/docker-clamav).
+```ClamAvSpec``` is an integration test that requires access to a running clam daemon.
+This spec may be run locally via the usual ```sbt it:test```, but integration tests are not enabled for this project during continuous integration builds.
+
+You may run ```clamd``` natively or via the [docker-clamav image](https://hub.docker.com/r/mkodockx/docker-clamav).
+Either way, the instance must accept connections on the default TCP port (3310).
+For docker, simply:
+```docker run --rm -d -p 3310:3310 mk0x/docker-clamav:alpine```
+
+The spec requires the instance to be available at the host ```avscan```.
+If you are running locally this can be achieved by editing your ```/etc/hosts``` file as follows:
+
+```127.0.0.1       avscan```
+
+If you are using Docker Machine on a Mac then the host IP should be the IP of your Docker Machine.
+
+```DOCKER_IP       avscan```
+
 
 ## Setting up AWS credentials
 

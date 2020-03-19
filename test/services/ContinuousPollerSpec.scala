@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import akka.actor.ActorSystem
 import config.ServiceConfiguration
 import org.scalatest.concurrent.Eventually
-import org.scalatest.mockito.MockitoSugar
+import org.scalatestplus.mockito.MockitoSugar
 import play.api.inject.DefaultApplicationLifecycle
 import uk.gov.hmrc.play.test.UnitSpec
 
@@ -70,7 +70,7 @@ class ContinuousPollerSpec extends UnitSpec with MockitoSugar with Eventually {
 
       val serviceLifecycle = new DefaultApplicationLifecycle()
 
-      val queuePollingJob = new ContinuousPoller(orchestrator, serviceConfiguration)(actorSystem, serviceLifecycle)
+      new ContinuousPoller(orchestrator, serviceConfiguration)(actorSystem, serviceLifecycle)
 
       eventually {
         callCount.get() > 5
@@ -94,7 +94,7 @@ class ContinuousPollerSpec extends UnitSpec with MockitoSugar with Eventually {
 
       val serviceLifecycle = new DefaultApplicationLifecycle()
 
-      val queuePollingJob = new ContinuousPoller(orchestrator, serviceConfiguration)(actorSystem, serviceLifecycle)
+      new ContinuousPoller(orchestrator, serviceConfiguration)(actorSystem, serviceLifecycle)
 
       eventually {
         callCount.get() > 5

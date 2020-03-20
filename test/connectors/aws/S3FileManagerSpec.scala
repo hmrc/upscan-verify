@@ -222,7 +222,8 @@ class S3FileManagerSpec
           s3ObjectClosed = true
         }
       }
-      s3Object.setObjectContent(new ByteArrayInputStream(byteArray))
+      val fileInputStream = new ByteArrayInputStream(byteArray)
+      s3Object.setObjectContent(fileInputStream)
 
       val fileMetadata = new ObjectMetadata()
       fileMetadata.setContentLength(byteArray.length)
@@ -242,8 +243,9 @@ class S3FileManagerSpec
       Then("expected byte array is returned")
       result shouldBe ((fileContent, fileContent.length))
 
-      And("stream has been closed")
+      And("stream has been fully read and closed")
       eventually {
+        fileInputStream.read() shouldBe -1
         s3ObjectClosed shouldBe true
       }
 

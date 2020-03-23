@@ -101,10 +101,9 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
 
       val result: Future[T] = function(content)
       result.onComplete(_ => {
-        // This is required to ensure the full reading of the InputStream, as
-        // without reading the InputStream we see large amounts of error messages:
+        // Without closing the InputStream we see large amounts of error messages:
         // Not all bytes were read from the S3ObjectInputStream
-        Stream.continually(fileInputStream.read).takeWhile(_ != -1)
+        fileInputStream.abort()
         fileFromLocation.close()
       })
       result

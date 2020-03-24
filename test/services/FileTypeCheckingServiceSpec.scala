@@ -17,13 +17,13 @@
 package services
 
 import java.io.InputStream
-import java.time.{Clock, Instant, ZoneId}
+import java.time.Instant
 
 import config.ServiceConfiguration
 import model._
 import org.mockito.Mockito.when
 import org.scalatest.GivenWhenThen
-import org.scalatest.mockito.MockitoSugar
+import org.scalatestplus.mockito.MockitoSugar
 import uk.gov.hmrc.play.test.UnitSpec
 import com.kenshoo.play.metrics.Metrics
 import com.codahale.metrics.MetricRegistry
@@ -31,7 +31,6 @@ import util.logging.LoggingDetails
 import utils.WithIncrementingClock
 
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with MockitoSugar with WithIncrementingClock {

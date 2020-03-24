@@ -26,7 +26,8 @@ import play.api.Logger
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext.fromLoggingDetails
+
+import scala.concurrent.ExecutionContext
 
 import scala.concurrent.Future
 
@@ -41,8 +42,7 @@ class ClamAvScanningService @Inject()(
   clamClientFactory: ClamAntiVirusFactory,
   messageDigestComputingInputStreamFactory: ChecksumComputingInputStreamFactory,
   metrics: Metrics,
-  clock: Clock)
-    extends ScanningService {
+  clock: Clock)(implicit executionContext: ExecutionContext) extends ScanningService {
 
   override def scan(location: S3ObjectLocation, fileContent: ObjectContent, metadata: InboundObjectMetadata)(
     implicit ld: LoggingDetails): Future[Either[FileInfected, NoVirusFound]] = {

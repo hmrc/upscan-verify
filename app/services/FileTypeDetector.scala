@@ -20,7 +20,6 @@ import java.io.InputStream
 
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.metadata.{Metadata, TikaMetadataKeys}
-import org.apache.tika.mime.MediaType
 
 case class MimeType(value: String) extends AnyVal
 

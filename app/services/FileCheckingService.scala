@@ -16,11 +16,8 @@
 
 package services
 
-import java.time.{Clock, Instant}
+import java.time.Clock
 
-import cats._
-import cats.implicits._
-import cats.data.EitherT
 import javax.inject.Inject
 import model._
 import uk.gov.hmrc.http.logging.LoggingDetails

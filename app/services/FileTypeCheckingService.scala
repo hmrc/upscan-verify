@@ -25,18 +25,16 @@ import javax.inject.Inject
 import model._
 import play.api.Logger
 import uk.gov.hmrc.http.logging.LoggingDetails
-import util.logging.LoggingDetails
 import util.logging.WithLoggingDetails.withLoggingDetails
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 case class FileAllowed(mimeType: MimeType, fileTypeTimings: Timings)
 
 class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector,
                                         serviceConfiguration: ServiceConfiguration,
                                         metrics: Metrics,
-                                        clock: Clock)
-                                       (implicit ec: ExecutionContext) {
+                                        clock: Clock) {
 
   def scan(location: S3ObjectLocation,
            objectContent: ObjectContent,

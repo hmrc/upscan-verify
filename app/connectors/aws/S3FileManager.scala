@@ -17,7 +17,7 @@
 package connectors.aws
 
 import java.io.InputStream
-import java.time.{Clock, Instant}
+import java.time.Clock
 import java.util.UUID
 
 import com.amazonaws.services.s3.AmazonS3

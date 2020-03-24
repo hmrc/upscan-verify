@@ -103,7 +103,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
       result.onComplete(_ => {
         // Without closing the InputStream we see large amounts of error messages:
         // Not all bytes were read from the S3ObjectInputStream
-        fileInputStream.abort()
+        fileInputStream.close()
         fileFromLocation.close()
       })
       result

@@ -88,22 +88,19 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
     }
 
   override def withObjectContent[T](objectLocation: S3ObjectLocation)(function: ObjectContent => Future[T])(
-    implicit loggingDetails: LoggingDetails): Future[T] = Future {
+    implicit loggingDetails: LoggingDetails): Future[T] =
+    Future {
       val getObjectRequest = new GetObjectRequest(objectLocation.bucket, objectLocation.objectKey)
       objectLocation.objectVersion.foreach(getObjectRequest.setVersionId)
       val fileFromLocation = s3Client.getObject(getObjectRequest)
-      val fileInputStream = fileFromLocation.getObjectContent
-      val content: ObjectContent =
-        ObjectContent(fileInputStream, fileFromLocation.getObjectMetadata.getContentLength)
+      val content =
+        ObjectContent(fileFromLocation.getObjectContent, fileFromLocation.getObjectMetadata.getContentLength)
       withLoggingDetails(loggingDetails) {
         Logger.debug(s"Fetched content for objectKey: [${objectLocation.objectKey}].")
       }
 
       val result: Future[T] = function(content)
-      result.onComplete(_ => {
-        fileInputStream.close()
-        fileFromLocation.close()
-      })
+      result.onComplete(_ => fileFromLocation.close())
       result
     }.flatMap(f => f)
 

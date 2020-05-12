@@ -24,19 +24,17 @@ import com.kenshoo.play.metrics.Metrics
 import model.{FileInfected, S3ObjectLocation, Timings}
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
-import org.scalatest.{Assertions, GivenWhenThen, Matchers}
-import org.scalatestplus.mockito.MockitoSugar
+import org.scalatest.{Assertions, GivenWhenThen}
+import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
-import uk.gov.hmrc.play.test.UnitSpec
 import util.logging.LoggingDetails
-import utils.WithIncrementingClock
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen with MockitoSugar with WithIncrementingClock {
+class ClamAvScanningServiceSpec extends UnitSpec with Assertions with GivenWhenThen with WithIncrementingClock {
 
   implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 

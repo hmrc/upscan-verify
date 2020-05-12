@@ -18,11 +18,10 @@ package services
 
 import java.io.ByteArrayInputStream
 
-import org.scalatest.{Assertions, GivenWhenThen, Matchers}
-import org.scalatestplus.mockito.MockitoSugar
-import uk.gov.hmrc.play.test.UnitSpec
+import org.scalatest.{Assertions, GivenWhenThen}
+import test.UnitSpec
 
-class TikaFileTypeCheckingSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen with MockitoSugar {
+class TikaFileTypeCheckingSpec extends UnitSpec with Assertions with GivenWhenThen {
 
   "TikaFileTypeDetector" should {
 

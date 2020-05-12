@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-package utils
+package util.logging
 
-import org.scalatest.Matchers
 import org.slf4j.MDC
+import test.UnitSpec
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.play.test.UnitSpec
-import util.logging.WithLoggingDetails
 
-class WithLoggingDetailsSpec extends UnitSpec with Matchers {
+class WithLoggingDetailsSpec extends UnitSpec {
   "loggingWithDetails" should {
     "add details to logging context " in {
       MDC.put("key1", "old-val")

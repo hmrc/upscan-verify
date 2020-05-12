@@ -18,17 +18,19 @@ package uk.gov.hmrc.clamav
 
 import java.io.ByteArrayInputStream
 
+import org.scalatest.{Matchers, WordSpecLike}
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
-import uk.gov.hmrc.play.test.UnitSpec
 
 import scala.Array.emptyByteArray
+import scala.concurrent.{Await, Awaitable}
+import scala.concurrent.duration._
 
 /*
  * This integration test requires a clam daemon to be available as per the configuration in instance().
  * See the README for details of how to configure this for local testing.
  */
-class ClamAvSpec extends UnitSpec {
+class ClamAvSpec extends WordSpecLike with Matchers {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -44,6 +46,8 @@ class ClamAvSpec extends UnitSpec {
     }
     new ClamAntiVirusFactory(configuration).getClient()
   }
+
+  private def await[T](awaitable: Awaitable[T]): T = Await.result(awaitable, 5.seconds)
 
   "Scanning files" should {
     "allow clean files" in {

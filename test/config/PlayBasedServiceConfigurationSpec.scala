@@ -17,11 +17,11 @@
 package config
 
 import com.typesafe.config.ConfigFactory
-import org.scalatest.{Assertions, GivenWhenThen, Matchers}
+import org.scalatest.{Assertions, GivenWhenThen}
 import play.api.Configuration
-import uk.gov.hmrc.play.test.UnitSpec
+import test.UnitSpec
 
-class PlayBasedServiceConfigurationSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen {
+class PlayBasedServiceConfigurationSpec extends UnitSpec with Assertions with GivenWhenThen {
 
   "PlayBasedServiceConfiguration" should {
 

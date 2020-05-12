@@ -33,10 +33,9 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{doThrow, verify, verifyNoMoreInteractions, when}
 import org.mockito.{ArgumentCaptor, Mockito}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.{Assertions, GivenWhenThen, Matchers}
-import org.scalatestplus.mockito.MockitoSugar
+import org.scalatest.{Assertions, GivenWhenThen}
 import services._
-import uk.gov.hmrc.play.test.UnitSpec
+import test.UnitSpec
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -45,10 +44,8 @@ import scala.concurrent.{Await, Future}
 
 class S3FileManagerSpec
     extends UnitSpec
-    with Matchers
     with Assertions
     with GivenWhenThen
-    with MockitoSugar
     with Eventually {
 
   private val awsLastModified      = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime

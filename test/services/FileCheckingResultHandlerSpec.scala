@@ -28,16 +28,14 @@ import org.mockito.ArgumentMatchers.{any, eq => meq}
 import org.mockito.Mockito._
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
-import org.scalatestplus.mockito.MockitoSugar
-import uk.gov.hmrc.play.test.UnitSpec
+import test.{UnitSpec, WithIncrementingClock}
 import util.logging.LoggingDetails
-import utils.WithIncrementingClock
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class FileCheckingResultHandlerSpec extends UnitSpec with MockitoSugar with Eventually with GivenWhenThen with WithIncrementingClock {
+class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenWhenThen with WithIncrementingClock {
 
   val fileSize: Long = 97
 

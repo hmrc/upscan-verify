@@ -27,16 +27,14 @@ import model.Message
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{Assertions, GivenWhenThen, Matchers}
-import org.scalatestplus.mockito.MockitoSugar
-import uk.gov.hmrc.play.test.UnitSpec
-import utils.WithIncrementingClock
+import org.scalatest.{Assertions, GivenWhenThen}
+import test.{UnitSpec, WithIncrementingClock}
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class SqsQueueConsumerSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen with MockitoSugar with WithIncrementingClock {
+class SqsQueueConsumerSpec extends UnitSpec with Assertions with GivenWhenThen with WithIncrementingClock {
 
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 

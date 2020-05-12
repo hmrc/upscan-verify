@@ -25,18 +25,16 @@ import model._
 import org.mockito.ArgumentMatchers.{any, eq => meq}
 import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when}
 import org.mockito.{ArgumentMatchers, Mockito}
-import org.scalatest.{GivenWhenThen, Matchers}
-import org.scalatestplus.mockito.MockitoSugar
+import org.scalatest.GivenWhenThen
+import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.play.test.UnitSpec
 import util.logging.LoggingDetails
-import utils.WithIncrementingClock
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class ScanUploadedFilesFlowSpec extends UnitSpec with Matchers with GivenWhenThen with MockitoSugar with WithIncrementingClock {
+class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithIncrementingClock {
 
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 

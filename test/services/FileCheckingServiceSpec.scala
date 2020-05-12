@@ -21,18 +21,16 @@ import java.time.Instant
 
 import model._
 import org.mockito.Mockito.{verifyNoInteractions, when}
-import org.scalatest.{GivenWhenThen, Matchers}
-import org.scalatestplus.mockito.MockitoSugar
+import org.scalatest.GivenWhenThen
+import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.play.test.UnitSpec
 import util.logging.LoggingDetails
-import utils.WithIncrementingClock
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen with MockitoSugar with WithIncrementingClock {
+class FileCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithIncrementingClock {
 
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 

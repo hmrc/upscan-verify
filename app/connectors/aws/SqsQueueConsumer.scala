@@ -23,7 +23,7 @@ import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageReq
 import config.ServiceConfiguration
 import javax.inject.Inject
 import model.Message
-import play.api.Logger
+import play.api.Logging
 import services.QueueConsumer
 
 import scala.collection.JavaConverters._
@@ -32,7 +32,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS,
                                  configuration: ServiceConfiguration,
                                  clock: Clock)
-                                (implicit ec: ExecutionContext) extends QueueConsumer {
+                                (implicit ec: ExecutionContext) extends QueueConsumer with Logging {
 
   override def poll(): Future[List[Message]] = {
     val receiveMessageRequest = new ReceiveMessageRequest(configuration.inboundQueueUrl)
@@ -47,8 +47,8 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS,
       val receivedAt = clock.instant()
 
       result.getMessages.asScala.toList.map { sqsMessage =>
-        if (Logger.isDebugEnabled) {
-          Logger.debug(
+        if (logger.isDebugEnabled) {
+          logger.debug(
             s"Received message with id: [${sqsMessage.getMessageId}] and receiptHandle: [${sqsMessage.getReceiptHandle}], message details:\n "
               + sqsMessage.toString)
         }
@@ -62,7 +62,7 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS,
     val deleteMessageRequest = new DeleteMessageRequest(configuration.inboundQueueUrl, message.receiptHandle)
     Future {
       sqsClient.deleteMessage(deleteMessageRequest)
-      Logger.debug(
+      logger.debug(
         s"Deleted message from Queue: [${configuration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}].")
     }
   }

@@ -19,7 +19,7 @@ package services
 import cats.implicits._
 import javax.inject.Inject
 import model.Message
-import play.api.Logger
+import play.api.Logging
 import util.logging.LoggingDetails
 import util.logging.WithLoggingDetails.withLoggingDetails
 import utils.MonadicUtils
@@ -28,7 +28,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class QueueProcessingJob @Inject()(consumer: QueueConsumer,
                                    messageProcessor: MessageProcessor)
-                                  (implicit ec: ExecutionContext) extends PollingJob {
+                                  (implicit ec: ExecutionContext) extends PollingJob with Logging {
 
   def run(): Future[Unit] = {
     val outcomes = for {
@@ -51,13 +51,13 @@ class QueueProcessingJob @Inject()(consumer: QueueConsumer,
         ()
       case Left(ExceptionWithContext(exception, Some(context))) =>
         withLoggingDetails(LoggingDetails.fromMessageContext(context)) {
-          Logger.error(
+          logger.error(
             s"Failed to process message '${message.id}' for file '${context.fileReference}', cause ${exception.getMessage}",
             exception
           )
         }
       case Left(ExceptionWithContext(exception, None)) =>
-        Logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)
+        logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)
     }
   }
 

@@ -23,7 +23,7 @@ import java.util.UUID
 import config.ServiceConfiguration
 import javax.inject.Inject
 import model._
-import play.api.Logger
+import play.api.Logging
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.logging.LoggingDetails
 
@@ -33,7 +33,7 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager,
                                           rejectionNotifier: RejectionNotifier,
                                           configuration: ServiceConfiguration,
                                           clock: Clock)
-                                         (implicit ec: ExecutionContext) {
+                                         (implicit ec: ExecutionContext) extends Logging {
 
   def handleCheckingResult(objectDetails: InboundObjectDetails,
                            result: Either[FileValidationFailure, FileValidationSuccess],
@@ -49,7 +49,7 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager,
       case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(IncorrectFileType(mime, consumingService, fileTypeTimings)))) =>
         handleIncorrectType(objectDetails, mime, consumingService)(checksum, messageReceivedAt, virusScanTimings, fileTypeTimings)
 
-      case _ => Future.successful(Logger.error(s"Unexpected match result for result: [$result]."))
+      case _ => Future.successful(logger.error(s"Unexpected match result for result: [$result]."))
     }
 
   private def handleValid(details: InboundObjectDetails,
@@ -58,7 +58,7 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager,
                          (messageReceivedAt: Instant,
                           virusScanTimings: Timings,
                           fileTypeTimings: Timings)
-                         (implicit ec: ExecutionContext, ld: LoggingDetails) = {
+                         (implicit ec: ExecutionContext, ld: LoggingDetails): Future[Unit] = {
 
     def metadata(key: String): Option[(String,String)] = details.metadata.items.get(key).map(s"x-amz-meta-${key}" -> _)
 
@@ -83,7 +83,7 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager,
 
   private def handleInfected(details: InboundObjectDetails, errorMessage: String)
                             (checksum: String, messageReceivedAt: Instant, virusScanTimings: Timings)
-                            (implicit ec: ExecutionContext, ld: LoggingDetails) = {
+                            (implicit ec: ExecutionContext, ld: LoggingDetails): Future[Unit] = {
 
     def metadata(key: String): Option[(String,String)] = details.metadata.items.get(key).map(s"x-amz-meta-${key}" -> _)
 
@@ -107,7 +107,7 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager,
 
   private def handleIncorrectType(details: InboundObjectDetails, mimeType: MimeType, serviceName: Option[String])
                                  (checksum: String, messageReceivedAt: Instant, virusScanTimings: Timings, fileTypeTimings: Timings)
-                                 (implicit ec: ExecutionContext, ld: LoggingDetails) = {
+                                 (implicit ec: ExecutionContext, ld: LoggingDetails): Future[Unit] = {
 
     def metadata(key: String): Option[(String,String)] = details.metadata.items.get(key).map(s"x-amz-meta-${key}" -> _)
 

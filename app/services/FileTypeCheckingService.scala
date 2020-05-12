@@ -23,7 +23,7 @@ import com.kenshoo.play.metrics.Metrics
 import config.ServiceConfiguration
 import javax.inject.Inject
 import model._
-import play.api.Logger
+import play.api.Logging
 import uk.gov.hmrc.http.logging.LoggingDetails
 import util.logging.WithLoggingDetails.withLoggingDetails
 
@@ -34,7 +34,7 @@ case class FileAllowed(mimeType: MimeType, fileTypeTimings: Timings)
 class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector,
                                         serviceConfiguration: ServiceConfiguration,
                                         metrics: Metrics,
-                                        clock: Clock) {
+                                        clock: Clock) extends Logging {
 
   def scan(location: S3ObjectLocation,
            objectContent: ObjectContent,
@@ -68,7 +68,7 @@ class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector,
     if (allowedMimeTypes.contains(mimeType.value)) true
     else {
       withLoggingDetails(ld) {
-        Logger.error(s"Consuming service [$consumingService] does not allow MIME type: [${mimeType.value}]")
+        logger.error(s"Consuming service [$consumingService] does not allow MIME type: [${mimeType.value}]")
       }
       false
     }

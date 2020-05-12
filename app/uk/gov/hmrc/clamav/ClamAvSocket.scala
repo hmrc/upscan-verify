@@ -19,12 +19,12 @@ package uk.gov.hmrc.clamav
 import java.io.{DataOutputStream, InputStream}
 import java.net.{InetSocketAddress, Socket}
 
-import play.api.Logger
+import play.api.Logging
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 
 import scala.concurrent.{ExecutionContext, Future}
 
-private[clamav] class ClamAvSocket(socket: Socket, val in : InputStream, val out : DataOutputStream) extends Connection {
+private[clamav] class ClamAvSocket(socket: Socket, val in : InputStream, val out : DataOutputStream) extends Connection with Logging {
 
   private def terminate()(implicit ec: ExecutionContext): Future[Unit] =
     Future {
@@ -32,7 +32,7 @@ private[clamav] class ClamAvSocket(socket: Socket, val in : InputStream, val out
       out.close()
     } recover {
       case e: Throwable =>
-        Logger.error("Error closing socket to clamd", e)
+        logger.error("Error closing socket to clamd", e)
     }
 
 }
@@ -44,15 +44,14 @@ private[clamav] trait Connection {
 
 private[clamav] object ClamAvSocket {
 
-  private def openSocket(config : ClamAvConfig)(implicit ec : ExecutionContext) = Future {
+  private def openSocket(config : ClamAvConfig)(implicit ec : ExecutionContext): Future[ClamAvSocket] = Future {
     val sock = new Socket
     sock.setSoTimeout(config.timeout)
 
     val address: InetSocketAddress = new InetSocketAddress(config.host, config.port)
     sock.connect(address)
 
-    val out: DataOutputStream =
-      new DataOutputStream(sock.getOutputStream)
+    val out: DataOutputStream = new DataOutputStream(sock.getOutputStream)
 
     val in: InputStream = sock.getInputStream
 

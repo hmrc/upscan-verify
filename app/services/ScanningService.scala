@@ -22,13 +22,12 @@ import java.util.concurrent.TimeUnit
 import com.kenshoo.play.metrics.Metrics
 import javax.inject.Inject
 import model._
-import play.api.Logger
+import play.api.Logging
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.http.logging.LoggingDetails
 
 import scala.concurrent.ExecutionContext
-
 import scala.concurrent.Future
 
 case class NoVirusFound(checksum: String, virusScanTimings: Timings)
@@ -42,7 +41,7 @@ class ClamAvScanningService @Inject()(
   clamClientFactory: ClamAntiVirusFactory,
   messageDigestComputingInputStreamFactory: ChecksumComputingInputStreamFactory,
   metrics: Metrics,
-  clock: Clock)(implicit executionContext: ExecutionContext) extends ScanningService {
+  clock: Clock)(implicit executionContext: ExecutionContext) extends ScanningService with Logging {
 
   override def scan(location: S3ObjectLocation, fileContent: ObjectContent, metadata: InboundObjectMetadata)(
     implicit ld: LoggingDetails): Future[Either[FileInfected, NoVirusFound]] = {
@@ -58,7 +57,7 @@ class ClamAvScanningService @Inject()(
                        metrics.defaultRegistry.counter("cleanFileUpload").inc()
                        Right(NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
                      case Infected(message) =>
-                       Logger.warn(s"File is infected: [$message].")
+                       logger.warn(s"File is infected: [$message].")
                        metrics.defaultRegistry.counter("quarantineFileUpload").inc()
                        Left(FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant())))
                    }

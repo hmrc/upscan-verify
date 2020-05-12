@@ -95,7 +95,7 @@ class ClamAvSpec extends UnitSpec {
   private def getBytes(payloadSize: Int = 0, shouldInsertVirusAtPosition: Option[Int] = None) =
     getPayload(payloadSize, shouldInsertVirusAtPosition).getBytes()
 
-  private def getPayload(payloadSize: Int = 0, shouldInsertVirusAtPosition: Option[Int] = None): String = {
+  private def getPayload(payloadSize: Int, shouldInsertVirusAtPosition: Option[Int]): String = {
     val payloadData = shouldInsertVirusAtPosition match {
       case Some(position) =>
         val virusStartPosition = math.min(position, payloadSize - virusSig.length)

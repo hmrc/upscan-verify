@@ -9,12 +9,14 @@ import modules.MockAWSClientModule
 import org.apache.commons.io.IOUtils
 import org.mockito.ArgumentMatchers.{eq => eql}
 import org.mockito.Mockito
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpecLike
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 import org.scalatestplus.play.guice.GuiceOneServerPerSuite
 import play.api.Application
 import play.api.inject.guice.{GuiceApplicationBuilder, GuiceableModuleConversions}
 
-class IntegrationSpec extends WordSpecLike with Matchers
+class IntegrationSpec extends AnyWordSpecLike with should.Matchers
                              with GuiceOneServerPerSuite with GuiceableModuleConversions with BeforeAndAfterEach with BeforeAndAfterAll {
 
   override lazy val app: Application = new GuiceApplicationBuilder()

@@ -18,7 +18,8 @@ package uk.gov.hmrc.clamav
 
 import java.io.ByteArrayInputStream
 
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpecLike
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
 
@@ -30,7 +31,7 @@ import scala.concurrent.duration._
  * This integration test requires a clam daemon to be available as per the configuration in instance().
  * See the README for details of how to configure this for local testing.
  */
-class ClamAvSpec extends WordSpecLike with Matchers {
+class ClamAvSpec extends AnyWordSpecLike with should.Matchers {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 

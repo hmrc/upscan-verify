@@ -16,7 +16,8 @@
 
 package test
 
-import org.scalatest.{Matchers, WordSpecLike}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatestplus.mockito.MockitoSugar
 
-trait UnitSpec extends WordSpecLike with Matchers with MockitoSugar
+trait UnitSpec extends AnyWordSpecLike with should.Matchers with MockitoSugar

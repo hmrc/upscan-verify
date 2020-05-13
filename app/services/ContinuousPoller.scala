@@ -20,7 +20,7 @@ import javax.inject.Inject
 import akka.actor.{Actor, ActorSystem, PoisonPill, Props}
 import akka.event.Logging
 import config.ServiceConfiguration
-import play.api.Logger
+import play.api.Logging
 import play.api.inject.ApplicationLifecycle
 import services.ContinuousPollingActor.Poll
 
@@ -36,19 +36,19 @@ trait PollingJob {
 
 class ContinuousPoller @Inject()(job: PollingJob, serviceConfiguration: ServiceConfiguration)(
   implicit actorSystem: ActorSystem,
-  applicationLifecycle: ApplicationLifecycle) {
+  applicationLifecycle: ApplicationLifecycle) extends Logging {
 
-  Logger.info(s"Creating ContinuousPollingActor for PollingJob: [${job.jobName}].")
+  logger.info(s"Creating ContinuousPollingActor for PollingJob: [${job.jobName}].")
 
   private val pollingActor =
     actorSystem.actorOf(ContinuousPollingActor(job, serviceConfiguration.retryInterval), "Poller")
 
-  Logger.info(s"Sending initial Poll message to Actor: [${pollingActor.toString}].")
+  logger.info(s"Sending initial Poll message to Actor: [${pollingActor.toString}].")
   pollingActor ! Poll
 
 
   applicationLifecycle.addStopHook { () =>
-    Logger.info(s"Sending PoisonPill message to Actor: [${pollingActor.toString}].")
+    logger.info(s"Sending PoisonPill message to Actor: [${pollingActor.toString}].")
     pollingActor ! PoisonPill
     Future.successful(())
   }

@@ -19,7 +19,7 @@ package services
 import java.time.Instant
 
 import model.S3ObjectLocation
-import play.api.Logger
+import play.api.Logging
 
 import scala.concurrent.Future
 
@@ -51,7 +51,7 @@ trait RejectionNotifier {
 }
 
 
-object LoggingRejectionNotifier extends RejectionNotifier {
+object LoggingRejectionNotifier extends RejectionNotifier with Logging {
 
   override def notifyRejection(fileProperties: S3ObjectLocation,
                                checksum: String,
@@ -60,7 +60,7 @@ object LoggingRejectionNotifier extends RejectionNotifier {
                                details: String,
                                serviceName: Option[String],
                                customMessagePrefix: String): Future[Unit] = {
-    Logger.warn(
+    logger.warn(
       s"""$customMessagePrefix${serviceName.fold("")(service => s"\nService name: [$service]")}
          |File ID: [${fileProperties.objectKey}]${fileProperties.objectVersion.fold("")(version => s"\nVersion: [$version]")}
          |Checksum: [$checksum]

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package utils
+package test
 
 import java.time.{Clock, Duration, Instant, ZoneId}
 import java.util.concurrent.atomic.AtomicLong
@@ -28,5 +28,5 @@ class IncrementingClock(baseTimeInMillis: Long, increment: Duration, zoneId: Zon
   override def withZone(newZoneId: ZoneId): Clock = new IncrementingClock(baseMillis.get(), increment, zoneId)
   override def instant(): Instant = Instant.ofEpochMilli(baseMillis.getAndAdd(increment.toMillis))
 
-  protected[utils] def reset() = baseMillis.set(baseTimeInMillis)
+  protected[test] def reset() = baseMillis.set(baseTimeInMillis)
 }

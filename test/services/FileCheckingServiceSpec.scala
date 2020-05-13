@@ -20,19 +20,16 @@ import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
 
 import model._
-import org.mockito.Mockito.{verifyNoInteractions, when}
-import org.scalatest.{GivenWhenThen, Matchers}
-import org.scalatestplus.mockito.MockitoSugar
+import org.scalatest.GivenWhenThen
+import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.play.test.UnitSpec
 import util.logging.LoggingDetails
-import utils.WithIncrementingClock
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen with MockitoSugar with WithIncrementingClock {
+class FileCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithIncrementingClock {
 
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
@@ -100,13 +97,11 @@ class FileCheckingServiceSpec extends UnitSpec with Matchers with GivenWhenThen 
 
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(Left(FileInfected("Virus", checksum, Timings(clock.instant(), clock.instant())))))
-      when(fileTypeCheckingService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Right(FileAllowed(MimeType("application/xml"), Timings(clock.instant(), clock.instant())))))
 
       Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe
         Left(FileRejected(Left(FileInfected("Virus", checksum, Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))))))
 
-      verifyNoInteractions(fileTypeCheckingService)
+      verifyZeroInteractions(fileTypeCheckingService)
     }
 
     "return failed file type scanning if virus not found but invalid file type" in {

@@ -19,18 +19,15 @@ package services
 import java.time.Instant
 
 import model.Message
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when}
-import org.scalatest.{GivenWhenThen, Matchers}
-import org.scalatestplus.mockito.MockitoSugar
-import uk.gov.hmrc.play.test.UnitSpec
+import org.scalatest.GivenWhenThen
+import test.UnitSpec
 import utils.MonadicUtils
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class QueueProcessingFlowSpec extends UnitSpec with Matchers with GivenWhenThen with MockitoSugar {
+class QueueProcessingFlowSpec extends UnitSpec with GivenWhenThen {
 
   "get messages from the queue consumer, and confirm successfully processed and do not confirm unsuccessfully processed" in {
 
@@ -44,10 +41,8 @@ class QueueProcessingFlowSpec extends UnitSpec with Matchers with GivenWhenThen 
     val invalidMessage = Message("ID2", "INVALID-BODY", "RECEIPT-2", Instant.now())
     val validMessage2  = Message("ID3", "VALID-BODY", "RECEIPT-3", Instant.now())
 
-    when(queueConsumer.poll()).thenReturn(List(validMessage1, invalidMessage, validMessage2))
-    when(queueConsumer.confirm(any()))
-      .thenReturn(Future.successful(()))
-      .thenReturn(Future.successful(()))
+    when(queueConsumer.poll()).thenReturn(Future.successful(List(validMessage1, invalidMessage, validMessage2)))
+    when(queueConsumer.confirm(any[Message])).thenReturn(Future.successful(()))
 
     And("processing of two messages succeeds")
     val context = MessageContext("TEST")
@@ -73,7 +68,7 @@ class QueueProcessingFlowSpec extends UnitSpec with Matchers with GivenWhenThen 
     verify(messageProcessor).processMessage(invalidMessage)
     verify(messageProcessor).processMessage(validMessage2)
 
-    And("successfull  y processed messages should be confirmed")
+    And("successfully processed messages should be confirmed")
     verify(queueConsumer).confirm(validMessage1)
     verify(queueConsumer).confirm(validMessage2)
 

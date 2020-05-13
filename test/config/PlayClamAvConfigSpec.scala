@@ -17,7 +17,7 @@
 package config
 
 import play.api.Configuration
-import uk.gov.hmrc.play.test.UnitSpec
+import test.UnitSpec
 
 class PlayClamAvConfigSpec extends UnitSpec {
 

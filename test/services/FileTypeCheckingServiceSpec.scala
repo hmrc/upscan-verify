@@ -21,19 +21,16 @@ import java.time.Instant
 
 import config.ServiceConfiguration
 import model._
-import org.mockito.Mockito.when
 import org.scalatest.GivenWhenThen
-import org.scalatestplus.mockito.MockitoSugar
-import uk.gov.hmrc.play.test.UnitSpec
 import com.kenshoo.play.metrics.Metrics
 import com.codahale.metrics.MetricRegistry
+import test.{UnitSpec, WithIncrementingClock}
 import util.logging.LoggingDetails
-import utils.WithIncrementingClock
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with MockitoSugar with WithIncrementingClock {
+class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithIncrementingClock {
 
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
@@ -122,7 +119,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with Mocki
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
       val content  = ObjectContent(null, 1200)
-      val metadata = InboundObjectMetadata(Map.empty, Instant.now, 0)
+      val metadata = InboundObjectMetadata(Map("consuming-service" -> serviceName), Instant.now, 0)
 
       val fileMimeType = MimeType("application/pdf")
       val detector = new FileTypeDetector {

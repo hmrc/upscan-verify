@@ -22,21 +22,17 @@ import java.time.{Duration => _, _}
 import com.codahale.metrics.MetricRegistry
 import com.kenshoo.play.metrics.Metrics
 import model.{FileInfected, S3ObjectLocation, Timings}
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito
-import org.scalatest.{Assertions, GivenWhenThen, Matchers}
-import org.scalatestplus.mockito.MockitoSugar
+import org.scalatest.{Assertions, GivenWhenThen}
+import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
-import uk.gov.hmrc.play.test.UnitSpec
 import util.logging.LoggingDetails
-import utils.WithIncrementingClock
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions with GivenWhenThen with MockitoSugar with WithIncrementingClock {
+class ClamAvScanningServiceSpec extends UnitSpec with Assertions with GivenWhenThen with WithIncrementingClock {
 
   implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
@@ -59,10 +55,10 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
 
     "return success if file can be retrieved and scan result clean" in {
       val client = mock[ClamAntiVirus]
-      Mockito.when(client.sendAndCheck(any(), any())(any())).thenReturn(Future.successful(Clean))
+      when(client.sendAndCheck(any[InputStream], any[Int])(any[ExecutionContext])).thenReturn(Future.successful(Clean))
 
       val factory = mock[ClamAntiVirusFactory]
-      Mockito.when(factory.getClient()).thenReturn(client)
+      when(factory.getClient()).thenReturn(client)
 
       val metrics         = metricsStub()
       val scanningService = new ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics, clock)
@@ -90,10 +86,10 @@ class ClamAvScanningServiceSpec extends UnitSpec with Matchers with Assertions w
 
     "return infected if file can be retrieved and scan result infected" in {
       val client = mock[ClamAntiVirus]
-      Mockito.when(client.sendAndCheck(any(), any())(any())).thenReturn(Future.successful(Infected("File dirty")))
+      when(client.sendAndCheck(any[InputStream], any[Int])(any[ExecutionContext])).thenReturn(Future.successful(Infected("File dirty")))
 
       val factory = mock[ClamAntiVirusFactory]
-      Mockito.when(factory.getClient()).thenReturn(client)
+      when(factory.getClient()).thenReturn(client)
 
       val metrics         = metricsStub()
       val scanningService = new ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics, clock)

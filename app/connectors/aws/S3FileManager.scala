@@ -24,7 +24,7 @@ import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.{CopyObjectRequest, GetObjectMetadataRequest, GetObjectRequest, ObjectMetadata => S3ObjectMetadata}
 import javax.inject.Inject
 import model.S3ObjectLocation
-import play.api.Logger
+import play.api.Logging
 import services.{FileManager, InboundObjectMetadata, ObjectContent, OutboundObjectMetadata}
 import uk.gov.hmrc.http.logging.LoggingDetails
 import util.logging.WithLoggingDetails.withLoggingDetails
@@ -32,7 +32,7 @@ import util.logging.WithLoggingDetails.withLoggingDetails
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 
-class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: ExecutionContext) extends FileManager {
+class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: ExecutionContext) extends FileManager with Logging {
 
   override def copyObject(
     sourceLocation: S3ObjectLocation,
@@ -51,7 +51,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
     Future {
       s3Client.copyObject(request)
       withLoggingDetails(loggingDetails) {
-        Logger.debug(s"Copied object with [$sourceLocation] to [$newKey].")
+        logger.debug(s"Copied object with [$sourceLocation] to [$newKey].")
       }
     }
 
@@ -68,7 +68,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
     Future {
       s3Client.putObject(targetLocation.bucket, targetLocation.objectKey, content, quarantineObjectMetadata)
       withLoggingDetails(loggingDetails) {
-        Logger.debug(s"Wrote object with objectKey: [${targetLocation.objectKey}], to quarantine bucket.")
+        logger.debug(s"Wrote object with objectKey: [${targetLocation.objectKey}], to quarantine bucket.")
       }
     }
   }
@@ -79,7 +79,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
     awsMetadata
   }
 
-  override def delete(objectLocation: S3ObjectLocation)(implicit loggingDetails: LoggingDetails) =
+  override def delete(objectLocation: S3ObjectLocation)(implicit loggingDetails: LoggingDetails): Future[Unit] =
     Future {
       objectLocation.objectVersion match {
         case Some(versionId) => s3Client.deleteVersion(objectLocation.bucket, objectLocation.objectKey, versionId)
@@ -96,7 +96,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
       val content =
         ObjectContent(fileFromLocation.getObjectContent, fileFromLocation.getObjectMetadata.getContentLength)
       withLoggingDetails(loggingDetails) {
-        Logger.debug(s"Fetched content for objectKey: [${objectLocation.objectKey}].")
+        logger.debug(s"Fetched content for objectKey: [${objectLocation.objectKey}].")
       }
 
       val result: Future[T] = function(content)
@@ -114,7 +114,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
       metadata <- Future(s3Client.getObjectMetadata(getMetadataRequest))
     } yield {
       withLoggingDetails(loggingDetails) {
-        Logger.debug(s"Fetched metadata for objectKey: [${objectLocation.objectKey}].")
+        logger.debug(s"Fetched metadata for objectKey: [${objectLocation.objectKey}].")
       }
       InboundObjectMetadata(metadata.getUserMetadata.asScala.toMap, metadata.getLastModified.toInstant, metadata.getContentLength)
     }

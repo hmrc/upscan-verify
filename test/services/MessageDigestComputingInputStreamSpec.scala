@@ -20,7 +20,7 @@ import java.io.ByteArrayInputStream
 
 import org.apache.commons.codec.digest.DigestUtils
 import org.scalatest.GivenWhenThen
-import uk.gov.hmrc.play.test.UnitSpec
+import test.UnitSpec
 
 import scala.collection.mutable
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package utils
+package test
 
 import java.time.{Clock, Duration, Instant, ZoneId}
 

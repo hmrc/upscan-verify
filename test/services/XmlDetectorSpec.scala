@@ -20,9 +20,10 @@ import java.io.{BufferedReader, ByteArrayInputStream, InputStream, InputStreamRe
 
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.mime.MediaType
-import org.scalatest.{GivenWhenThen, Matchers, WordSpec}
+import org.scalatest.GivenWhenThen
+import test.UnitSpec
 
-class XmlDetectorSpec extends WordSpec with Matchers with GivenWhenThen {
+class XmlDetectorSpec extends UnitSpec with GivenWhenThen {
 
   "XMLDetector" should {
 
@@ -64,7 +65,7 @@ class XmlDetectorSpec extends WordSpec with Matchers with GivenWhenThen {
 
   }
 
-  private def readAll(is : InputStream) =  {
+  private def readAll(is : InputStream): String =  {
     val reader = new BufferedReader(new InputStreamReader(is))
     Stream.continually(reader.readLine()).takeWhile(_ != null).mkString("\n")
   }

@@ -21,7 +21,6 @@ import java.time.Instant
 
 import config.ServiceConfiguration
 import model._
-import org.mockito.Mockito.when
 import org.scalatest.GivenWhenThen
 import com.kenshoo.play.metrics.Metrics
 import com.codahale.metrics.MetricRegistry
@@ -120,7 +119,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithI
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
       val content  = ObjectContent(null, 1200)
-      val metadata = InboundObjectMetadata(Map.empty, Instant.now, 0)
+      val metadata = InboundObjectMetadata(Map("consuming-service" -> serviceName), Instant.now, 0)
 
       val fileMimeType = MimeType("application/pdf")
       val detector = new FileTypeDetector {

@@ -16,7 +16,7 @@
 
 package connectors.aws
 
-import java.io.ByteArrayInputStream
+import java.io.{ByteArrayInputStream, InputStream}
 import java.nio.charset.StandardCharsets.UTF_8
 import java.time.{Clock, Instant}
 
@@ -29,15 +29,12 @@ import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model._
 import model.S3ObjectLocation
 import org.apache.commons.io.IOUtils
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.{doThrow, verify, verifyNoMoreInteractions, when}
-import org.mockito.{ArgumentCaptor, Mockito}
+import org.mockito.captor.ArgCaptor
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.{Assertions, GivenWhenThen}
 import services._
 import test.UnitSpec
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -57,11 +54,8 @@ class S3FileManagerSpec
 
   "S3FileManager" should {
     "allow to copy file from inbound bucket to outbound bucket" in {
-      val s3Metadata = mock[ObjectMetadata]
-      when(s3Metadata.getLastModified).thenReturn(awsLastModified)
-
       val s3client: AmazonS3 = mock[AmazonS3]
-      when(s3client.copyObject(any(): CopyObjectRequest)).thenReturn(new CopyObjectResult())
+      when(s3client.copyObject(any[CopyObjectRequest])).thenReturn(new CopyObjectResult())
 
       val fileManager      = new S3FileManager(s3client, clock)
       val inboundLocation  = S3ObjectLocation("inboundBucket", "file", Some("version"))
@@ -82,13 +76,12 @@ class S3FileManagerSpec
         2.seconds)
 
       Then("the S3 copy method of AWS client should be called")
-      val argumentCaptor: ArgumentCaptor[CopyObjectRequest] =
-        ArgumentCaptor.forClass(classOf[CopyObjectRequest])
-      verify(s3client).copyObject(argumentCaptor.capture())
+      val argumentCaptor = ArgCaptor[CopyObjectRequest]
+      verify(s3client).copyObject(argumentCaptor)
       verifyNoMoreInteractions(s3client)
 
       And("proper version of the file has been downloaded")
-      val request = argumentCaptor.getValue
+      val request = argumentCaptor.value
 
       request.getSourceBucketName      shouldBe inboundLocation.bucket
       request.getSourceKey             shouldBe inboundLocation.objectKey
@@ -108,8 +101,8 @@ class S3FileManagerSpec
         inboundLocation
       )
 
-      val s3client: AmazonS3 = mock[AmazonS3]
-      when(s3client.copyObject(any(): CopyObjectRequest)).thenThrow(new RuntimeException("exception"))
+      val s3client = mock[AmazonS3]
+      when(s3client.copyObject(any[CopyObjectRequest])).thenThrow(new RuntimeException("exception"))
       val fileManager = new S3FileManager(s3client, clock)
 
       When("copying the file is requested")
@@ -168,7 +161,7 @@ class S3FileManagerSpec
       fileMetadata.setUserMetadata(userMetadata)
       fileMetadata.setLastModified(awsLastModified)
 
-      when(s3client.getObjectMetadata(any())).thenReturn(fileMetadata)
+      when(s3client.getObjectMetadata(any[GetObjectMetadataRequest])).thenReturn(fileMetadata)
 
       When("fetching objects metadata")
       val metadata =
@@ -180,23 +173,20 @@ class S3FileManagerSpec
         .InboundObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified, fileSize = 0)
 
       And("proper version of the file has been downloaded")
-      val argumentCaptor: ArgumentCaptor[GetObjectMetadataRequest] =
-        ArgumentCaptor.forClass(classOf[GetObjectMetadataRequest])
-      Mockito.verify(s3client).getObjectMetadata(argumentCaptor.capture())
-      val getObjectMetadataRequest = argumentCaptor.getValue
+      val argumentCaptor = ArgCaptor[GetObjectMetadataRequest]
+      verify(s3client).getObjectMetadata(argumentCaptor)
+      val getObjectMetadataRequest = argumentCaptor.value
 
       getObjectMetadataRequest.getBucketName shouldBe "inboundBucket"
       getObjectMetadataRequest.getKey        shouldBe "file"
       getObjectMetadataRequest.getVersionId  shouldBe "version"
     }
 
-    "return error if retrieving metadata fails" in {}
-
     "return error if deleting the file failed" in {
 
       val s3client: AmazonS3 = mock[AmazonS3]
       Given("deleting file would fail")
-      doThrow(new RuntimeException("exception")).when(s3client).deleteObject(any(), any())
+      doThrow(new RuntimeException("exception")).when(s3client).deleteObject(any[String], any[String])
       val fileManager = new S3FileManager(s3client, clock)
 
       When("deleting the file is requested")
@@ -228,13 +218,13 @@ class S3FileManagerSpec
       s3Object.setObjectMetadata(fileMetadata)
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      when(s3client.getObject(any())).thenReturn(s3Object)
+      when(s3client.getObject(any[GetObjectRequest])).thenReturn(s3Object)
 
       Given("a valid file location")
       val fileManager = new S3FileManager(s3client, clock)
 
       When("the bytes are requested")
-      def readingFunction(f: ObjectContent) =
+      def readingFunction(f: ObjectContent): Future[(String, Long)] =
         Future.successful((IOUtils.toString(f.inputStream, UTF_8), f.length))
       val result = Await.result(fileManager.withObjectContent(fileLocation)(readingFunction), 2.seconds)
 
@@ -248,9 +238,9 @@ class S3FileManagerSpec
       }
 
       And("proper version of the file has been downloaded")
-      val argumentCaptor: ArgumentCaptor[GetObjectRequest] = ArgumentCaptor.forClass(classOf[GetObjectRequest])
-      Mockito.verify(s3client).getObject(argumentCaptor.capture())
-      val getObjectRequest = argumentCaptor.getValue
+      val argumentCaptor = ArgCaptor[GetObjectRequest]
+      verify(s3client).getObject(argumentCaptor)
+      val getObjectRequest = argumentCaptor.value
 
       getObjectRequest.getBucketName shouldBe "inboundBucket"
       getObjectRequest.getKey        shouldBe "file"
@@ -275,7 +265,7 @@ class S3FileManagerSpec
       s3Object.setObjectMetadata(fileMetadata)
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      when(s3client.getObject(any())).thenReturn(s3Object)
+      when(s3client.getObject(any[GetObjectRequest])).thenReturn(s3Object)
 
       Given("a valid file location")
       val fileManager = new S3FileManager(s3client, clock)
@@ -293,12 +283,10 @@ class S3FileManagerSpec
 
     "return error if file retrieval fails" in {
       val fileLocation = S3ObjectLocation("inboundBucket", "file", None)
+      val expectedGetObjectRequest = new GetObjectRequest(fileLocation.bucket, fileLocation.objectKey)
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      Mockito
-        .doThrow(new RuntimeException("exception"))
-        .when(s3client)
-        .getObject(fileLocation.bucket, fileLocation.objectKey)
+      when(s3client.getObject(eqTo(expectedGetObjectRequest))).thenThrow(new RuntimeException("exception"))
 
       Given("a call to the S3 client errors")
       val fileManager = new S3FileManager(s3client, clock)
@@ -338,11 +326,13 @@ class S3FileManagerSpec
       Await.result(fileManager.writeObject(inboundLocation, outboundLocation, content, metadata), 2.seconds)
 
       Then("a new S3 object with details set as contents and object metadata set should be created")
-      verify(s3client).putObject(any(), any(), any(), any())
+      verify(s3client).putObject(any[String], any[String], any[InputStream], any[ObjectMetadata])
 
     }
 
     "return failure if put to quarantine bucket fails" in {
+      import scala.collection.JavaConverters._
+
       Given("a valid file location and details of an error")
       val inboundLocation  = S3ObjectLocation("inboundBucket", "file", Some("version"))
       val outboundLocation = S3ObjectLocation("outboundBucket", "outboundLocation", None)
@@ -357,7 +347,8 @@ class S3FileManagerSpec
       )
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      when(s3client.putObject(any(), any(), any(), any())).thenThrow(new SdkClientException("This is a put exception"))
+      when(s3client.putObject(any[String], any[String], any[InputStream], any[ObjectMetadata])).thenThrow(
+        new SdkClientException("This is a put exception"))
 
       val fileManager = new S3FileManager(s3client, clock)
 
@@ -374,14 +365,14 @@ class S3FileManagerSpec
       val result = Await.ready(fileManager.writeObject(inboundLocation, outboundLocation, content, metadata), 2.seconds)
 
       And("a new S3 object with details set as contents and object metadata set should be created")
-      val metadataCaptor: ArgumentCaptor[ObjectMetadata] = ArgumentCaptor.forClass(classOf[ObjectMetadata])
-      verify(s3client).putObject(any(), any(), any(), metadataCaptor.capture())
+      val metadataCaptor = ArgCaptor[ObjectMetadata]
+      verify(s3client).putObject(any[String], any[String], any[InputStream], metadataCaptor)
 
       And("the new object should contain metadata copied from inbound object")
-      metadataCaptor.getValue.getUserMetadata.asScala shouldBe metadata.items
+      metadataCaptor.value.getUserMetadata.asScala shouldBe metadata.items
 
       And("the new object shouldn't contain any other metadata of the inbound object")
-      metadataCaptor.getValue.getContentType shouldBe null
+      metadataCaptor.value.getContentType shouldBe null
 
       And("only users metadata have been copied")
 

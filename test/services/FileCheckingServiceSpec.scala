@@ -20,7 +20,6 @@ import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
 
 import model._
-import org.mockito.Mockito.{verifyNoInteractions, when}
 import org.scalatest.GivenWhenThen
 import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.http.logging.LoggingDetails
@@ -98,13 +97,11 @@ class FileCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithIncre
 
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(Left(FileInfected("Virus", checksum, Timings(clock.instant(), clock.instant())))))
-      when(fileTypeCheckingService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Right(FileAllowed(MimeType("application/xml"), Timings(clock.instant(), clock.instant())))))
 
       Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe
         Left(FileRejected(Left(FileInfected("Virus", checksum, Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))))))
 
-      verifyNoInteractions(fileTypeCheckingService)
+      verifyZeroInteractions(fileTypeCheckingService)
     }
 
     "return failed file type scanning if virus not found but invalid file type" in {

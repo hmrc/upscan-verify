@@ -19,8 +19,6 @@ package services
 import java.time.Instant
 
 import model.Message
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when}
 import org.scalatest.GivenWhenThen
 import test.UnitSpec
 import utils.MonadicUtils
@@ -44,9 +42,7 @@ class QueueProcessingFlowSpec extends UnitSpec with GivenWhenThen {
     val validMessage2  = Message("ID3", "VALID-BODY", "RECEIPT-3", Instant.now())
 
     when(queueConsumer.poll()).thenReturn(Future.successful(List(validMessage1, invalidMessage, validMessage2)))
-    when(queueConsumer.confirm(any()))
-      .thenReturn(Future.successful(()))
-      .thenReturn(Future.successful(()))
+    when(queueConsumer.confirm(any[Message])).thenReturn(Future.successful(()))
 
     And("processing of two messages succeeds")
     val context = MessageContext("TEST")
@@ -72,7 +68,7 @@ class QueueProcessingFlowSpec extends UnitSpec with GivenWhenThen {
     verify(messageProcessor).processMessage(invalidMessage)
     verify(messageProcessor).processMessage(validMessage2)
 
-    And("successfull  y processed messages should be confirmed")
+    And("successfully processed messages should be confirmed")
     verify(queueConsumer).confirm(validMessage1)
     verify(queueConsumer).confirm(validMessage2)
 

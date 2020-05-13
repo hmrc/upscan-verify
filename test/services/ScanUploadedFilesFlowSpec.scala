@@ -22,12 +22,10 @@ import com.amazonaws.AmazonServiceException
 import com.codahale.metrics.MetricRegistry
 import com.kenshoo.play.metrics.Metrics
 import model._
-import org.mockito.ArgumentMatchers.{any, eq => meq}
-import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when}
-import org.mockito.{ArgumentMatchers, Mockito}
 import org.scalatest.GivenWhenThen
 import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.logging.LoggingDetails
 import util.logging.LoggingDetails
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -77,13 +75,14 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
           clock
         )
 
-      when(fileManager.getObjectMetadata(meq(location))(any()))
+      when(fileManager.getObjectMetadata(eqTo(location))(any[LoggingDetails]))
         .thenReturn(Future.successful(inboundObjectMetadata))
 
-      when(fileCheckingService.check(any(), any())(any()))
+      when(fileCheckingService.check(any[S3ObjectLocation], any[InboundObjectMetadata])(any[LoggingDetails]))
         .thenReturn(Future.successful(processingResult))
 
-      when(scanningResultHandler.handleCheckingResult(any(), any(), any())(any()))
+      when(scanningResultHandler.handleCheckingResult(
+        any[InboundObjectDetails], any[Either[FileValidationFailure, FileValidationSuccess]], any[Instant])(any[LoggingDetails]))
         .thenReturn(Future.successful(()))
 
       When("message is handled")
@@ -95,9 +94,9 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       And("scanning result handler is called")
       verify(scanningResultHandler)
         .handleCheckingResult(
-          meq(InboundObjectDetails(inboundObjectMetadata, "127.0.0.1", location)),
-          meq(processingResult),
-          ArgumentMatchers.any[Instant]())(any())
+          eqTo(InboundObjectDetails(inboundObjectMetadata, "127.0.0.1", location)),
+          eqTo(processingResult),
+          any[Instant])(any[LoggingDetails])
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 1
@@ -128,7 +127,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
 
       And("the fileManager fails to return file metadata for the message")
 
-      when(fileManager.getObjectMetadata(meq(location))(any()))
+      when(fileManager.getObjectMetadata(eqTo(location))(any[LoggingDetails]))
         .thenReturn(Future.failed(new AmazonServiceException("Expected exception")))
 
       When("message is processed")
@@ -151,12 +150,9 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       val scanningResultHandler = mock[FileCheckingResultHandler]
 
       Given("there is a valid message")
-      val location            = S3ObjectLocation("bucket", "ID2", None)
       val message             = Message("ID2", "INVALID-BODY", "RECEIPT-2", clock.instant())
       val fileCheckingService = mock[FileCheckingService]
       val metrics: Metrics    = metricsStub()
-      val inboundObjectMetadata =
-        InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clockStart.minusSeconds(1), 0)
       val flow =
         new ScanUploadedFilesFlow(
           parser,
@@ -167,9 +163,6 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
           clock
         )
 
-      when(fileManager.getObjectMetadata(meq(location))(any()))
-        .thenReturn(Future.successful(inboundObjectMetadata))
-
       When("message is processed")
       val result = flow.processMessage(message)
 
@@ -177,7 +170,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       Await.result(result.value, 10 seconds).isLeft shouldBe true
 
       And("file checking service should not be invoked")
-      verifyNoMoreInteractions(fileCheckingService)
+      verifyZeroInteractions(fileCheckingService)
 
       And("the metrics should not be updated")
       metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 0
@@ -206,10 +199,10 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
           clock
         )
 
-      when(fileManager.getObjectMetadata(meq(location))(any()))
+      when(fileManager.getObjectMetadata(eqTo(location))(any[LoggingDetails]))
         .thenReturn(Future.successful(inboundObjectMetadata))
 
-      when(fileCheckingService.check(any(), any())(any()))
+      when(fileCheckingService.check(any[S3ObjectLocation], any[InboundObjectMetadata])(any[LoggingDetails]))
         .thenReturn(Future.failed(new RuntimeException("Expected exception")))
 
       When("message is handled")
@@ -219,7 +212,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       Await.result(result.value, 10 seconds).isLeft shouldBe true
 
       And("scanning result handler is not invoked")
-      Mockito.verifyNoInteractions(scanningResultHandler)
+      verifyZeroInteractions(scanningResultHandler)
 
       And("the metrics should not be updated")
       metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 0

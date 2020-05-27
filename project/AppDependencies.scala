@@ -4,7 +4,7 @@ import sbt._
 object AppDependencies {
 
   private val compile = Seq(
-    "uk.gov.hmrc"       %% "bootstrap-backend-play-27" % "2.10.0",
+    "uk.gov.hmrc"       %% "bootstrap-backend-play-27" % "2.14.0",
     "org.typelevel"     %% "cats-core"                 % "2.1.1",
     "com.amazonaws"      % "aws-java-sdk-s3"           % "1.11.769",
     "com.amazonaws"      % "aws-java-sdk-sqs"          % "1.11.769",

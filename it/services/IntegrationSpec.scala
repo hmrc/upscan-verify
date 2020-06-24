@@ -15,8 +15,14 @@ import org.scalatestplus.play.guice.GuiceOneServerPerSuite
 import play.api.Application
 import play.api.inject.guice.{GuiceApplicationBuilder, GuiceableModuleConversions}
 
-class IntegrationSpec extends AnyWordSpecLike with should.Matchers with MockitoSugar
-                             with GuiceOneServerPerSuite with GuiceableModuleConversions with BeforeAndAfterEach with BeforeAndAfterAll {
+class IntegrationSpec
+    extends AnyWordSpecLike
+    with should.Matchers
+    with MockitoSugar
+    with GuiceOneServerPerSuite
+    with GuiceableModuleConversions
+    with BeforeAndAfterEach
+    with BeforeAndAfterAll {
 
   override lazy val app: Application = new GuiceApplicationBuilder()
     .disable(classOf[connectors.aws.AWSClientModule])

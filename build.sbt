@@ -1,10 +1,10 @@
+import com.typesafe.sbt.packager.Keys.{dockerBaseImage, dockerRepository, dockerUpdateLatest}
 import play.sbt.PlayImport.PlayKeys.playDefaultPort
 import sbt.Keys._
 import sbt._
 import scoverage.ScoverageKeys
 import uk.gov.hmrc.DefaultBuildSettings.integrationTestSettings
 import uk.gov.hmrc.sbtdistributables.SbtDistributablesPlugin
-
 
 val appName = "upscan-verify"
 
@@ -34,3 +34,7 @@ lazy val microservice = Project(appName, file("."))
   .configs(IntegrationTest)
   .settings(integrationTestSettings(): _*)
   .settings(IntegrationTest / resourceDirectory := baseDirectory.value / "it" / "resources")
+  .settings(Seq(
+    dockerUpdateLatest := true,
+    dockerBaseImage := "artefacts.tax.service.gov.uk/hmrc-jre:latest",
+    dockerRepository := Some("artefacts.tax.service.gov.uk")))

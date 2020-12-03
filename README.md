@@ -9,7 +9,7 @@ The microservice is internal component of *Upscan* and external users don't have
 
 Detailed documentation of the *Upscan* can be found here: https://github.com/hmrc/upscan-initiate/blob/master/README.md
 
-[![Build Status](https://travis-ci.org/hmrc/upscan-verify.svg)](https://travis-ci.org/hmrc/upscan-verify) [ ![Download](https://api.bintray.com/packages/hmrc/releases/upscan-verify/images/download.svg) ](https://bintray.com/hmrc/releases/upscan-verify/_latestVersion)
+[ ![Download](https://api.bintray.com/packages/hmrc/releases/upscan-verify/images/download.svg) ](https://bintray.com/hmrc/releases/upscan-verify/_latestVersion)
 
 # Service configuration
 

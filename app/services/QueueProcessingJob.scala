@@ -58,7 +58,7 @@ class QueueProcessingJob @Inject()(consumer: QueueConsumer, messageProcessor: Me
       case Left(ExceptionWithContext(exception, Some(context))) =>
         withLoggingDetails(LoggingDetails.fromMessageContext(context)) {
           logger.error(
-            s"Failed to process message '${message.id}' for file '${context.fileReference}', cause ${exception.getMessage}",
+            s"Failed to process message '${message.id}' for Key=[${context.fileReference}], cause ${exception.getMessage}",
             exception
           )
         }

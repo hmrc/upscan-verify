@@ -68,7 +68,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
     Future {
       s3Client.putObject(targetLocation.bucket, targetLocation.objectKey, content, quarantineObjectMetadata)
       withLoggingDetails(loggingDetails) {
-        logger.debug(s"Wrote object with objectKey: [${targetLocation.objectKey}], to quarantine bucket.")
+        logger.debug(s"Wrote object with Key=[${targetLocation.objectKey}] to quarantine bucket.")
       }
     }
   }
@@ -96,7 +96,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
       val content =
         ObjectContent(fileFromLocation.getObjectContent, fileFromLocation.getObjectMetadata.getContentLength)
       withLoggingDetails(loggingDetails) {
-        logger.debug(s"Fetched content for objectKey: [${objectLocation.objectKey}].")
+        logger.debug(s"Fetched content for Key=[${objectLocation.objectKey}].")
       }
 
       val result: Future[T] = function(content)
@@ -114,7 +114,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
       metadata <- Future(s3Client.getObjectMetadata(getMetadataRequest))
     } yield {
       withLoggingDetails(loggingDetails) {
-        logger.debug(s"Fetched metadata for objectKey: [${objectLocation.objectKey}].")
+        logger.debug(s"Fetched metadata for Key=[${objectLocation.objectKey}].")
       }
       InboundObjectMetadata(metadata.getUserMetadata.asScala.toMap, metadata.getLastModified.toInstant, metadata.getContentLength)
     }

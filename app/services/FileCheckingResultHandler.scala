@@ -38,7 +38,8 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager,
   def handleCheckingResult(objectDetails: InboundObjectDetails,
                            result: Either[FileValidationFailure, FileValidationSuccess],
                            messageReceivedAt: Instant)
-                          (implicit ld: LoggingDetails): Future[Unit] =
+                          (implicit ld: LoggingDetails): Future[Unit] = {
+    logger.debug(s"Handling check result for Key=[${objectDetails.location.objectKey}] Result=[$result]")
     result match {
       case Right(FileValidationSuccess(checksum, mimeType, virusScanTimings, fileTypeTimings)) =>
         handleValid(objectDetails, checksum, mimeType)(messageReceivedAt, virusScanTimings, fileTypeTimings)
@@ -51,6 +52,7 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager,
 
       case _ => Future.successful(logger.error(s"Unexpected match result for result: [$result]."))
     }
+  }
 
   private def handleValid(details: InboundObjectDetails,
                           checksum: String,

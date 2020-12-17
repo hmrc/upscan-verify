@@ -62,7 +62,7 @@ object LoggingRejectionNotifier extends RejectionNotifier with Logging {
                                customMessagePrefix: String): Future[Unit] = {
     logger.warn(
       s"""$customMessagePrefix${serviceName.fold("")(service => s"\nService name: [$service]")}
-         |File ID: [${fileProperties.objectKey}]${fileProperties.objectVersion.fold("")(version => s"\nVersion: [$version]")}
+         |Key: [${fileProperties.objectKey}]${fileProperties.objectVersion.fold("")(version => s"\nVersion: [$version]")}
          |Checksum: [$checksum]
          |File size: [$fileSize B]
          |File upload datetime: [$fileUploadDatetime]

@@ -57,7 +57,7 @@ class ClamAvScanningService @Inject()(
                        metrics.defaultRegistry.counter("cleanFileUpload").inc()
                        Right(NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
                      case Infected(message) =>
-                       logger.warn(s"File is infected: [$message].")
+                       logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
                        metrics.defaultRegistry.counter("quarantineFileUpload").inc()
                        Left(FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant())))
                    }

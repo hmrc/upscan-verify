@@ -16,24 +16,25 @@
 
 package services
 
-import java.time.Clock
-
 import javax.inject.Inject
 import model._
+import play.api.Logger
 import uk.gov.hmrc.http.logging.LoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class FileCheckingService @Inject()(fileManager: FileManager,
                                     virusScanningService: ScanningService,
-                                    fileTypeCheckingService: FileTypeCheckingService,
-                                    clock: Clock)
+                                    fileTypeCheckingService: FileTypeCheckingService)
                                    (implicit ec: ExecutionContext) {
+
+  private val logger = Logger(getClass)
 
   def check(location: S3ObjectLocation,
             objectMetadata: InboundObjectMetadata)
            (implicit ld: LoggingDetails): Future[Either[FileRejected, FileValidationSuccess]] = {
 
+    logger.debug(s"Checking upload Key=[${location.objectKey}]")
     virusScan(location, objectMetadata) flatMap {
       case Left(fi: FileInfected)                => FileRejected.futureLeft(fi)
       case Right(nvf: NoVirusFound)              =>

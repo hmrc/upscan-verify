@@ -47,7 +47,7 @@ trait RejectionNotifier {
                             fileUploadDatetime: Instant,
                             details: String,
                             serviceName: Option[String]
-                           ): Future[Unit] = notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "Invalid file type uploaded, which is not whitelisted for this service.")
+                           ): Future[Unit] = notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "File type is not allowed for this service.")
 }
 
 

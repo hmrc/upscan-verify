@@ -18,14 +18,15 @@ package services
 
 import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
-
 import com.kenshoo.play.metrics.Metrics
+
 import javax.inject.Inject
 import model._
 import play.api.Logging
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.http.logging.LoggingDetails
+import util.logging.WithLoggingDetails.withLoggingDetails
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -57,7 +58,9 @@ class ClamAvScanningService @Inject()(
                        metrics.defaultRegistry.counter("cleanFileUpload").inc()
                        Right(NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
                      case Infected(message) =>
-                       logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
+                       withLoggingDetails(ld) {
+                         logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
+                       }
                        metrics.defaultRegistry.counter("quarantineFileUpload").inc()
                        Left(FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant())))
                    }

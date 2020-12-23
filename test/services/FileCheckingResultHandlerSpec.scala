@@ -241,7 +241,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       val details:  String = "There is a virus"
       val checksum: String = "CHECKSUM"
 
-      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]]))
+      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(any[LoggingDetails]))
         .thenReturn(Future.successful(()))
       when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(any[LoggingDetails]))
         .thenReturn(Future.successful(()))
@@ -289,7 +289,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       val checksum: String = "CHECKSUM"
 
       Given("notification service fails")
-      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]]))
+      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(any[LoggingDetails]))
         .thenReturn(Future.failed(new Exception("Notification failed")))
 
       When("scanning infected file")
@@ -323,7 +323,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt, fileSize)
       val checksum: String = "CHECKSUM"
 
-      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]]))
+      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(any[LoggingDetails]))
         .thenReturn(Future.successful(()))
       when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(any[LoggingDetails])).
         thenReturn(Future.successful(()))
@@ -357,7 +357,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       val inboundObjectDetails   = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
       val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectDetails, fileTypeRejectedExpectedCheckpoints)
 
-      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]]))
+      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(any[LoggingDetails]))
         .thenReturn(Future.successful(()))
       when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(any[LoggingDetails]))
         .thenReturn(Future.successful(()))
@@ -378,7 +378,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
         )
 
       Then("notification is created")
-      verify(rejectionNotifier).notifyInvalidFileType(eqTo(file), eqTo(checksum), eqTo(fileSize), eqTo(uploadedAt), any[String], eqTo(serviceName))
+      verify(rejectionNotifier).notifyInvalidFileType(eqTo(file), eqTo(checksum), eqTo(fileSize), eqTo(uploadedAt), any[String], eqTo(serviceName))(eqTo(ld))
 
       And("file metadata and error details are stored in the quarantine bucket")
 
@@ -420,7 +420,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       when(fileManager.delete(file)).thenReturn(Future.failed(new RuntimeException("Expected failure")))
 
       When("when processing checking result")
-      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]]))
+      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(any[LoggingDetails]))
         .thenReturn(Future.successful(()))
       val result =
         Await.ready(

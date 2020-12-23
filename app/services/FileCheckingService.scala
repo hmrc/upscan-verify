@@ -20,6 +20,7 @@ import javax.inject.Inject
 import model._
 import play.api.Logger
 import uk.gov.hmrc.http.logging.LoggingDetails
+import util.logging.WithLoggingDetails.withLoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -33,8 +34,9 @@ class FileCheckingService @Inject()(fileManager: FileManager,
   def check(location: S3ObjectLocation,
             objectMetadata: InboundObjectMetadata)
            (implicit ld: LoggingDetails): Future[Either[FileRejected, FileValidationSuccess]] = {
-
-    logger.debug(s"Checking upload Key=[${location.objectKey}]")
+    withLoggingDetails(ld) {
+      logger.debug(s"Checking upload Key=[${location.objectKey}]")
+    }
     virusScan(location, objectMetadata) flatMap {
       case Left(fi: FileInfected)                => FileRejected.futureLeft(fi)
       case Right(nvf: NoVirusFound)              =>

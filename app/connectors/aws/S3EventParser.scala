@@ -82,7 +82,7 @@ class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessagePars
           requestParameters.sourceIPAddress)
 
         withLoggingDetails(LoggingDetails.fromMessageContext(MessageContext(event.location.objectKey))) {
-          logger.debug(s"Created FileUploadEvent for Key=[${event.location.objectKey}].")
+          logger.info(s"Created FileUploadEvent for Key=[${event.location.objectKey}].")
         }
         Future.successful(event)
 

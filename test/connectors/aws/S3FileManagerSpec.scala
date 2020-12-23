@@ -18,7 +18,7 @@ package connectors.aws
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.nio.charset.StandardCharsets.UTF_8
-import java.time.{Clock, Instant}
+import java.time.Instant
 
 import util.logging.LoggingDetails
 import java.util
@@ -48,8 +48,6 @@ class S3FileManagerSpec
   private val awsLastModified      = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
   private val metadataLastModified = awsLastModified.toInstant
 
-  private val clock = Clock.systemDefaultZone()
-
   implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   "S3FileManager" should {
@@ -57,7 +55,7 @@ class S3FileManagerSpec
       val s3client: AmazonS3 = mock[AmazonS3]
       when(s3client.copyObject(any[CopyObjectRequest])).thenReturn(new CopyObjectResult())
 
-      val fileManager      = new S3FileManager(s3client, clock)
+      val fileManager      = new S3FileManager(s3client)
       val inboundLocation  = S3ObjectLocation("inboundBucket", "file", Some("version"))
       val outboundLocation = S3ObjectLocation("outboundBucket", "outboundLocation", None)
 
@@ -103,7 +101,7 @@ class S3FileManagerSpec
 
       val s3client = mock[AmazonS3]
       when(s3client.copyObject(any[CopyObjectRequest])).thenThrow(new RuntimeException("exception"))
-      val fileManager = new S3FileManager(s3client, clock)
+      val fileManager = new S3FileManager(s3client)
 
       When("copying the file is requested")
       val result = Await.ready(
@@ -126,7 +124,7 @@ class S3FileManagerSpec
     "allow to delete non versioned file" in {
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      val fileManager        = new S3FileManager(s3client, clock)
+      val fileManager        = new S3FileManager(s3client)
 
       When("deleting the file is requested")
       Await.result(fileManager.delete(S3ObjectLocation("inboundBucket", "file", None)), 2.seconds)
@@ -140,7 +138,7 @@ class S3FileManagerSpec
     "allow to delete versioned file" in {
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      val fileManager        = new S3FileManager(s3client, clock)
+      val fileManager        = new S3FileManager(s3client)
 
       When("deleting the file is requested")
       Await.result(fileManager.delete(S3ObjectLocation("inboundBucket", "file", Some("version"))), 2.seconds)
@@ -153,7 +151,7 @@ class S3FileManagerSpec
 
     "allow to retrieve objects metadata" in {
       val s3client: AmazonS3 = mock[AmazonS3]
-      val fileManager        = new S3FileManager(s3client, clock)
+      val fileManager        = new S3FileManager(s3client)
 
       val userMetadata = new util.HashMap[String, String]()
       userMetadata.put("callbackUrl", "http://some.callback.url")
@@ -187,7 +185,7 @@ class S3FileManagerSpec
       val s3client: AmazonS3 = mock[AmazonS3]
       Given("deleting file would fail")
       doThrow(new RuntimeException("exception")).when(s3client).deleteObject(any[String], any[String])
-      val fileManager = new S3FileManager(s3client, clock)
+      val fileManager = new S3FileManager(s3client)
 
       When("deleting the file is requested")
       val result = Await.ready(fileManager.delete(S3ObjectLocation("inboundBucket", "file", None)), 2.seconds)
@@ -221,7 +219,7 @@ class S3FileManagerSpec
       when(s3client.getObject(any[GetObjectRequest])).thenReturn(s3Object)
 
       Given("a valid file location")
-      val fileManager = new S3FileManager(s3client, clock)
+      val fileManager = new S3FileManager(s3client)
 
       When("the bytes are requested")
       def readingFunction(f: ObjectContent): Future[(String, Long)] =
@@ -268,7 +266,7 @@ class S3FileManagerSpec
       when(s3client.getObject(any[GetObjectRequest])).thenReturn(s3Object)
 
       Given("a valid file location")
-      val fileManager = new S3FileManager(s3client, clock)
+      val fileManager = new S3FileManager(s3client)
 
       When("the file has been read")
       Await.ready(
@@ -289,7 +287,7 @@ class S3FileManagerSpec
       when(s3client.getObject(eqTo(expectedGetObjectRequest))).thenThrow(new RuntimeException("exception"))
 
       Given("a call to the S3 client errors")
-      val fileManager = new S3FileManager(s3client, clock)
+      val fileManager = new S3FileManager(s3client)
 
       When("the bytes are requested")
       val result = Await.ready(fileManager.withObjectContent(fileLocation)(Future.successful), 2.seconds)
@@ -316,7 +314,7 @@ class S3FileManagerSpec
       )
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      val fileManager        = new S3FileManager(s3client, clock)
+      val fileManager        = new S3FileManager(s3client)
 
       When("a call to copy to quarantine is made")
       val content = new ByteArrayInputStream("This is a dirty file".getBytes)
@@ -350,7 +348,7 @@ class S3FileManagerSpec
       when(s3client.putObject(any[String], any[String], any[InputStream], any[ObjectMetadata])).thenThrow(
         new SdkClientException("This is a put exception"))
 
-      val fileManager = new S3FileManager(s3client, clock)
+      val fileManager = new S3FileManager(s3client)
 
       When("a call to copy to quarantine is made")
       val content = new ByteArrayInputStream("This is a dirty file".getBytes)

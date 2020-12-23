@@ -17,8 +17,6 @@
 package connectors.aws
 
 import java.io.InputStream
-import java.time.Clock
-import java.util.UUID
 
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.{CopyObjectRequest, GetObjectMetadataRequest, GetObjectRequest, ObjectMetadata => S3ObjectMetadata}
@@ -32,7 +30,7 @@ import util.logging.WithLoggingDetails.withLoggingDetails
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 
-class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: ExecutionContext) extends FileManager with Logging {
+class S3FileManager @Inject()(s3Client: AmazonS3)(implicit ec: ExecutionContext) extends FileManager with Logging {
 
   override def copyObject(
     sourceLocation: S3ObjectLocation,
@@ -40,7 +38,6 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
     metadata: OutboundObjectMetadata)(implicit loggingDetails: LoggingDetails): Future[Unit] = {
 
     val outboundMetadata = buildS3objectMetadata(metadata)
-    val newKey           = UUID.randomUUID().toString
     val request = new CopyObjectRequest(
       sourceLocation.bucket,
       sourceLocation.objectKey,
@@ -51,7 +48,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
     Future {
       s3Client.copyObject(request)
       withLoggingDetails(loggingDetails) {
-        logger.debug(s"Copied object with [$sourceLocation] to [$newKey].")
+        logger.debug(s"Copied object with Key=[${sourceLocation.objectKey}] from [$sourceLocation] to [$targetLocation].")
       }
     }
 
@@ -68,7 +65,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
     Future {
       s3Client.putObject(targetLocation.bucket, targetLocation.objectKey, content, quarantineObjectMetadata)
       withLoggingDetails(loggingDetails) {
-        logger.debug(s"Wrote object with Key=[${targetLocation.objectKey}] to quarantine bucket.")
+        logger.debug(s"Wrote object with Key=[${sourceLocation.objectKey}] to location [$targetLocation].")
       }
     }
   }
@@ -84,6 +81,9 @@ class S3FileManager @Inject()(s3Client: AmazonS3, clock: Clock)(implicit ec: Exe
       objectLocation.objectVersion match {
         case Some(versionId) => s3Client.deleteVersion(objectLocation.bucket, objectLocation.objectKey, versionId)
         case None            => s3Client.deleteObject(objectLocation.bucket, objectLocation.objectKey)
+      }
+      withLoggingDetails(loggingDetails) {
+        logger.debug(s"Deleted object with Key=[${objectLocation.objectKey}] from [$objectLocation].")
       }
     }
 

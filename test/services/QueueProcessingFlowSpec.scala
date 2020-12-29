@@ -16,8 +16,10 @@
 
 package services
 
-import java.time.Instant
+import com.codahale.metrics.MetricRegistry
+import com.kenshoo.play.metrics.Metrics
 
+import java.time.Instant
 import model.Message
 import org.scalatest.GivenWhenThen
 import test.UnitSpec
@@ -33,8 +35,15 @@ class QueueProcessingFlowSpec extends UnitSpec with GivenWhenThen {
 
     val queueConsumer    = mock[QueueConsumer]
     val messageProcessor = mock[MessageProcessor]
+
+    val metricsStub = new Metrics {
+      override val defaultRegistry: MetricRegistry = new MetricRegistry
+
+      override def toJson: String = ???
+    }
+
     val queueProcessingFlow =
-      new QueueProcessingJob(queueConsumer, messageProcessor)
+      new QueueProcessingJob(queueConsumer, messageProcessor, metricsStub)
 
     Given("there are three message in a message queue")
     val validMessage1  = Message("ID1", "VALID-BODY", "RECEIPT-1", Instant.now())

@@ -17,6 +17,8 @@
 package services
 
 import cats.implicits._
+import com.kenshoo.play.metrics.Metrics
+
 import javax.inject.Inject
 import model.Message
 import play.api.Logging
@@ -26,9 +28,12 @@ import utils.MonadicUtils
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class QueueProcessingJob @Inject()(consumer: QueueConsumer,
-                                   messageProcessor: MessageProcessor)
-                                  (implicit ec: ExecutionContext) extends PollingJob with Logging {
+class QueueProcessingJob @Inject()(consumer: QueueConsumer, messageProcessor: MessageProcessor, metrics: Metrics)(
+  implicit ec: ExecutionContext)
+    extends PollingJob
+    with Logging {
+
+  private val queueThroughput = metrics.defaultRegistry.meter("verifyThroughput")
 
   def run(): Future[Unit] = {
     val outcomes = for {
@@ -43,7 +48,8 @@ class QueueProcessingJob @Inject()(consumer: QueueConsumer,
 
     val outcome = for {
       context <- messageProcessor.processMessage(message)
-      _       <- MonadicUtils.withContext(consumer.confirm(message), context)
+      _ <- MonadicUtils.withContext(consumer.confirm(message), context)
+      _ = queueThroughput.mark()
     } yield ()
 
     outcome.value.map {

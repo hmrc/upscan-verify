@@ -7,7 +7,7 @@ addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.13")
 
 addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.7.4")
 
-addSbtPlugin("uk.gov.hmrc" % "sbt-auto-build" % "2.6.0")
+addSbtPlugin("uk.gov.hmrc" % "sbt-auto-build" % "2.12.0")
 
 addSbtPlugin("uk.gov.hmrc" % "sbt-settings" % "4.1.0")
 

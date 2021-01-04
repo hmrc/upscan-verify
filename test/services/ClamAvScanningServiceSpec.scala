@@ -16,9 +16,6 @@
 
 package services
 
-import java.io.{ByteArrayInputStream, FilterInputStream, InputStream}
-import java.time.{Duration => _, _}
-
 import com.codahale.metrics.MetricRegistry
 import com.kenshoo.play.metrics.Metrics
 import model.{FileInfected, S3ObjectLocation, Timings}
@@ -28,9 +25,11 @@ import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
 import util.logging.LoggingDetails
 
-import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future}
+import java.io.{ByteArrayInputStream, FilterInputStream, InputStream}
+import java.time.{Duration => _, _}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class ClamAvScanningServiceSpec extends UnitSpec with Assertions with GivenWhenThen with WithIncrementingClock {
 
@@ -55,7 +54,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Assertions with GivenWhenT
 
     "return success if file can be retrieved and scan result clean" in {
       val client = mock[ClamAntiVirus]
-      when(client.sendAndCheck(any[InputStream], any[Int])(any[ExecutionContext])).thenReturn(Future.successful(Clean))
+      when(client.scanInputStream(any[InputStream], any[Int])).thenReturn(Future.successful(Clean))
 
       val factory = mock[ClamAntiVirusFactory]
       when(factory.getClient()).thenReturn(client)
@@ -86,7 +85,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Assertions with GivenWhenT
 
     "return infected if file can be retrieved and scan result infected" in {
       val client = mock[ClamAntiVirus]
-      when(client.sendAndCheck(any[InputStream], any[Int])(any[ExecutionContext])).thenReturn(Future.successful(Infected("File dirty")))
+      when(client.scanInputStream(any[InputStream], any[Int])).thenReturn(Future.successful(Infected("File dirty")))
 
       val factory = mock[ClamAntiVirusFactory]
       when(factory.getClient()).thenReturn(client)

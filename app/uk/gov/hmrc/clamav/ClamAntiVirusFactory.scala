@@ -16,64 +16,72 @@
 
 package uk.gov.hmrc.clamav
 
+import uk.gov.hmrc.clamav.model._
+
 import java.io.InputStream
-import java.nio.charset.StandardCharsets.UTF_8
-
 import javax.inject.Inject
-import org.apache.commons.io.IOUtils
-import uk.gov.hmrc.clamav.config.ClamAvConfig
-import uk.gov.hmrc.clamav.model.{ClamAvException, Clean, Infected, ScanningResult}
-
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
-class ClamAntiVirusFactory @Inject()(clamAvConfig: ClamAvConfig)(implicit ec: ExecutionContext) {
-  def getClient(): ClamAntiVirus = new ClamAntiVirusImpl(clamAvConfig)
+class ClamAntiVirusFactory @Inject()(clamAvIO: ClamAvIO)(implicit ec: ExecutionContext) {
+  def getClient(): ClamAntiVirus = new ClamAntiVirusImpl(clamAvIO)
 }
 
-private[clamav] class ClamAntiVirusImpl(clamAvConfig: ClamAvConfig)(implicit ec: ExecutionContext) extends ClamAntiVirus {
+private[clamav] class ClamAntiVirusImpl(clamavIO: ClamAvIO)(implicit ec: ExecutionContext)
+    extends ClamAntiVirus {
 
-  private val Handshake              = "zINSTREAM\u0000"
-  private val FileCleanResponse      = "stream: OK\u0000"
-  private val VirusFoundResponse     = "stream\\: (.+) FOUND\u0000".r
-  private val ParseableErrorResponse = "(.+) ERROR\u0000".r
+  import clamavIO._
 
-  override def sendAndCheck(inputStream: InputStream, length: Int)(implicit ec: ExecutionContext): Future[ScanningResult] =
+  private val StartInstreamHandshakeCommand = "zINSTREAM\u0000"
+  private val StatsCommand                  = "zSTATS\u0000"
+  private val FileCleanResponse             = "stream: OK\u0000"
+  private val VirusFoundResponse            = "stream\\: (.+) FOUND\u0000".r
+  private val ParseableErrorResponse        = "(.+) ERROR\u0000".r
+  private val queueRegex                    = "(?s).*QUEUE: (\\d+) items.*".r
+  private val threadsRegex                  = "(?s).*THREADS: live (\\d+)  idle (\\d+) max (\\d+) .*".r
+
+  override def scanInputStream(inputStream: InputStream, length: Int): Future[ScanningResult] =
     if (length > 0) {
-      ClamAvSocket.withSocket(clamAvConfig) { connection =>
+      withSocket { implicit connection =>
         for {
-          _              <- sendHandshake(connection)
-          _              <- sendRequest(connection)(inputStream, length)
-          response       <- readResponse(connection)
-          parsedResponse <- parseResponse(response)
+          _              <- sendCommand(StartInstreamHandshakeCommand)
+          _              <- sendData(inputStream, length)
+          response       <- readResponse
+          parsedResponse <- parseScanResponse(response)
         } yield parsedResponse
       }
     } else {
       Future.successful(Clean)
     }
 
-  private def sendHandshake(connection: Connection)(implicit ec: ExecutionContext) =
-    Future {
-      connection.out.write(Handshake.getBytes)
-    }
-
-  private def sendRequest(connection: Connection)(stream: InputStream, length: Int)(implicit ec: ExecutionContext) =
-    Future {
-      connection.out.writeInt(length)
-      IOUtils.copy(stream, connection.out)
-      connection.out.writeInt(0)
-      connection.out.flush()
-    }
-
-  private def readResponse(connection: Connection): Future[String] = Future {
-    IOUtils.toString(connection.in, UTF_8)
+  override def stats: Future[ClamAvStats] = withSocket { implicit connection =>
+    for {
+      _        <- sendCommand(StatsCommand)
+      response <- readResponse
+      stats    <- parseStatsResponse(response)
+    } yield stats
   }
 
-  private def parseResponse(response: String) =
+  private def parseStatsResponse(response: String): Future[ClamAvStats] =
+    Future
+      .fromTry {
+        Try {
+          val queueRegex(queueLength)       = response
+          val threadsRegex(live, idle, max) = response
+          ClamAvStats(queueLength.toInt, idle.toInt, live.toInt, max.toInt)
+        }
+      }
+      .recoverWith {
+        case ex => Future.failed(new RuntimeException(s"Unparseable stats response from ClamAV: [$response]", ex))
+      }
+
+
+  private def parseScanResponse(response: String) =
     response match {
       case FileCleanResponse             => Future.successful(Clean)
       case VirusFoundResponse(virus)     => Future.successful(Infected(virus))
-      case ParseableErrorResponse(error) => Future.failed(new ClamAvException(error))
+      case ParseableErrorResponse(error) => Future.failed(ClamAvException(error))
       case unparseableResponse =>
-        Future.failed(new ClamAvException(s"Unparseable response from ClamAV: $unparseableResponse"))
+        Future.failed(ClamAvException(s"Unparseable scan response from ClamAV: $unparseableResponse"))
     }
 }

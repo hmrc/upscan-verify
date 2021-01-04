@@ -21,4 +21,6 @@ sealed trait ScanningResult
 case object Clean extends ScanningResult
 case class Infected(virusName: String) extends ScanningResult
 
-class ClamAvException(message: String) extends Exception(message)
+case class ClamAvException(message: String) extends Exception(message)
+
+case class ClamAvStats(queueLength: Int, idleThreads: Int, liveThreads: Int, maxThreads: Int)

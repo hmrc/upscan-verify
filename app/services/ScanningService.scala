@@ -18,9 +18,9 @@ package services
 
 import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
-
 import com.kenshoo.play.metrics.Metrics
-import javax.inject.Inject
+
+import javax.inject.{Inject, Singleton}
 import model._
 import play.api.Logging
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
@@ -37,22 +37,23 @@ trait ScanningService {
     implicit ld: LoggingDetails): Future[Either[FileValidationFailure, NoVirusFound]]
 }
 
+@Singleton
 class ClamAvScanningService @Inject()(
   clamClientFactory: ClamAntiVirusFactory,
   messageDigestComputingInputStreamFactory: ChecksumComputingInputStreamFactory,
   metrics: Metrics,
   clock: Clock)(implicit executionContext: ExecutionContext) extends ScanningService with Logging {
 
+  private val antivirusClient = clamClientFactory.getClient()
+
   override def scan(location: S3ObjectLocation, fileContent: ObjectContent, metadata: InboundObjectMetadata)(
     implicit ld: LoggingDetails): Future[Either[FileInfected, NoVirusFound]] = {
 
     val startTime       = clock.instant()
-    val antivirusClient = clamClientFactory.getClient()
-
     val inputStream = messageDigestComputingInputStreamFactory.create(fileContent.inputStream)
 
     for {
-      scanResult <- antivirusClient.sendAndCheck(inputStream, fileContent.length.toInt).map {
+      scanResult <- antivirusClient.scanInputStream(inputStream, fileContent.length.toInt).map {
                      case Clean =>
                        metrics.defaultRegistry.counter("cleanFileUpload").inc()
                        Right(NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))

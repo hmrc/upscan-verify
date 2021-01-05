@@ -18,11 +18,11 @@ package services
 
 import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
-
 import cats.implicits._
 import com.kenshoo.play.metrics.Metrics
 import javax.inject.Inject
 import model.Message
+import play.api.Logger
 import util.logging.LoggingDetails
 import utils.MonadicUtils._
 
@@ -39,6 +39,8 @@ class ScanUploadedFilesFlow @Inject()(parser: MessageParser,
                                       metrics: Metrics,
                                       clock: Clock)
                                      (implicit ec: ExecutionContext) extends MessageProcessor {
+
+  private val logger = Logger(getClass)
 
   def processMessage(message: Message): FutureEitherWithContext[MessageContext] = {
 
@@ -59,8 +61,11 @@ class ScanUploadedFilesFlow @Inject()(parser: MessageParser,
     addUploadToStartProcessMetrics(uploadedTimestamp, message.receivedAt)
     addUploadToEndScanMetrics(uploadedTimestamp, endTime)
     addInternalProcessMetrics(message.receivedAt, endTime)
-    message.queueTimeStamp.foreach { ts =>
-      addQueueSentToStartProcessMetrics(ts, message.receivedAt)
+    message.queueTimeStamp match {
+      case Some(ts) =>
+        addQueueSentToStartProcessMetrics(ts, message.receivedAt)
+      case None =>
+        logger.debug("SentTimestamp is missing, not updating queueSentToStartProcessing metric")
     }
   }
 
@@ -71,6 +76,7 @@ class ScanUploadedFilesFlow @Inject()(parser: MessageParser,
 
   private def addQueueSentToStartProcessMetrics(queueTimestamp: Instant, startTime: Instant): Unit = {
     val interval = startTime.toEpochMilli - queueTimestamp.toEpochMilli
+    logger.debug(s"Updating queueSentToStartProcessing metric to $interval")
     metrics.defaultRegistry.timer("queueSentToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
   }
 

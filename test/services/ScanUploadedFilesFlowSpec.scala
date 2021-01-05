@@ -103,7 +103,6 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       metrics.defaultRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 1
       metrics.defaultRegistry.timer("upscanVerifyProcessing").getSnapshot.size()  shouldBe 1
       metrics.defaultRegistry.timer("queueSentToStartProcessing").getSnapshot.size()  shouldBe 1
-
     }
 
     "skip processing if file metadata is unavailable" in {

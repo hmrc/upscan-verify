@@ -46,9 +46,9 @@ class QueueProcessingFlowSpec extends UnitSpec with GivenWhenThen {
       new QueueProcessingJob(queueConsumer, messageProcessor, metricsStub)
 
     Given("there are three message in a message queue")
-    val validMessage1  = Message("ID1", "VALID-BODY", "RECEIPT-1", Instant.now())
-    val invalidMessage = Message("ID2", "INVALID-BODY", "RECEIPT-2", Instant.now())
-    val validMessage2  = Message("ID3", "VALID-BODY", "RECEIPT-3", Instant.now())
+    val validMessage1  = Message("ID1", "VALID-BODY", "RECEIPT-1", Instant.now(), None)
+    val invalidMessage = Message("ID2", "INVALID-BODY", "RECEIPT-2", Instant.now(), None)
+    val validMessage2  = Message("ID3", "VALID-BODY", "RECEIPT-3", Instant.now(), None)
 
     when(queueConsumer.poll()).thenReturn(Future.successful(List(validMessage1, invalidMessage, validMessage2)))
     when(queueConsumer.confirm(any[Message])).thenReturn(Future.successful(()))

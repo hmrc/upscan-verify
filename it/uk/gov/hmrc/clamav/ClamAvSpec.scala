@@ -44,8 +44,10 @@ class ClamAvSpec extends AnyWordSpecLike with should.Matchers {
       override val timeout: Int = 5000
       override val port: Int    = 3310
       override val host: String = "avscan"
+      override val statsPollInterval: FiniteDuration = ???
+      override val statsPollStartDelay: FiniteDuration = ???
     }
-    new ClamAntiVirusFactory(configuration).getClient()
+    new ClamAntiVirusFactory(new ClamAvIO(configuration)).getClient()
   }
 
   private def await[T](awaitable: Awaitable[T]): T = Await.result(awaitable, 5.seconds)
@@ -55,46 +57,46 @@ class ClamAvSpec extends AnyWordSpecLike with should.Matchers {
       val clamAv = instance()
       val bytes  = FileBytes(cleanFile)
 
-      await(clamAv.sendAndCheck(bytes)) shouldBe Clean
+      await(clamAv.scanBytes(bytes)) shouldBe Clean
     }
 
     "allow to scan empty file" in {
       val clamAv = instance()
 
-      await(clamAv.sendAndCheck(emptyByteArray)) shouldBe Clean
+      await(clamAv.scanBytes(emptyByteArray)) shouldBe Clean
     }
 
     "detect a virus in a file" in {
       val clamAv = instance()
       val bytes  = FileBytes(virusFileWithSig)
-      await(clamAv.sendAndCheck(bytes)) shouldBe a [Infected]
+      await(clamAv.scanBytes(bytes)) shouldBe a [Infected]
     }
 
     "allow clean files sent as a stream" in {
       val clamAv = instance()
       val bytes  = FileBytes(cleanFile)
 
-      await(clamAv.sendAndCheck(new ByteArrayInputStream(bytes), bytes.length)) shouldBe Clean
+      await(clamAv.scanInputStream(new ByteArrayInputStream(bytes), bytes.length)) shouldBe Clean
     }
 
     "detect a virus in a file sent as a stream" in {
       val clamAv = instance()
       val bytes  = FileBytes(virusFileWithSig)
 
-      await(clamAv.sendAndCheck(new ByteArrayInputStream(bytes), bytes.length)) shouldBe a [Infected]
+      await(clamAv.scanInputStream(new ByteArrayInputStream(bytes), bytes.length)) shouldBe a [Infected]
     }
   }
 
   "Can scan stream without virus" in {
     val clamAv = instance()
 
-    await(clamAv.sendAndCheck(getBytes(payloadSize = 10000))) shouldBe Clean
+    await(clamAv.scanBytes(getBytes(payloadSize = 10000))) shouldBe Clean
   }
 
   "Can detect a small stream with a virus at the beginning" in {
     val clamAv = instance()
 
-    await(clamAv.sendAndCheck(getBytes(shouldInsertVirusAtPosition = Some(0)))) shouldBe a [Infected]
+    await(clamAv.scanBytes(getBytes(shouldInsertVirusAtPosition = Some(0)))) shouldBe a [Infected]
   }
 
   private def getBytes(payloadSize: Int = 0, shouldInsertVirusAtPosition: Option[Int] = None) =

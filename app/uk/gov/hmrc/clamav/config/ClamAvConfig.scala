@@ -16,8 +16,12 @@
 
 package uk.gov.hmrc.clamav.config
 
+import scala.concurrent.duration.FiniteDuration
+
 trait ClamAvConfig {
   val host: String
   val port: Int
   val timeout: Int
+  val statsPollInterval: FiniteDuration
+  val statsPollStartDelay: FiniteDuration
 }

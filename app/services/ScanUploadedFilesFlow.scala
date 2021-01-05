@@ -50,19 +50,28 @@ class ScanUploadedFilesFlow @Inject()(parser: MessageParser,
       inboundObjectDetails  = InboundObjectDetails(metadata, parsedMessage.clientIp, parsedMessage.location)
       scanningResult       <- withContext(fileCheckingService.check(parsedMessage.location, metadata)(ld), context)
       _                    <- withContext(scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult, message.receivedAt)(ld), context)
-      _                     = addMetrics(metadata.uploadedTimestamp, message.receivedAt, clock.instant())
+      _                     = addMetrics(metadata.uploadedTimestamp, message)
     } yield context
   }
 
-  private def addMetrics(uploadedTimestamp: Instant, startTime: Instant, endTime: Instant): Unit = {
-    addUploadToStartProcessMetrics(uploadedTimestamp, startTime)
+  private def addMetrics(uploadedTimestamp: Instant, message: Message): Unit = {
+    val endTime = clock.instant()
+    addUploadToStartProcessMetrics(uploadedTimestamp, message.receivedAt)
     addUploadToEndScanMetrics(uploadedTimestamp, endTime)
-    addInternalProcessMetrics(startTime, endTime)
+    addInternalProcessMetrics(message.receivedAt, endTime)
+    message.queueTimeStamp.foreach { ts =>
+      addQueueSentToStartProcessMetrics(ts, message.receivedAt)
+    }
   }
 
   private def addUploadToStartProcessMetrics(uploadedTimestamp: Instant, startTime: Instant): Unit = {
     val interval = startTime.toEpochMilli - uploadedTimestamp.toEpochMilli
     metrics.defaultRegistry.timer("uploadToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
+  }
+
+  private def addQueueSentToStartProcessMetrics(queueTimestamp: Instant, startTime: Instant): Unit = {
+    val interval = startTime.toEpochMilli - queueTimestamp.toEpochMilli
+    metrics.defaultRegistry.timer("queueSentToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
   }
 
   private def addUploadToEndScanMetrics(uploadedTimestamp: Instant, endTime: Instant): Unit = {

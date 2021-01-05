@@ -54,7 +54,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
   "ScanUploadedFilesFlow" should {
     "scan and post-process valid message" in {
       Given("there is a valid message in the queue")
-      val message          = Message("ID", "VALID-BODY", "RECEIPT-1", clock.instant())
+      val message          = Message("ID", "VALID-BODY", "RECEIPT-1", clock.instant(), Some(clock.instant().minusSeconds(1)))
       val location         = S3ObjectLocation("bucket", "ID", None)
       val processingResult = Right(FileValidationSuccess("CHECKSUM", MimeType("application/xml"),
         Timings(clock.instant(), clock.instant()), Timings(clock.instant(), clock.instant())))
@@ -102,6 +102,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 1
       metrics.defaultRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 1
       metrics.defaultRegistry.timer("upscanVerifyProcessing").getSnapshot.size()  shouldBe 1
+      metrics.defaultRegistry.timer("queueSentToStartProcessing").getSnapshot.size()  shouldBe 1
 
     }
 
@@ -112,7 +113,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
 
       Given("there is a valid message")
       val location            = S3ObjectLocation("bucket", "ID2", None)
-      val message             = Message("ID2", "VALID-BODY", "RECEIPT-2", clock.instant())
+      val message             = Message("ID2", "VALID-BODY", "RECEIPT-2", clock.instant(), None)
       val fileCheckingService = mock[FileCheckingService]
       val metrics: Metrics    = metricsStub()
       val flow =
@@ -150,7 +151,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       val scanningResultHandler = mock[FileCheckingResultHandler]
 
       Given("there is a valid message")
-      val message             = Message("ID2", "INVALID-BODY", "RECEIPT-2", clock.instant())
+      val message             = Message("ID2", "INVALID-BODY", "RECEIPT-2", clock.instant(), None)
       val fileCheckingService = mock[FileCheckingService]
       val metrics: Metrics    = metricsStub()
       val flow =
@@ -180,7 +181,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
 
     "return error if scanning failed" in {
       Given("there is a valid message in the queue")
-      val message  = Message("ID", "VALID-BODY", "RECEIPT-1", clock.instant())
+      val message  = Message("ID", "VALID-BODY", "RECEIPT-1", clock.instant(), None)
       val location = S3ObjectLocation("bucket", "ID", None)
       val inboundObjectMetadata =
         InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clockStart.minusSeconds(1), 0)

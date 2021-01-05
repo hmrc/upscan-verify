@@ -23,7 +23,7 @@ import services.{MimeType, NoVirusFound}
 
 import scala.concurrent.Future
 
-case class Message(id: String, body: String, receiptHandle: String, receivedAt: Instant)
+case class Message(id: String, body: String, receiptHandle: String, receivedAt: Instant, queueTimeStamp: Option[Instant])
 
 case class S3ObjectLocation(bucket: String, objectKey: String, objectVersion: Option[String])
 case class FileUploadEvent(location: S3ObjectLocation, clientIp: String)

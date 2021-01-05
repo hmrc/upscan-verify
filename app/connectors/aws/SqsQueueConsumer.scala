@@ -16,8 +16,7 @@
 
 package connectors.aws
 
-import java.time.Clock
-
+import java.time.{Clock, Instant}
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest, ReceiveMessageResult}
 import config.ServiceConfiguration
@@ -52,8 +51,11 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS,
             s"Received message with id: [${sqsMessage.getMessageId}] and receiptHandle: [${sqsMessage.getReceiptHandle}], message details:\n "
               + sqsMessage.toString)
         }
-
-        Message(sqsMessage.getMessageId, sqsMessage.getBody, sqsMessage.getReceiptHandle, receivedAt)
+        val queueTimestamp = sqsMessage.getAttributes.asScala.get("SentTimestamp").map(s => Instant.ofEpochMilli(s.toInt))
+        if(queueTimestamp.isEmpty){
+          logger.warn(s"SentTimestamp is missing from the message attribute. Message id = ${sqsMessage.getMessageId}")
+        }
+        Message(sqsMessage.getMessageId, sqsMessage.getBody, sqsMessage.getReceiptHandle, receivedAt, queueTimestamp)
       }
     }
   }

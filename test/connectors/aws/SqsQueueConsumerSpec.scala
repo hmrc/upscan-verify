@@ -72,8 +72,8 @@ class SqsQueueConsumerSpec extends UnitSpec with Assertions with GivenWhenThen w
 
       And("the list of messages should be returned")
       messages shouldBe List(
-        Message("ID1", "SQS message body: 1", "SQS receipt handle: 1", clockStart.plusSeconds(0)),
-        Message("ID2", "SQS message body: 2", "SQS receipt handle: 2", clockStart.plusSeconds(0)))
+        Message("ID1", "SQS message body: 1", "SQS receipt handle: 1", clockStart.plusSeconds(0), None),
+        Message("ID2", "SQS message body: 2", "SQS receipt handle: 2", clockStart.plusSeconds(0), None))
     }
 
     "call an SQS endpoint to receive messages for empty queue" in {

@@ -9,9 +9,6 @@
 
     <logger name="uk.gov" level="${logger.uk.gov:-WARN}"/>
 
-    <logger name="services.ScanUploadedFilesFlow" level="DEBUG"/>
-    <logger name="connectors.aws.SqsQueueConsumer" level="DEBUG"/>
-
     <root level="${logger.root:-WARN}">
         <appender-ref ref="STDOUT"/>
     </root>

@@ -54,8 +54,6 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS,
         val queueTimestamp = sqsMessage.getAttributes.asScala.get("SentTimestamp").map(s => Instant.ofEpochMilli(s.toLong))
         if(queueTimestamp.isEmpty){
           logger.warn(s"SentTimestamp is missing from the message attribute. Message id = ${sqsMessage.getMessageId}")
-        } else {
-          logger.debug(s"SentTimestamp found. Message id = ${sqsMessage.getMessageId}")
         }
         Message(sqsMessage.getMessageId, sqsMessage.getBody, sqsMessage.getReceiptHandle, receivedAt, queueTimestamp)
       }

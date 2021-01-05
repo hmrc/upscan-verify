@@ -16,19 +16,15 @@
 
 package config
 
+import javax.inject.Inject
 import play.api.Configuration
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 
-import javax.inject.{Inject, Singleton}
-import scala.concurrent.duration.FiniteDuration
 
-@Singleton
 class PlayClamAvConfig @Inject()(configuration: Configuration) extends ClamAvConfig {
   val host: String = getRequired(configuration.getOptional[String](_), "clam.antivirus.host")
   val port: Int = getRequired(configuration.getOptional[Int](_), "clam.antivirus.port")
   val timeout: Int = getRequired(configuration.getOptional[Int](_), "clam.antivirus.timeout")
-  val statsPollInterval = getRequired(configuration.getOptional[FiniteDuration](_), "clam.antivirus.statsPollInterval")
-  val statsPollStartDelay = getRequired(configuration.getOptional[FiniteDuration](_), "clam.antivirus.statsPollStartDelay")
 
   private def getRequired[T](function: String => Option[T], key: String) =
     function(key).getOrElse(throw new IllegalStateException(s"$key missing"))

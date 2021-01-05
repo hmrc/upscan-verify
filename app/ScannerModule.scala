@@ -33,7 +33,6 @@ class ScannerModule extends Module {
       bind[PollingJob].to[QueueProcessingJob],
       bind[MessageProcessor].to[ScanUploadedFilesFlow],
       bind[ContinuousPoller].toSelf.eagerly(),
-      bind[ClamAvStatsMonitoringService].toSelf.eagerly(),
       bind[ScanningService].to[ClamAvScanningService],
       bind[FileManager].to[S3FileManager],
       bind[RejectionNotifier].toInstance(LoggingRejectionNotifier),

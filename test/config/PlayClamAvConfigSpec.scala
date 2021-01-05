@@ -18,28 +18,19 @@ package config
 
 import play.api.Configuration
 import test.UnitSpec
-import scala.concurrent.duration._
 
 class PlayClamAvConfigSpec extends UnitSpec {
 
   "PlayClamAvConfig" should {
     "load the configuration values from the play application config if all values are present" in {
       val configuration: Configuration = Configuration.from(
-        Map(
-          "clam.antivirus.host"                -> "avscan",
-          "clam.antivirus.port"                -> 3310,
-          "clam.antivirus.timeout"             -> 5000,
-          "clam.antivirus.statsPollInterval"   -> "1 minute",
-          "clam.antivirus.statsPollStartDelay" -> "1 minute"
-        )
+        Map("clam.antivirus.host" -> "avscan", "clam.antivirus.port" -> 3310, "clam.antivirus.timeout" -> 5000)
       )
 
       val clamAvConfig = new PlayClamAvConfig(configuration)
-      clamAvConfig.host                shouldBe "avscan"
-      clamAvConfig.port                shouldBe 3310
-      clamAvConfig.timeout             shouldBe 5000
-      clamAvConfig.statsPollInterval   shouldBe 1.minute
-      clamAvConfig.statsPollStartDelay shouldBe 1.minute
+      clamAvConfig.host shouldBe "avscan"
+      clamAvConfig.port shouldBe 3310
+      clamAvConfig.timeout shouldBe 5000
     }
 
     "throw an exception if there is no clam host" in {

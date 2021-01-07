@@ -73,7 +73,7 @@ class FileCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithIncre
 
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
-      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService, clock)
+      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant())))))
@@ -92,7 +92,7 @@ class FileCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithIncre
 
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
-      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService, clock)
+      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
       val checksum: String        = "CHECKSUM"
 
       when(virusScanningService.scan(location, content, metadata))
@@ -108,7 +108,7 @@ class FileCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithIncre
 
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
-      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService, clock)
+      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant())))))

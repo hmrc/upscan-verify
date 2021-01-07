@@ -17,9 +17,10 @@
 package services
 
 import java.time.Instant
-
 import model.S3ObjectLocation
 import play.api.Logging
+import uk.gov.hmrc.http.logging.LoggingDetails
+import util.logging.WithLoggingDetails.withLoggingDetails
 
 import scala.concurrent.Future
 
@@ -31,23 +32,24 @@ trait RejectionNotifier {
                       fileUploadDatetime: Instant,
                       details: String,
                       serviceName: Option[String],
-                      customMessagePrefix: String): Future[Unit]
+                      customMessagePrefix: String)
+                     (implicit ld: LoggingDetails): Future[Unit]
 
   def notifyFileInfected(fileProperties: S3ObjectLocation,
                          checksum: String,
                          fileSize: Long,
                          fileUploadDatetime: Instant,
                          details: String,
-                         serviceName: Option[String]
-                        ): Future[Unit] = notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "Virus detected in file.")
+                         serviceName: Option[String])
+                        (implicit ld: LoggingDetails): Future[Unit] = notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "Virus detected in file.")
 
   def notifyInvalidFileType(fileProperties: S3ObjectLocation,
                             checksum: String,
                             fileSize: Long,
                             fileUploadDatetime: Instant,
                             details: String,
-                            serviceName: Option[String]
-                           ): Future[Unit] = notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "Invalid file type uploaded, which is not whitelisted for this service.")
+                            serviceName: Option[String])
+                           (implicit ld: LoggingDetails): Future[Unit] = notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "File type is not allowed for this service.")
 }
 
 
@@ -59,17 +61,20 @@ object LoggingRejectionNotifier extends RejectionNotifier with Logging {
                                fileUploadDatetime: Instant,
                                details: String,
                                serviceName: Option[String],
-                               customMessagePrefix: String): Future[Unit] = {
-    logger.warn(
-      s"""$customMessagePrefix${serviceName.fold("")(service => s"\nService name: [$service]")}
-         |File ID: [${fileProperties.objectKey}]${fileProperties.objectVersion.fold("")(version => s"\nVersion: [$version]")}
-         |Checksum: [$checksum]
-         |File size: [$fileSize B]
-         |File upload datetime: [$fileUploadDatetime]
-         |Bucket: [${fileProperties.bucket}]
-         |Details: [$details].
-       """.stripMargin
-    )
+                               customMessagePrefix: String)
+                              (implicit ld: LoggingDetails): Future[Unit] = {
+    withLoggingDetails(ld) {
+      logger.warn(
+        s"""$customMessagePrefix${serviceName.fold("")(service => s"\nService name: [$service]")}
+           |Key: [${fileProperties.objectKey}]${fileProperties.objectVersion.fold("")(version => s"\nVersion: [$version]")}
+           |Checksum: [$checksum]
+           |File size: [$fileSize B]
+           |File upload datetime: [$fileUploadDatetime]
+           |Bucket: [${fileProperties.bucket}]
+           |Details: [$details].
+         """.stripMargin
+      )
+    }
     Future.successful(())
   }
 }

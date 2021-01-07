@@ -43,7 +43,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithI
   }
 
   "FileTypeCheckingService" should {
-    "return valid result for whitelisted mime type for service" in {
+    "return valid result for allowed mime type for the service" in {
 
       Given("an uploaded file with a valid MIME type for the service")
       val serviceName                    = "valid-test-service"

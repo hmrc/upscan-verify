@@ -16,17 +16,17 @@
 
 package services
 
-import java.io.ByteArrayInputStream
-import java.time.{Clock, Instant}
-import java.util.UUID
-
 import config.ServiceConfiguration
-import javax.inject.Inject
 import model._
 import play.api.Logging
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.logging.LoggingDetails
+import util.logging.WithLoggingDetails.withLoggingDetails
 
+import java.io.ByteArrayInputStream
+import java.time.{Clock, Instant}
+import java.util.UUID
+import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 
 class FileCheckingResultHandler @Inject()(fileManager: FileManager,
@@ -38,7 +38,10 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager,
   def handleCheckingResult(objectDetails: InboundObjectDetails,
                            result: Either[FileValidationFailure, FileValidationSuccess],
                            messageReceivedAt: Instant)
-                          (implicit ld: LoggingDetails): Future[Unit] =
+                          (implicit ld: LoggingDetails): Future[Unit] = {
+    withLoggingDetails(ld) {
+      logger.info(s"Handling check result for Key=[${objectDetails.location.objectKey}] Result=[$result]")
+    }
     result match {
       case Right(FileValidationSuccess(checksum, mimeType, virusScanTimings, fileTypeTimings)) =>
         handleValid(objectDetails, checksum, mimeType)(messageReceivedAt, virusScanTimings, fileTypeTimings)
@@ -49,8 +52,11 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager,
       case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(IncorrectFileType(mime, consumingService, fileTypeTimings)))) =>
         handleIncorrectType(objectDetails, mime, consumingService)(checksum, messageReceivedAt, virusScanTimings, fileTypeTimings)
 
-      case _ => Future.successful(logger.error(s"Unexpected match result for result: [$result]."))
+      case _ => Future.successful(withLoggingDetails(ld) {
+        logger.error(s"Unexpected match result for Key=[${objectDetails.location.objectKey}] Result=[$result]")
+      })
     }
+  }
 
   private def handleValid(details: InboundObjectDetails,
                           checksum: String,

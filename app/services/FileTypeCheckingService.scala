@@ -48,7 +48,7 @@ class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector,
 
     addCheckingTimeMetrics(startTime)
 
-    if (isAllowedForService(fileType, consumingService)) {
+    if (isAllowedForService(fileType, consumingService, location)) {
       metrics.defaultRegistry.counter("validTypeFileUpload").inc()
       Future.successful(Right(FileAllowed(fileType, Timings(startTime, clock.instant()))))
     } else {
@@ -57,7 +57,7 @@ class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector,
     }
   }
 
-  private def isAllowedForService(mimeType: MimeType, consumingService: Option[String])
+  private def isAllowedForService(mimeType: MimeType, consumingService: Option[String], location: S3ObjectLocation)
                                  (implicit ld: LoggingDetails): Boolean = {
 
     val allowedMimeTypes =
@@ -68,7 +68,7 @@ class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector,
     if (allowedMimeTypes.contains(mimeType.value)) true
     else {
       withLoggingDetails(ld) {
-        logger.error(s"Consuming service [$consumingService] does not allow MIME type: [${mimeType.value}]")
+        logger.warn(s"File with Key=[${location.objectKey}] is not allowed by [$consumingService] - service does not allow MIME type: [${mimeType.value}]")
       }
       false
     }

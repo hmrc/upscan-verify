@@ -36,7 +36,7 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager,
                                          (implicit ec: ExecutionContext) extends Logging {
 
   def handleCheckingResult(objectDetails: InboundObjectDetails,
-                           result: Either[FileValidationFailure, FileValidationSuccess],
+                           result: Either[FileRejected, FileValidationSuccess],
                            messageReceivedAt: Instant)
                           (implicit ld: LoggingDetails): Future[Unit] = {
     withLoggingDetails(ld) {

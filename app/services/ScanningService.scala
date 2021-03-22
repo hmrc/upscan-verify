@@ -35,7 +35,7 @@ case class NoVirusFound(checksum: String, virusScanTimings: Timings)
 
 trait ScanningService {
   def scan(location: S3ObjectLocation, objectContent: ObjectContent, objectMetadata: InboundObjectMetadata)(
-    implicit ld: LoggingDetails): Future[Either[FileValidationFailure, NoVirusFound]]
+    implicit ld: LoggingDetails): Future[Either[FileInfected, NoVirusFound]]
 }
 
 class ClamAvScanningService @Inject()(
@@ -73,6 +73,6 @@ class ClamAvScanningService @Inject()(
   private def addScanningTimeMetrics(startTime: Instant, endTime: Instant): Unit = {
     metrics.defaultRegistry
       .timer("scanningTime")
-      .update(endTime.toEpochMilli() - startTime.toEpochMilli(), TimeUnit.MILLISECONDS)
+      .update(endTime.toEpochMilli - startTime.toEpochMilli, TimeUnit.MILLISECONDS)
   }
 }

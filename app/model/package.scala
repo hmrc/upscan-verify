@@ -16,12 +16,10 @@
 
 package model
 
-import java.time.Instant
-
 import play.api.libs.json._
 import services.{MimeType, NoVirusFound}
 
-import scala.concurrent.Future
+import java.time.Instant
 
 case class Message(id: String, body: String, receiptHandle: String, receivedAt: Instant, queueTimeStamp: Option[Instant])
 
@@ -41,34 +39,17 @@ case class Timings(start: Instant,
 
 case class FileValidationSuccess(checksum: String, mimeType: MimeType, virusScanTimings: Timings, fileTypeTimings: Timings)
 
-sealed trait FileValidationFailure
-
 case class FileInfected(details: String,
                         checksum: String,
-                        virusScanTimings: Timings) extends FileValidationFailure
+                        virusScanTimings: Timings)
 
 case class IncorrectFileType(typeFound: MimeType,
                              consumingService: Option[String],
-                             fileTypeTimings: Timings) extends FileValidationFailure
-
+                             fileTypeTimings: Timings)
 
 case class FileRejected(virusScanResult: Either[FileInfected, NoVirusFound],
                                  fileTypeResultOpt: Option[IncorrectFileType] = None
-                                ) extends FileValidationFailure
-
-object FileRejected {
-  def futureLeft(fi: FileInfected): Future[Either[FileRejected, FileValidationSuccess]] = {
-    Future.successful(Left(FileRejected(Left(fi))))
-  }
-
-  def left(fi: NoVirusFound, ift: IncorrectFileType): Either[FileRejected, FileValidationSuccess] = {
-    Left(FileRejected(Right(fi), Some(ift)))
-  }
-
-  def right(fvs: FileValidationSuccess): Either[FileRejected, FileValidationSuccess] = {
-    Right(fvs)
-  }
-}
+                                )
 
 sealed trait FileCheckingError {
   def value: String

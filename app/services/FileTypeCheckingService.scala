@@ -39,7 +39,7 @@ class FileTypeCheckingService @Inject()(mimeTypeDetector: MimeTypeDetector,
   def scan(location: S3ObjectLocation,
            objectContent: ObjectContent,
            objectMetadata: InboundObjectMetadata)
-          (implicit ld: LoggingDetails): Future[Either[FileValidationFailure, FileAllowed]] = {
+          (implicit ld: LoggingDetails): Future[Either[IncorrectFileType, FileAllowed]] = {
 
     val startTime = clock.instant()
 

@@ -65,8 +65,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithI
       val checkingService = new FileTypeCheckingService(detector, configuration, metrics, clock)
 
       When("the file is checked")
-      val result: Either[FileValidationFailure, FileAllowed] =
-        Await.result(checkingService.scan(location, content, metadata), 2.seconds)
+      val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
       Then("a valid result should be returned")
       result shouldBe Right(FileAllowed(MimeType("application/pdf"), Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:32Z"))))

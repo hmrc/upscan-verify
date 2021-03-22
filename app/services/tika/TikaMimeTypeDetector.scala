@@ -16,28 +16,42 @@
 
 package services.tika
 
+import cats.syntax.either._
 import org.apache.tika.config.TikaConfig
+import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.{Metadata, TikaMetadataKeys}
-import services.{MimeTypeDetector, MimeType}
+import services.MimeTypeDetector.MimeTypeDetectionError
+import services.MimeTypeDetector.MimeTypeDetectionError.NotAllowedFileExtension
+import services.{MimeType, MimeTypeDetector}
 
 import java.io.InputStream
+import javax.inject.{Inject, Singleton}
 
-class TikaMimeTypeDetector extends MimeTypeDetector {
+@Singleton
+class TikaMimeTypeDetector @Inject()(fileNameValidator: FileNameValidator) extends MimeTypeDetector {
 
   private val config   = TikaConfig.getDefaultConfig
   private val detector = config.getDetector
 
-  def detect(inputStream: InputStream, fileName: Option[String]): MimeType = {
-    import org.apache.tika.io.TikaInputStream
+  def detect(inputStream: InputStream, maybeFileName: Option[String]): Either[MimeTypeDetectionError, MimeType] = {
+    val mediaType = detectMediaType(inputStream, maybeFileName)
+    val mimeType  = MimeType(s"${mediaType.getType}/${mediaType.getSubtype}")
+    maybeFileName.fold(mimeType.asRight[MimeTypeDetectionError]) { filename =>
+      fileNameValidator
+        .validate(mimeType, filename)
+        .map(_ => mimeType)
+        .leftMap(extension => NotAllowedFileExtension(mimeType, extension))
+    }
+  }
 
-    val tikaInputStream = TikaInputStream.get(inputStream)
+  private def detectMediaType(inputStream: InputStream, maybeFileName: Option[String]) = {
+    val tikaInputStream: TikaInputStream = TikaInputStream.get(inputStream)
 
     val metadata = new Metadata()
-    fileName.foreach(metadata.add(TikaMetadataKeys.RESOURCE_NAME_KEY, _))
-    val detectionResult = detector.detect(tikaInputStream, metadata)
+    maybeFileName.foreach(metadata.add(TikaMetadataKeys.RESOURCE_NAME_KEY, _))
+    val mediaType = detector.detect(tikaInputStream, metadata)
 
     tikaInputStream.close()
-
-    MimeType(s"${detectionResult.getType}/${detectionResult.getSubtype}")
+    mediaType
   }
 }

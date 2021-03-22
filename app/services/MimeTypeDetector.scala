@@ -16,12 +16,23 @@
 
 package services
 
+import services.MimeTypeDetector.MimeTypeDetectionError
+
 import java.io.InputStream
 
 case class MimeType(value: String) extends AnyVal
 
-trait MimeTypeDetector {
-  def detect(inputStream: InputStream, fileName: Option[String]): MimeType
+object MimeType {
+  val octetStream = MimeType("application/octet-stream")
 }
 
+trait MimeTypeDetector {
+  def detect(inputStream: InputStream, fileName: Option[String]): Either[MimeTypeDetectionError, MimeType]
+}
 
+object MimeTypeDetector {
+  sealed trait MimeTypeDetectionError
+  object MimeTypeDetectionError {
+    final case class NotAllowedFileExtension(detectedMimeType: MimeType, fileExtension: String) extends MimeTypeDetectionError
+  }
+}

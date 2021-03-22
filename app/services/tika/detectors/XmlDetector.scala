@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package services
-
-import java.io.InputStream
+package services.tika.detectors
 
 import org.apache.tika.detect.{Detector, XmlRootExtractor}
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.mime.MediaType
+
+import java.io.InputStream
 
 class XmlDetector extends Detector  {
 

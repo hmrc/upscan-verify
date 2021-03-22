@@ -53,8 +53,8 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithI
       val content  = ObjectContent(null, 1200)
       val metadata = InboundObjectMetadata(Map("consuming-service" -> serviceName), Instant.now, 0)
 
-      val detector = new FileTypeDetector {
-        override def detectType(inputStream: InputStream, fileName: Option[String]): MimeType =
+      val detector = new MimeTypeDetector {
+        override def detect(inputStream: InputStream, fileName: Option[String]): MimeType =
           MimeType("application/pdf")
       }
 
@@ -88,8 +88,8 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithI
       val metadata = InboundObjectMetadata(Map("consuming-service" -> "valid-test-service"), Instant.now, 0)
 
       val fileMimeType = MimeType("image/jpeg")
-      val detector = new FileTypeDetector {
-        override def detectType(inputStream: InputStream, fileName: Option[String]): MimeType =
+      val detector = new MimeTypeDetector {
+        override def detect(inputStream: InputStream, fileName: Option[String]): MimeType =
           fileMimeType
       }
 
@@ -122,8 +122,8 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithI
       val metadata = InboundObjectMetadata(Map("consuming-service" -> serviceName), Instant.now, 0)
 
       val fileMimeType = MimeType("application/pdf")
-      val detector = new FileTypeDetector {
-        override def detectType(inputStream: InputStream, fileName: Option[String]): MimeType =
+      val detector = new MimeTypeDetector {
+        override def detect(inputStream: InputStream, fileName: Option[String]): MimeType =
           fileMimeType
       }
 

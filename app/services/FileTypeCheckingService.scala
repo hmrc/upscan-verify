@@ -31,7 +31,7 @@ import scala.concurrent.Future
 
 case class FileAllowed(mimeType: MimeType, fileTypeTimings: Timings)
 
-class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector,
+class FileTypeCheckingService @Inject()(mimeTypeDetector: MimeTypeDetector,
                                         serviceConfiguration: ServiceConfiguration,
                                         metrics: Metrics,
                                         clock: Clock) extends Logging {
@@ -44,16 +44,16 @@ class FileTypeCheckingService @Inject()(fileTypeDetector: FileTypeDetector,
     val startTime = clock.instant()
 
     val consumingService = objectMetadata.consumingService
-    val fileType         = fileTypeDetector.detectType(objectContent.inputStream, objectMetadata.originalFilename)
+    val mimeType         = mimeTypeDetector.detect(objectContent.inputStream, objectMetadata.originalFilename)
 
     addCheckingTimeMetrics(startTime)
 
-    if (isAllowedForService(fileType, consumingService, location)) {
+    if (isAllowedForService(mimeType, consumingService, location)) {
       metrics.defaultRegistry.counter("validTypeFileUpload").inc()
-      Future.successful(Right(FileAllowed(fileType, Timings(startTime, clock.instant()))))
+      Future.successful(Right(FileAllowed(mimeType, Timings(startTime, clock.instant()))))
     } else {
       metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
-      Future.successful(Left(IncorrectFileType(fileType, consumingService, Timings(startTime, clock.instant()))))
+      Future.successful(Left(IncorrectFileType(mimeType, consumingService, Timings(startTime, clock.instant()))))
     }
   }
 

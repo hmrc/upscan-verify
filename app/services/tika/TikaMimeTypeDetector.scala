@@ -14,25 +14,20 @@
  * limitations under the License.
  */
 
-package services
-
-import java.io.InputStream
+package services.tika
 
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.metadata.{Metadata, TikaMetadataKeys}
+import services.{MimeTypeDetector, MimeType}
 
-case class MimeType(value: String) extends AnyVal
+import java.io.InputStream
 
-trait FileTypeDetector {
-  def detectType(inputStream: InputStream, fileName: Option[String]): MimeType
-}
-
-class TikaFileTypeDetector extends FileTypeDetector {
+class TikaMimeTypeDetector extends MimeTypeDetector {
 
   private val config   = TikaConfig.getDefaultConfig
   private val detector = config.getDetector
 
-  def detectType(inputStream: InputStream, fileName: Option[String]): MimeType = {
+  def detect(inputStream: InputStream, fileName: Option[String]): MimeType = {
     import org.apache.tika.io.TikaInputStream
 
     val tikaInputStream = TikaInputStream.get(inputStream)

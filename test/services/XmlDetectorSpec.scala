@@ -17,10 +17,10 @@
 package services
 
 import java.io.{BufferedReader, ByteArrayInputStream, InputStream, InputStreamReader}
-
 import org.apache.tika.metadata.Metadata
 import org.apache.tika.mime.MediaType
 import org.scalatest.GivenWhenThen
+import services.tika.detectors.XmlDetector
 import test.UnitSpec
 
 class XmlDetectorSpec extends UnitSpec with GivenWhenThen {

@@ -1,1 +1,1 @@
-services.XmlDetector
+services.tika.detectors.XmlDetector

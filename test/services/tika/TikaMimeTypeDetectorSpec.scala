@@ -74,5 +74,12 @@ class TikaMimeTypeDetectorSpec extends UnitSpec with Assertions with GivenWhenTh
         .left
         .value shouldBe NotAllowedFileExtension(MimeType("text/plain"), "vbe")
     }
+
+    "detect files with html extension as html" in {
+      tikaMimeTypeDetector
+        .detect(new ByteArrayInputStream("""<html><head></head></html>"""".getBytes), Some("test.html"))
+        .right
+        .value shouldBe MimeType("text/html")
+    }
   }
 }

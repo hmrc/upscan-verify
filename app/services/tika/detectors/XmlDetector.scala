@@ -17,23 +17,28 @@
 package services.tika.detectors
 
 import org.apache.tika.detect.{Detector, XmlRootExtractor}
-import org.apache.tika.metadata.Metadata
+import org.apache.tika.metadata.{Metadata, TikaMetadataKeys}
 import org.apache.tika.mime.MediaType
 
 import java.io.InputStream
 
-class XmlDetector extends Detector  {
+class XmlDetector extends Detector {
 
   val extractor = new XmlRootExtractor
 
-  override def detect(input: InputStream, metadata: Metadata): MediaType = {
-    input.mark(1024)
-    try {
-      Option(extractor.extractRootElement(input))
-        .fold(MediaType.OCTET_STREAM)(_ => MediaType.APPLICATION_XML)
-    } finally {
-      input.reset()
+  override def detect(input: InputStream, metadata: Metadata): MediaType =
+    if (filenameHasHtmlExtension(metadata)) {
+      MediaType.OCTET_STREAM
+    } else {
+      input.mark(1024)
+      try {
+        Option(extractor.extractRootElement(input))
+          .fold(MediaType.OCTET_STREAM)(_ => MediaType.APPLICATION_XML)
+      } finally {
+        input.reset()
+      }
     }
 
-  }
+  private def filenameHasHtmlExtension(metadata: Metadata): Boolean =
+    Option(metadata.get(TikaMetadataKeys.RESOURCE_NAME_KEY)).exists(_.toLowerCase.matches(".*\\.htm(l)?"))
 }

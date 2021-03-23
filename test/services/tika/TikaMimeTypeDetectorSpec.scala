@@ -68,6 +68,13 @@ class TikaMimeTypeDetectorSpec extends UnitSpec with Assertions with GivenWhenTh
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     }
 
+    "properly detect XHTML file" in {
+      tikaMimeTypeDetector
+        .detect(this.getClass.getResourceAsStream("/test.xhtml"), Some("test.xhtml"))
+        .right
+        .value shouldBe MimeType("application/xhtml+xml")
+    }
+
     "detect text files with non standard extension as application/octet-stream" in {
       tikaMimeTypeDetector
         .detect(new ByteArrayInputStream("""MsgBox "Hello World"""".getBytes), Some("test.vbe"))

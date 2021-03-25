@@ -16,42 +16,30 @@
 
 package services.tika
 
-import cats.syntax.either._
 import org.apache.tika.config.TikaConfig
-import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.{Metadata, TikaMetadataKeys}
-import services.MimeTypeDetector.MimeTypeDetectionError
-import services.MimeTypeDetector.MimeTypeDetectionError.NotAllowedFileExtension
 import services.{MimeType, MimeTypeDetector}
 
 import java.io.InputStream
-import javax.inject.{Inject, Singleton}
+import javax.inject.Singleton
 
 @Singleton
-class TikaMimeTypeDetector @Inject()(fileNameValidator: FileNameValidator) extends MimeTypeDetector {
+class TikaMimeTypeDetector extends MimeTypeDetector {
 
   private val config   = TikaConfig.getDefaultConfig
   private val detector = config.getDetector
 
-  def detect(inputStream: InputStream, maybeFileName: Option[String]): Either[MimeTypeDetectionError, MimeType] = {
-    val mediaType = detectMediaType(inputStream, maybeFileName)
-    val mimeType  = MimeType(s"${mediaType.getType}/${mediaType.getSubtype}")
-    maybeFileName.fold(mimeType.asRight[MimeTypeDetectionError]) { filename =>
-      fileNameValidator
-        .validate(mimeType, filename)
-        .map(_ => mimeType)
-        .leftMap(extension => NotAllowedFileExtension(mimeType, extension))
-    }
-  }
+  def detect(inputStream: InputStream, fileName: Option[String]): MimeType = {
+    import org.apache.tika.io.TikaInputStream
 
-  private def detectMediaType(inputStream: InputStream, maybeFileName: Option[String]) = {
-    val tikaInputStream: TikaInputStream = TikaInputStream.get(inputStream)
+    val tikaInputStream = TikaInputStream.get(inputStream)
 
     val metadata = new Metadata()
-    maybeFileName.foreach(metadata.add(TikaMetadataKeys.RESOURCE_NAME_KEY, _))
-    val mediaType = detector.detect(tikaInputStream, metadata)
+    fileName.foreach(metadata.add(TikaMetadataKeys.RESOURCE_NAME_KEY, _))
+    val detectionResult = detector.detect(tikaInputStream, metadata)
 
     tikaInputStream.close()
-    mediaType
+
+    MimeType(s"${detectionResult.getType}/${detectionResult.getSubtype}")
   }
 }

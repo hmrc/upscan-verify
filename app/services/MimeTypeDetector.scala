@@ -16,24 +16,23 @@
 
 package services
 
+import services.MimeTypeDetector.MimeTypeDetectionError
+
 import java.io.InputStream
 
-import org.apache.tika.detect.{Detector, XmlRootExtractor}
-import org.apache.tika.metadata.Metadata
-import org.apache.tika.mime.MediaType
+case class MimeType(value: String) extends AnyVal
 
-class XmlDetector extends Detector  {
+object MimeType {
+  val octetStream = MimeType("application/octet-stream")
+}
 
-  val extractor = new XmlRootExtractor
+trait MimeTypeDetector {
+  def detect(inputStream: InputStream, fileName: Option[String]): Either[MimeTypeDetectionError, MimeType]
+}
 
-  override def detect(input: InputStream, metadata: Metadata): MediaType = {
-    input.mark(1024)
-    try {
-      Option(extractor.extractRootElement(input))
-        .fold(MediaType.OCTET_STREAM)(_ => MediaType.APPLICATION_XML)
-    } finally {
-      input.reset()
-    }
-
+object MimeTypeDetector {
+  sealed trait MimeTypeDetectionError
+  object MimeTypeDetectionError {
+    final case class NotAllowedFileExtension(detectedMimeType: MimeType, fileExtension: String) extends MimeTypeDetectionError
   }
 }

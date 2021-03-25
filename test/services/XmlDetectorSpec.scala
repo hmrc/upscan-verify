@@ -17,10 +17,10 @@
 package services
 
 import java.io.{BufferedReader, ByteArrayInputStream, InputStream, InputStreamReader}
-
-import org.apache.tika.metadata.Metadata
+import org.apache.tika.metadata.{Metadata, TikaMetadataKeys}
 import org.apache.tika.mime.MediaType
 import org.scalatest.GivenWhenThen
+import services.tika.detectors.XmlDetector
 import test.UnitSpec
 
 class XmlDetectorSpec extends UnitSpec with GivenWhenThen {
@@ -45,6 +45,18 @@ class XmlDetectorSpec extends UnitSpec with GivenWhenThen {
       val xml = """NOT XML"""
       val is = new ByteArrayInputStream(xml.getBytes)
       xmlDetector.detect(is, new Metadata()) shouldBe MediaType.OCTET_STREAM
+    }
+
+    "detect file with .html extension as octet stream" in {
+      val metadata = new Metadata()
+      metadata.add(TikaMetadataKeys.RESOURCE_NAME_KEY, "test.html")
+      xmlDetector.detect(new ByteArrayInputStream("""<html></html>""".getBytes), metadata) shouldBe MediaType.OCTET_STREAM
+    }
+
+    "detect file with .htm extension as octet stream" in {
+      val metadata = new Metadata()
+      metadata.add(TikaMetadataKeys.RESOURCE_NAME_KEY, "test.htm")
+      xmlDetector.detect(new ByteArrayInputStream("""<html></html>""".getBytes), metadata) shouldBe MediaType.OCTET_STREAM
     }
 
     "reset input stream after processing" in {

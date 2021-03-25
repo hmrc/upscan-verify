@@ -24,42 +24,37 @@ import util.logging.WithLoggingDetails.withLoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class FileCheckingService @Inject()(fileManager: FileManager,
-                                    virusScanningService: ScanningService,
-                                    fileTypeCheckingService: FileTypeCheckingService)
-                                   (implicit ec: ExecutionContext) {
+class FileCheckingService @Inject()(
+  fileManager: FileManager,
+  virusScanningService: ScanningService,
+  fileTypeCheckingService: FileTypeCheckingService)(implicit ec: ExecutionContext) {
 
   private val logger = Logger(getClass)
 
-  def check(location: S3ObjectLocation,
-            objectMetadata: InboundObjectMetadata)
-           (implicit ld: LoggingDetails): Future[Either[FileRejected, FileValidationSuccess]] = {
+  def check(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata)(
+    implicit ld: LoggingDetails): Future[Either[FileRejected, FileValidationSuccess]] = {
     withLoggingDetails(ld) {
       logger.debug(s"Checking upload Key=[${location.objectKey}]")
     }
     virusScan(location, objectMetadata) flatMap {
-      case Left(fi: FileInfected)                => FileRejected.futureLeft(fi)
-      case Right(nvf: NoVirusFound)              =>
-
+      case Left(fi: FileInfected) => Future.successful(Left(FileRejected(Left(fi))))
+      case Right(nvf: NoVirusFound) =>
         fileType(location, objectMetadata) map {
-          case Left(ift: IncorrectFileType)      => FileRejected.left(nvf, ift)
-          case Right(FileAllowed(mime, timings)) => FileRejected.right(FileValidationSuccess(nvf.checksum,mime,nvf.virusScanTimings,timings))
+          case Left(ift: IncorrectFileType) => Left(FileRejected(Right(nvf), Some(ift)))
+          case Right(FileAllowed(mime, timings)) =>
+            Right(FileValidationSuccess(nvf.checksum, mime, nvf.virusScanTimings, timings))
         }
     }
   }
 
-  private def virusScan(location: S3ObjectLocation,
-                        objectMetadata: InboundObjectMetadata)
-                       (implicit ld: LoggingDetails): Future[Either[FileValidationFailure, NoVirusFound]] =
-
+  private def virusScan(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata)(
+    implicit ld: LoggingDetails): Future[Either[FileInfected, NoVirusFound]] =
     fileManager.withObjectContent(location) { objectContent: ObjectContent =>
       virusScanningService.scan(location, objectContent, objectMetadata)
     }
 
-  private def fileType(location: S3ObjectLocation,
-                       objectMetadata: InboundObjectMetadata)
-                      (implicit ld: LoggingDetails): Future[Either[FileValidationFailure, FileAllowed]] =
-
+  private def fileType(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata)(
+    implicit ld: LoggingDetails): Future[Either[IncorrectFileType, FileAllowed]] =
     fileManager.withObjectContent(location) { objectContent: ObjectContent =>
       fileTypeCheckingService.scan(location, objectContent, objectMetadata)
     }

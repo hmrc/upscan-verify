@@ -82,7 +82,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
         .thenReturn(Future.successful(processingResult))
 
       when(scanningResultHandler.handleCheckingResult(
-        any[InboundObjectDetails], any[Either[FileValidationFailure, FileValidationSuccess]], any[Instant])(any[LoggingDetails]))
+        any[InboundObjectDetails], any[Either[FileRejected, FileValidationSuccess]], any[Instant])(any[LoggingDetails]))
         .thenReturn(Future.successful(()))
 
       When("message is handled")

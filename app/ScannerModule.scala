@@ -15,12 +15,12 @@
  */
 
 import java.time.Clock
-
 import config.{PlayBasedServiceConfiguration, PlayClamAvConfig, ServiceConfiguration}
 import connectors.aws.{S3EventParser, S3FileManager, SqsQueueConsumer}
 import play.api.inject.{Binding, Module}
 import play.api.{Configuration, Environment}
 import services._
+import services.tika.TikaMimeTypeDetector
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 
 class ScannerModule extends Module {
@@ -36,7 +36,7 @@ class ScannerModule extends Module {
       bind[ScanningService].to[ClamAvScanningService],
       bind[FileManager].to[S3FileManager],
       bind[RejectionNotifier].toInstance(LoggingRejectionNotifier),
-      bind[FileTypeDetector].to[TikaFileTypeDetector],
+      bind[MimeTypeDetector].to[TikaMimeTypeDetector],
       bind[ChecksumComputingInputStreamFactory].toInstance(SHA256ChecksumComputingInputStreamFactory),
       bind[Clock].toInstance(Clock.systemDefaultZone())
     )

@@ -34,7 +34,10 @@ class FileNameValidator(configuration: Configuration) {
   private val mimeTypes = configuration.get[Map[String, Seq[String]]]("allowedExtensions")
 
   def validate(mimeType: MimeType, filename: String): Either[FileExtension, Unit] =
-    fileExtension(filename).fold(().asRight[FileExtension])(validateMimeType(mimeType))
+    {
+      println(s"validate mimeType= $mimeTypes")
+      fileExtension(filename).fold(().asRight[FileExtension])(validateMimeType(mimeType))
+    }
 
   private def fileExtension(filename: String): Option[String] = Option(FilenameUtils.getExtension(filename)).filter(_.nonEmpty)
 

@@ -86,20 +86,23 @@ class FileTypeCheckingService @Inject()(
     consumingService: Option[String],
     location: S3ObjectLocation,
     maybeFilename: Option[String])(implicit ld: LoggingDetails, timer: Timer): Either[FileTypeError, Unit] =
-    maybeFilename
-      .map { filename =>
-        fileNameValidator
-          .validate(mimeType, filename)
-          .leftMap { extension =>
-            withLoggingDetails(ld) {
-              logger.warn(
-                s"File with extension=[$extension] is not allowed for MIME type=[$mimeType]. consumingService=[$consumingService], key=[${location.objectKey}]")
+    {
+      logger.info(s"validateFileExtension - file name = $maybeFilename")
+      maybeFilename
+        .map { filename =>
+          fileNameValidator
+            .validate(mimeType, filename)
+            .leftMap { extension =>
+              withLoggingDetails(ld) {
+                logger.warn(
+                  s"File with extension=[$extension] is not allowed for MIME type=[$mimeType]. consumingService=[$consumingService], key=[${location.objectKey}]")
+              }
+              metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
+              NotAllowedFileExtension(mimeType, extension, consumingService, timer())
             }
-            metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
-            NotAllowedFileExtension(mimeType, extension, consumingService, timer())
-          }
-      }
-      .getOrElse(Right(()))
+        }
+        .getOrElse(Right(()))
+    }
 
   private def addCheckingTimeMetrics(implicit timer: Timer) {
     val interval = timer().difference

@@ -17,9 +17,9 @@
 package connectors.aws
 
 import java.io.InputStream
-
 import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.model.{CopyObjectRequest, GetObjectMetadataRequest, GetObjectRequest, ObjectMetadata => S3ObjectMetadata}
+import com.amazonaws.services.s3.model.{CopyObjectRequest, GetObjectMetadataRequest, GetObjectRequest, S3Object, ObjectMetadata => S3ObjectMetadata}
+
 import javax.inject.Inject
 import model.S3ObjectLocation
 import play.api.Logging
@@ -48,7 +48,8 @@ class S3FileManager @Inject()(s3Client: AmazonS3)(implicit ec: ExecutionContext)
     Future {
       s3Client.copyObject(request)
       withLoggingDetails(loggingDetails) {
-        logger.debug(s"Copied object with Key=[${sourceLocation.objectKey}] from [$sourceLocation] to [$targetLocation].")
+        logger.debug(
+          s"Copied object with Key=[${sourceLocation.objectKey}] from [$sourceLocation] to [$targetLocation].")
       }
     }
 
@@ -89,20 +90,20 @@ class S3FileManager @Inject()(s3Client: AmazonS3)(implicit ec: ExecutionContext)
 
   override def withObjectContent[T](objectLocation: S3ObjectLocation)(function: ObjectContent => Future[T])(
     implicit loggingDetails: LoggingDetails): Future[T] =
-    Future {
-      val getObjectRequest = new GetObjectRequest(objectLocation.bucket, objectLocation.objectKey)
-      objectLocation.objectVersion.foreach(getObjectRequest.setVersionId)
-      val fileFromLocation = s3Client.getObject(getObjectRequest)
-      val content =
-        ObjectContent(fileFromLocation.getObjectContent, fileFromLocation.getObjectMetadata.getContentLength)
-      withLoggingDetails(loggingDetails) {
+    for {
+      s3Object <- getS3Object(objectLocation)
+      content = ObjectContent(s3Object.getObjectContent, s3Object.getObjectMetadata.getContentLength)
+      _ = withLoggingDetails(loggingDetails) {
         logger.debug(s"Fetched content for Key=[${objectLocation.objectKey}].")
       }
+      result <- function(content).andThen { case _ => s3Object.close() }
+    } yield result
 
-      val result: Future[T] = function(content)
-      result.onComplete(_ => fileFromLocation.close())
-      result
-    }.flatMap(f => f)
+  private def getS3Object(objectLocation: S3ObjectLocation): Future[S3Object] = Future {
+    val getObjectRequest = new GetObjectRequest(objectLocation.bucket, objectLocation.objectKey)
+    objectLocation.objectVersion.foreach(getObjectRequest.setVersionId)
+    s3Client.getObject(getObjectRequest)
+  }
 
   override def getObjectMetadata(objectLocation: S3ObjectLocation)(
     implicit loggingDetails: LoggingDetails): Future[services.InboundObjectMetadata] = {
@@ -116,7 +117,10 @@ class S3FileManager @Inject()(s3Client: AmazonS3)(implicit ec: ExecutionContext)
       withLoggingDetails(loggingDetails) {
         logger.debug(s"Fetched metadata for Key=[${objectLocation.objectKey}].")
       }
-      InboundObjectMetadata(metadata.getUserMetadata.asScala.toMap, metadata.getLastModified.toInstant, metadata.getContentLength)
+      InboundObjectMetadata(
+        metadata.getUserMetadata.asScala.toMap,
+        metadata.getLastModified.toInstant,
+        metadata.getContentLength)
     }
   }
 }

@@ -16,77 +16,66 @@
 
 package services.tika
 
-import java.io.ByteArrayInputStream
 import org.scalatest.{Assertions, EitherValues, GivenWhenThen}
 import services.MimeType
-import services.MimeTypeDetector.MimeTypeDetectionError.NotAllowedFileExtension
 import test.UnitSpec
+
+import java.io.ByteArrayInputStream
 
 class TikaMimeTypeDetectorSpec extends UnitSpec with Assertions with GivenWhenThen with EitherValues {
 
   "TikaFileTypeDetector" should {
 
-    val tikaMimeTypeDetector = new TikaMimeTypeDetector(new FileNameValidator)
+    val tikaMimeTypeDetector = new TikaMimeTypeDetector
 
     "properly detect XML file" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.xml"), None).right.value shouldBe MimeType(
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.xml"), None) shouldBe MimeType(
         "application/xml")
     }
 
     "properly detect XML file without XML declaration" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test2.xml"), None).right.value shouldBe MimeType(
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test2.xml"), None) shouldBe MimeType(
         "application/xml")
     }
 
     "properly detect JPEG file" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.jpg"), None).right.value shouldBe MimeType(
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.jpg"), None) shouldBe MimeType(
         "image/jpeg")
     }
 
     "properly handle empty file" in {
-      tikaMimeTypeDetector.detect(new ByteArrayInputStream(Array.emptyByteArray), None).right.value shouldBe MimeType(
+      tikaMimeTypeDetector.detect(new ByteArrayInputStream(Array.emptyByteArray), None) shouldBe MimeType(
         "application/octet-stream")
     }
 
     "properly detect PNG file" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.png"), None).right.value shouldBe MimeType(
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.png"), None) shouldBe MimeType(
         "image/png")
     }
 
     "properly detect PDF file" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.pdf"), None).right.value shouldBe MimeType(
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.pdf"), None) shouldBe MimeType(
         "application/pdf")
     }
 
     "properly detect Open Office Writer file" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.odt"), None).right.value shouldBe MimeType(
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.odt"), None) shouldBe MimeType(
         "application/vnd.oasis.opendocument.text")
     }
 
     "properly detect MS-Word file" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.docx"), None).right.value shouldBe MimeType(
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.docx"), None) shouldBe MimeType(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     }
 
     "properly detect XHTML file" in {
       tikaMimeTypeDetector
-        .detect(this.getClass.getResourceAsStream("/test.xhtml"), Some("test.xhtml"))
-        .right
-        .value shouldBe MimeType("application/xhtml+xml")
-    }
-
-    "detect text files with non standard extension as application/octet-stream" in {
-      tikaMimeTypeDetector
-        .detect(new ByteArrayInputStream("""MsgBox "Hello World"""".getBytes), Some("test.vbe"))
-        .left
-        .value shouldBe NotAllowedFileExtension(MimeType("text/plain"), "vbe")
+        .detect(this.getClass.getResourceAsStream("/test.xhtml"), Some("test.xhtml")) shouldBe MimeType("application/xhtml+xml")
     }
 
     "detect files with html extension as html" in {
       tikaMimeTypeDetector
-        .detect(new ByteArrayInputStream("""<html><head></head></html>"""".getBytes), Some("test.html"))
-        .right
-        .value shouldBe MimeType("text/html")
+        .detect(new ByteArrayInputStream("""<html><head></head></html>"""".getBytes), Some("test.html")) shouldBe MimeType("text/html")
     }
   }
 }

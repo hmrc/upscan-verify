@@ -16,11 +16,8 @@
 
 package services
 
-import java.io.InputStream
-import java.nio.charset.StandardCharsets.UTF_8
-import java.time.Instant
-
 import config.ServiceConfiguration
+import model.FileTypeError.{NotAllowedFileExtension, NotAllowedMimeType}
 import model._
 import org.apache.commons.io.IOUtils
 import org.mockito.captor.ArgCaptor
@@ -30,6 +27,9 @@ import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.http.logging.LoggingDetails
 import util.logging.LoggingDetails
 
+import java.io.InputStream
+import java.nio.charset.StandardCharsets.UTF_8
+import java.time.Instant
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -343,7 +343,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       result.value.get.isFailure shouldBe true
     }
 
-    "Add error and metadata to quarantine bucket, and delete incorrect file in case of invalid file types" in {
+    "Add error and metadata to quarantine bucket, and delete incorrect file in case of invalid file mime type" in {
       val fileManager: FileManager             = mock[FileManager]
       val rejectionNotifier: RejectionNotifier = mock[RejectionNotifier]
       val clientIp                             = "127.0.0.1"
@@ -372,7 +372,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
             .handleCheckingResult(
               InboundObjectDetails(inboundObjectMetadata, clientIp, file),
               Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)),
-                                Some(IncorrectFileType(mimeType, serviceName, fileTypeTimings)))), receivedAt
+                                Some(NotAllowedMimeType(mimeType, serviceName, fileTypeTimings)))), receivedAt
             ),
           10.seconds
         )
@@ -392,6 +392,62 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
           eqTo(outboundObjectMetadata))(any[LoggingDetails])
       IOUtils.toString(streamCaptor.value, UTF_8) shouldBe
         """{"failureReason":"REJECTED","message":"MIME type [application/pdf] is not allowed for service: [valid-test-service]"}"""
+      locationCaptor.value.bucket shouldBe configuration.quarantineBucket
+
+      And("incorrectly typed file is deleted")
+      verify(fileManager).delete(file)
+      verifyNoMoreInteractions(fileManager)
+    }
+
+    "Add error and metadata to quarantine bucket, and delete incorrect file in case of invalid file extension" in {
+      val fileManager: FileManager             = mock[FileManager]
+      val rejectionNotifier: RejectionNotifier = mock[RejectionNotifier]
+      val clientIp                             = "127.0.0.1"
+      val handler                              = new FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
+
+      Given("there is a file with extension which is not allowed for the file's mime-type")
+      val file     = S3ObjectLocation("bucket", "file", None)
+      val mimeType = MimeType("text/plain")
+
+      val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue", "original-filename" -> "foo.foo"), uploadedAt, fileSize)
+      val inboundObjectDetails   = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
+      val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectDetails, fileTypeRejectedExpectedCheckpoints)
+
+      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(any[LoggingDetails]))
+        .thenReturn(Future.successful(()))
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(any[LoggingDetails]))
+        .thenReturn(Future.successful(()))
+      when(fileManager.delete(file)).thenReturn(Future.successful(()))
+
+      When("checking incorrectly typed file")
+      val serviceName: Option[String] = Some("valid-test-service")
+      val checksum: String = "CHECKSUM"
+      Await
+        .result(
+          handler
+            .handleCheckingResult(
+              InboundObjectDetails(inboundObjectMetadata, clientIp, file),
+              Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)),
+                                Some(NotAllowedFileExtension(mimeType, "foo", serviceName, fileTypeTimings)))), receivedAt
+            ),
+          10.seconds
+        )
+
+      Then("notification is created")
+      verify(rejectionNotifier).notifyInvalidFileType(eqTo(file), eqTo(checksum), eqTo(fileSize), eqTo(uploadedAt), any[String], eqTo(serviceName))(eqTo(ld))
+
+      And("file metadata and error details are stored in the quarantine bucket")
+
+      val locationCaptor = ArgCaptor[S3ObjectLocation]
+      val streamCaptor = ArgCaptor[InputStream]
+      verify(fileManager)
+        .writeObject(
+          eqTo(file),
+          locationCaptor,
+          streamCaptor,
+          eqTo(outboundObjectMetadata))(any[LoggingDetails])
+      IOUtils.toString(streamCaptor.value, UTF_8) shouldBe
+        """{"failureReason":"REJECTED","message":"File extension [foo] is not allowed for mime-type [text/plain], service: [valid-test-service]"}"""
       locationCaptor.value.bucket shouldBe configuration.quarantineBucket
 
       And("incorrectly typed file is deleted")
@@ -428,7 +484,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
             .handleCheckingResult(
               InboundObjectDetails(inboundObjectMetadata, clientIp, file),
               Left(FileRejected(Right(NoVirusFound("1234567890", virusScanTimings)),
-                   Some(IncorrectFileType(mimeType, Some("valid-test-service"), fileTypeTimings)))), receivedAt
+                   Some(NotAllowedMimeType(mimeType, Some("valid-test-service"), fileTypeTimings)))), receivedAt
             ),
           10.seconds
         )

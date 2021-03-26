@@ -17,6 +17,7 @@
 package services
 
 import config.ServiceConfiguration
+import model.FileTypeError.{NotAllowedFileExtension, NotAllowedMimeType}
 import model._
 import play.api.Logging
 import play.api.libs.json.Json
@@ -49,8 +50,15 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager,
       case Left(FileRejected(Left(FileInfected(errorMessage, checksum, virusScanTimings)), None)) =>
         handleInfected(objectDetails, errorMessage)(checksum, messageReceivedAt, virusScanTimings)
 
-      case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(IncorrectFileType(mime, consumingService, fileTypeTimings)))) =>
-        handleIncorrectType(objectDetails, mime, consumingService)(checksum, messageReceivedAt, virusScanTimings, fileTypeTimings)
+      case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(NotAllowedMimeType(mime, consumingService, fileTypeTimings)))) =>
+        val errorMessage =
+          s"MIME type [${mime.value}] is not allowed for service: [${consumingService.getOrElse("No service name provided")}]"
+        handleFileTypeError(objectDetails, errorMessage, consumingService)(checksum, messageReceivedAt, virusScanTimings, fileTypeTimings)
+
+      case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(NotAllowedFileExtension(mime, extension, consumingService, fileTypeTimings)))) =>
+        val errorMessage =
+          s"File extension [$extension] is not allowed for mime-type [${mime.value}], service: [${consumingService.getOrElse("No service name provided")}]"
+        handleFileTypeError(objectDetails, errorMessage, consumingService)(checksum, messageReceivedAt, virusScanTimings, fileTypeTimings)
 
       case _ => Future.successful(withLoggingDetails(ld) {
         logger.error(s"Unexpected match result for Key=[${objectDetails.location.objectKey}] Result=[$result]")
@@ -111,14 +119,12 @@ class FileCheckingResultHandler @Inject()(fileManager: FileManager,
     } yield ()
   }
 
-  private def handleIncorrectType(details: InboundObjectDetails, mimeType: MimeType, serviceName: Option[String])
+  private def handleFileTypeError(details: InboundObjectDetails, errorMessage: String, serviceName: Option[String])
                                  (checksum: String, messageReceivedAt: Instant, virusScanTimings: Timings, fileTypeTimings: Timings)
                                  (implicit ec: ExecutionContext, ld: LoggingDetails): Future[Unit] = {
 
     def metadata(key: String): Option[(String,String)] = details.metadata.items.get(key).map(s"x-amz-meta-${key}" -> _)
 
-    val errorMessage =
-      s"MIME type [${mimeType.value}] is not allowed for service: [${serviceName.getOrElse("No service name provided")}]"
     val fileCheckingError = ErrorMessage(Rejected, errorMessage)
     val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
     val targetLocation =

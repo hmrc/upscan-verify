@@ -27,7 +27,7 @@ trait WithIncrementingClock extends BeforeAndAfterEach { this: Suite =>
   lazy val zoneId        = ZoneId.systemDefault()
   lazy val tickIncrement = Duration.ofSeconds(1)
 
-  lazy val clock         = new IncrementingClock(Clock.fixed(clockStart, zoneId).millis(), tickIncrement)
+  implicit lazy val clock         = new IncrementingClock(Clock.fixed(clockStart, zoneId).millis(), tickIncrement)
 
   override protected def beforeEach(): Unit = {
     clock.reset()

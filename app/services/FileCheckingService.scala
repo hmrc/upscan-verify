@@ -16,12 +16,12 @@
 
 package services
 
-import javax.inject.Inject
 import model._
 import play.api.Logger
 import uk.gov.hmrc.http.logging.LoggingDetails
 import util.logging.WithLoggingDetails.withLoggingDetails
 
+import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 
 class FileCheckingService @Inject()(
@@ -40,7 +40,7 @@ class FileCheckingService @Inject()(
       case Left(fi: FileInfected) => Future.successful(Left(FileRejected(Left(fi))))
       case Right(nvf: NoVirusFound) =>
         fileType(location, objectMetadata) map {
-          case Left(ift: IncorrectFileType) => Left(FileRejected(Right(nvf), Some(ift)))
+          case Left(ift) => Left(FileRejected(Right(nvf), Some(ift)))
           case Right(FileAllowed(mime, timings)) =>
             Right(FileValidationSuccess(nvf.checksum, mime, nvf.virusScanTimings, timings))
         }
@@ -54,7 +54,7 @@ class FileCheckingService @Inject()(
     }
 
   private def fileType(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata)(
-    implicit ld: LoggingDetails): Future[Either[IncorrectFileType, FileAllowed]] =
+    implicit ld: LoggingDetails): Future[Either[FileTypeError, FileAllowed]] =
     fileManager.withObjectContent(location) { objectContent: ObjectContent =>
       fileTypeCheckingService.scan(location, objectContent, objectMetadata)
     }

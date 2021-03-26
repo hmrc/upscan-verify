@@ -16,9 +16,10 @@
 
 package services
 
+import model.FileTypeError.NotAllowedMimeType
+
 import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
-
 import model._
 import org.scalatest.GivenWhenThen
 import test.{UnitSpec, WithIncrementingClock}
@@ -113,14 +114,13 @@ class FileCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithIncre
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant())))))
 
-      when(fileTypeCheckingService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Left(IncorrectFileType(MimeType("application/xml"), Some("valid-test-service"), Timings(clock.instant(), clock.instant())))))
+      when(fileTypeCheckingService.scan(location, content, metadata)).thenReturn(Future.successful(Left(NotAllowedMimeType(MimeType("application/xml"), Some("valid-test-service"), Timings(clock.instant(), clock.instant())))))
 
       Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe Left(
 
         FileRejected(
           Right(NoVirusFound("CHECKSUM", Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1)))),
-          Some(IncorrectFileType(
+          Some(NotAllowedMimeType(
             MimeType("application/xml"),
             Some("valid-test-service"),
             Timings(clockStart.plusSeconds(2), clockStart.plusSeconds(3))

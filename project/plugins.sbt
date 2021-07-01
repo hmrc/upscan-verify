@@ -1,23 +1,12 @@
-import sbt._
+resolvers += MavenRepository("HMRC-open-artefacts-maven2", "https://open.artefacts.tax.service.gov.uk/maven2")
+resolvers += Resolver.url("HMRC-open-artefacts-ivy2", url("https://open.artefacts.tax.service.gov.uk/ivy2"))(
+  Resolver.ivyStylePatterns)
 
-resolvers += Resolver.bintrayIvyRepo("hmrc", "sbt-plugin-releases")
-resolvers += Resolver.bintrayIvyRepo("hmrc-digital", "sbt-plugin-releases")
-resolvers += Resolver.bintrayRepo("hmrc", "releases")
-resolvers += Resolver.bintrayRepo("hmrc-digital", "releases")
-
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.13")
-
-addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.7.5")
-
-addSbtPlugin("uk.gov.hmrc" % "sbt-auto-build" % "2.12.0")
-
-addSbtPlugin("uk.gov.hmrc" % "sbt-settings" % "4.6.0")
-
-addSbtPlugin("uk.gov.hmrc" % "sbt-artifactory" % "1.12.0")
-
-addSbtPlugin("uk.gov.hmrc" % "sbt-git-versioning" % "2.2.0")
+addSbtPlugin("uk.gov.hmrc" % "sbt-auto-build" % "3.2.0")
 
 addSbtPlugin("uk.gov.hmrc" % "sbt-distributables" % "2.1.0")
+
+addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.7.5")
 
 addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.6.1")
 

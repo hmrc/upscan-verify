@@ -26,6 +26,7 @@ import org.scalatest.{Assertions, GivenWhenThen}
 import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
+import uk.gov.hmrc.http.logging.LoggingDetails
 import util.logging.LoggingDetails
 
 import scala.concurrent.duration._
@@ -55,7 +56,7 @@ class ClamAvScanningServiceSpec extends UnitSpec with Assertions with GivenWhenT
 
     "return success if file can be retrieved and scan result clean" in {
       val client = mock[ClamAntiVirus]
-      when(client.sendAndCheck(any[InputStream], any[Int])(any[ExecutionContext])).thenReturn(Future.successful(Clean))
+      when(client.sendAndCheck(any[String], any[InputStream], any[Int])(any[LoggingDetails], any[ExecutionContext])).thenReturn(Future.successful(Clean))
 
       val factory = mock[ClamAntiVirusFactory]
       when(factory.getClient()).thenReturn(client)
@@ -86,7 +87,8 @@ class ClamAvScanningServiceSpec extends UnitSpec with Assertions with GivenWhenT
 
     "return infected if file can be retrieved and scan result infected" in {
       val client = mock[ClamAntiVirus]
-      when(client.sendAndCheck(any[InputStream], any[Int])(any[ExecutionContext])).thenReturn(Future.successful(Infected("File dirty")))
+      when(client.sendAndCheck(any[String], any[InputStream], any[Int])(any[LoggingDetails], any[ExecutionContext]))
+        .thenReturn(Future.successful(Infected("File dirty")))
 
       val factory = mock[ClamAntiVirusFactory]
       when(factory.getClient()).thenReturn(client)

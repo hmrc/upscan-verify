@@ -51,16 +51,16 @@ private[clamav] class ClamAntiVirusImpl(clamAvConfig: ClamAvConfig)(implicit ec:
       val start = System.currentTimeMillis()
         for {
           _               <- sendHandshake(connection)
-          handshakeMillis =  System.currentTimeMillis() - start
-          _               =  withLoggingDetails(ld)(logger.info(s"Send handshake for Key=[$objectKey] took ${handshakeMillis}ms"))
+          handshakeTimeMs =  System.currentTimeMillis()
+          _               =  withLoggingDetails(ld)(logger.info(s"Send clamav handshake for Key=[$objectKey] took ${handshakeTimeMs - start}ms"))
           _               <- sendRequest(connection)(inputStream, length)
-          sendReqMillis   =  System.currentTimeMillis() - handshakeMillis
-          _               =  withLoggingDetails(ld)(logger.info(s"Send request for Key=[$objectKey] took ${sendReqMillis}ms"))
+          sendReqTimeMs   =  System.currentTimeMillis()
+          _               =  withLoggingDetails(ld)(logger.info(s"Send clamav request for Key=[$objectKey] took ${sendReqTimeMs - handshakeTimeMs}ms"))
           response        <- readResponse(connection)
-          readResMillis   =  System.currentTimeMillis() - sendReqMillis
-          _               =  withLoggingDetails(ld)(logger.info(s"Read response for Key=[$objectKey] took ${readResMillis}ms"))
+          readResTimeMs   =  System.currentTimeMillis()
+          _               =  withLoggingDetails(ld)(logger.info(s"Read clamav response for Key=[$objectKey] took ${readResTimeMs - sendReqTimeMs}ms"))
           parsedResponse  <- parseResponse(response)
-          _               =  withLoggingDetails(ld)(logger.info(s"Parse response for Key=[$objectKey] took ${System.currentTimeMillis() - readResMillis}ms"))
+          _               =  withLoggingDetails(ld)(logger.info(s"Parse clamav response for Key=[$objectKey] took ${System.currentTimeMillis() - readResTimeMs}ms"))
         } yield parsedResponse
       }
     } else {

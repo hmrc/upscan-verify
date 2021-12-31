@@ -24,6 +24,8 @@ import org.apache.commons.io.IOUtils
 import play.api.Logger
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 import uk.gov.hmrc.clamav.model.{ClamAvException, Clean, Infected, ScanningResult}
+import uk.gov.hmrc.http.logging.LoggingDetails
+import util.logging.WithLoggingDetails.withLoggingDetails
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -39,22 +41,26 @@ private[clamav] class ClamAntiVirusImpl(clamAvConfig: ClamAvConfig)(implicit ec:
   private val VirusFoundResponse     = "stream\\: (.+) FOUND\u0000".r
   private val ParseableErrorResponse = "(.+) ERROR\u0000".r
 
-  override def sendAndCheck(inputStream: InputStream, length: Int)(implicit ec: ExecutionContext): Future[ScanningResult] =
+  override def sendAndCheck(
+    objectKey: String,
+    inputStream: InputStream,
+    length: Int
+  )(implicit ld: LoggingDetails, ec: ExecutionContext): Future[ScanningResult] =
     if (length > 0) {
       ClamAvSocket.withSocket(clamAvConfig) { connection =>
       val start = System.currentTimeMillis()
         for {
           _               <- sendHandshake(connection)
           handshakeMillis =  System.currentTimeMillis() - start
-          _               =  logger.info(s"Send handshake took ${handshakeMillis}ms")
+          _               =  withLoggingDetails(ld)(logger.info(s"Send handshake for Key=[$objectKey] took ${handshakeMillis}ms"))
           _               <- sendRequest(connection)(inputStream, length)
           sendReqMillis   =  System.currentTimeMillis() - handshakeMillis
-          _               =  logger.info(s"Send request took ${sendReqMillis}ms")
+          _               =  withLoggingDetails(ld)(logger.info(s"Send request for Key=[$objectKey] took ${sendReqMillis}ms"))
           response        <- readResponse(connection)
           readResMillis   =  System.currentTimeMillis() - sendReqMillis
-          _               =  logger.info(s"Read response took ${readResMillis}ms")
+          _               =  withLoggingDetails(ld)(logger.info(s"Read response for Key=[$objectKey] took ${readResMillis}ms"))
           parsedResponse  <- parseResponse(response)
-          _               =  logger.info(s"Parse response took ${System.currentTimeMillis() - readResMillis}ms")
+          _               =  withLoggingDetails(ld)(logger.info(s"Parse response for Key=[$objectKey] took ${System.currentTimeMillis() - readResMillis}ms"))
         } yield parsedResponse
       }
     } else {

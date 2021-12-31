@@ -53,7 +53,7 @@ class ClamAvScanningService @Inject()(
     val inputStream = messageDigestComputingInputStreamFactory.create(fileContent.inputStream)
 
     for {
-      scanResult <- antivirusClient.sendAndCheck(inputStream, fileContent.length.toInt).map {
+      scanResult <- antivirusClient.sendAndCheck(location.objectKey, inputStream, fileContent.length.toInt).map {
                      case Clean =>
                        metrics.defaultRegistry.counter("cleanFileUpload").inc()
                        Right(NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))

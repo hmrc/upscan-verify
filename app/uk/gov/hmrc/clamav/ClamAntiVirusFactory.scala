@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 
 import javax.inject.Inject
 import org.apache.commons.io.IOUtils
+import play.api.Logger
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 import uk.gov.hmrc.clamav.model.{ClamAvException, Clean, Infected, ScanningResult}
 
@@ -32,6 +33,7 @@ class ClamAntiVirusFactory @Inject()(clamAvConfig: ClamAvConfig)(implicit ec: Ex
 
 private[clamav] class ClamAntiVirusImpl(clamAvConfig: ClamAvConfig)(implicit ec: ExecutionContext) extends ClamAntiVirus {
 
+  private val logger                 = Logger(this.getClass)
   private val Handshake              = "zINSTREAM\u0000"
   private val FileCleanResponse      = "stream: OK\u0000"
   private val VirusFoundResponse     = "stream\\: (.+) FOUND\u0000".r
@@ -40,11 +42,19 @@ private[clamav] class ClamAntiVirusImpl(clamAvConfig: ClamAvConfig)(implicit ec:
   override def sendAndCheck(inputStream: InputStream, length: Int)(implicit ec: ExecutionContext): Future[ScanningResult] =
     if (length > 0) {
       ClamAvSocket.withSocket(clamAvConfig) { connection =>
+      val start = System.currentTimeMillis()
         for {
-          _              <- sendHandshake(connection)
-          _              <- sendRequest(connection)(inputStream, length)
-          response       <- readResponse(connection)
-          parsedResponse <- parseResponse(response)
+          _               <- sendHandshake(connection)
+          handshakeMillis =  System.currentTimeMillis() - start
+          _               =  logger.info(s"Send handshake took ${handshakeMillis}ms")
+          _               <- sendRequest(connection)(inputStream, length)
+          sendReqMillis   =  System.currentTimeMillis() - handshakeMillis
+          _               =  logger.info(s"Send request took ${sendReqMillis}ms")
+          response        <- readResponse(connection)
+          readResMillis   =  System.currentTimeMillis() - sendReqMillis
+          _               =  logger.info(s"Read response took ${readResMillis}ms")
+          parsedResponse  <- parseResponse(response)
+          _               =  logger.info(s"Parse response took ${System.currentTimeMillis() - readResMillis}ms")
         } yield parsedResponse
       }
     } else {
@@ -74,6 +84,6 @@ private[clamav] class ClamAntiVirusImpl(clamAvConfig: ClamAvConfig)(implicit ec:
       case VirusFoundResponse(virus)     => Future.successful(Infected(virus))
       case ParseableErrorResponse(error) => Future.failed(new ClamAvException(error))
       case unparseableResponse =>
-        Future.failed(new ClamAvException(s"Unparseable response from ClamAV: $unparseableResponse"))
+        Future.failed(new ClamAvException(s"Unparseable response from ClamAV: [$unparseableResponse]"))
     }
 }

@@ -47,6 +47,7 @@ private[clamav] object ClamAvSocket {
   private def openSocket(config : ClamAvConfig)(implicit ec : ExecutionContext): Future[ClamAvSocket] = Future {
     val sock = new Socket
     sock.setSoTimeout(config.timeout)
+    sock.setKeepAlive(true)
 
     val address: InetSocketAddress = new InetSocketAddress(config.host, config.port)
     sock.connect(address)

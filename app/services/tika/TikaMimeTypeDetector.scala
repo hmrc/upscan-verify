@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 HM Revenue & Customs
+ * Copyright 2022 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package services.tika
 
 import org.apache.tika.config.TikaConfig
-import org.apache.tika.metadata.{Metadata, TikaMetadataKeys}
+import org.apache.tika.metadata.{Metadata, TikaCoreProperties}
 import services.{MimeType, MimeTypeDetector}
 
 import java.io.InputStream
@@ -35,7 +35,7 @@ class TikaMimeTypeDetector extends MimeTypeDetector {
     val tikaInputStream = TikaInputStream.get(inputStream)
 
     val metadata = new Metadata()
-    fileName.foreach(metadata.add(TikaMetadataKeys.RESOURCE_NAME_KEY, _))
+    fileName.foreach(name => metadata.add(TikaCoreProperties.RESOURCE_NAME_KEY, name))
     val detectionResult = detector.detect(tikaInputStream, metadata)
 
     tikaInputStream.close()

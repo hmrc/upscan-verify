@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 HM Revenue & Customs
+ * Copyright 2022 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package services.tika.detectors
 
 import org.apache.tika.detect.{Detector, XmlRootExtractor}
-import org.apache.tika.metadata.{Metadata, TikaMetadataKeys}
+import org.apache.tika.metadata.{Metadata, TikaCoreProperties}
 import org.apache.tika.mime.MediaType
 
 import java.io.InputStream
@@ -39,6 +39,8 @@ class XmlDetector extends Detector {
       }
     }
 
-  private def filenameHasHtmlExtension(metadata: Metadata): Boolean =
-    Option(metadata.get(TikaMetadataKeys.RESOURCE_NAME_KEY)).exists(_.toLowerCase.matches(".*\\.htm(l)?"))
+  private def filenameHasHtmlExtension(metadata: Metadata): Boolean = {
+
+    Option(metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY)).exists(_.toLowerCase.matches(".*\\.htm(l)?"))
+  }
 }

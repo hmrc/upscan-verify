@@ -10,8 +10,8 @@ object AppDependencies {
     "com.amazonaws"      % "aws-java-sdk-s3"           % "1.11.921",
     "com.amazonaws"      % "aws-java-sdk-sqs"          % "1.11.921",
     "com.amazonaws"      % "aws-java-sdk-ec2"          % "1.11.921",
-    "org.apache.tika"    % "tika-core"                 % "1.25",
-    "org.apache.tika"    % "tika-parsers"              % "1.25",
+    "org.apache.tika"    % "tika-core"                 % "2.4.0",
+    "org.apache.tika"    % "tika-parsers"              % "2.4.0",
     "commons-io"         % "commons-io"                % "2.8.0"
   )
 

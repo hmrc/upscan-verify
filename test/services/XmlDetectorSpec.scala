@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 HM Revenue & Customs
+ * Copyright 2022 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package services
 
 import java.io.{BufferedReader, ByteArrayInputStream, InputStream, InputStreamReader}
-import org.apache.tika.metadata.{Metadata, TikaMetadataKeys}
+import org.apache.tika.metadata.{Metadata, TikaCoreProperties}
 import org.apache.tika.mime.MediaType
 import org.scalatest.GivenWhenThen
 import services.tika.detectors.XmlDetector
@@ -49,13 +49,13 @@ class XmlDetectorSpec extends UnitSpec with GivenWhenThen {
 
     "detect file with .html extension as octet stream" in {
       val metadata = new Metadata()
-      metadata.add(TikaMetadataKeys.RESOURCE_NAME_KEY, "test.html")
+      metadata.add(TikaCoreProperties.RESOURCE_NAME_KEY, "test.html")
       xmlDetector.detect(new ByteArrayInputStream("""<html></html>""".getBytes), metadata) shouldBe MediaType.OCTET_STREAM
     }
 
     "detect file with .htm extension as octet stream" in {
       val metadata = new Metadata()
-      metadata.add(TikaMetadataKeys.RESOURCE_NAME_KEY, "test.htm")
+      metadata.add(TikaCoreProperties.RESOURCE_NAME_KEY, "test.htm")
       xmlDetector.detect(new ByteArrayInputStream("""<html></html>""".getBytes), metadata) shouldBe MediaType.OCTET_STREAM
     }
 

@@ -21,5 +21,12 @@ import java.io.InputStream
 case class MimeType(value: String) extends AnyVal
 
 trait MimeTypeDetector {
-  def detect(inputStream: InputStream, fileName: Option[String]): MimeType
+  def detect(inputStream: InputStream, fileName: Option[String]): DetectedMimeType
+}
+
+sealed trait DetectedMimeType
+
+object DetectedMimeType {
+  final case class Detected(value: MimeType) extends DetectedMimeType
+  final case class DefaultFallback(value: MimeType) extends DetectedMimeType
 }

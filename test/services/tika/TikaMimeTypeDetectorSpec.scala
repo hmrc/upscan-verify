@@ -17,6 +17,7 @@
 package services.tika
 
 import org.scalatest.{Assertions, EitherValues, GivenWhenThen}
+import services.DetectedMimeType.{DefaultFallback, Detected}
 import services.MimeType
 import test.UnitSpec
 
@@ -29,53 +30,54 @@ class TikaMimeTypeDetectorSpec extends UnitSpec with Assertions with GivenWhenTh
     val tikaMimeTypeDetector = new TikaMimeTypeDetector
 
     "properly detect XML file" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.xml"), None) shouldBe MimeType(
-        "application/xml")
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.xml"), None) shouldBe
+        Detected(MimeType("application/xml"))
     }
 
     "properly detect XML file without XML declaration" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test2.xml"), None) shouldBe MimeType(
-        "application/xml")
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test2.xml"), None) shouldBe
+        Detected(MimeType("application/xml"))
     }
 
     "properly detect JPEG file" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.jpg"), None) shouldBe MimeType(
-        "image/jpeg")
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.jpg"), None) shouldBe
+        Detected(MimeType("image/jpeg"))
     }
 
     "properly handle empty file" in {
-      tikaMimeTypeDetector.detect(new ByteArrayInputStream(Array.emptyByteArray), None) shouldBe MimeType(
-        "application/octet-stream")
+      tikaMimeTypeDetector.detect(new ByteArrayInputStream(Array.emptyByteArray), None) shouldBe
+        DefaultFallback(MimeType("application/octet-stream"))
     }
 
     "properly detect PNG file" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.png"), None) shouldBe MimeType(
-        "image/png")
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.png"), None) shouldBe
+        Detected(MimeType("image/png"))
     }
 
     "properly detect PDF file" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.pdf"), None) shouldBe MimeType(
-        "application/pdf")
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.pdf"), None) shouldBe
+        Detected(MimeType("application/pdf"))
     }
 
     "properly detect Open Office Writer file" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.odt"), None) shouldBe MimeType(
-        "application/vnd.oasis.opendocument.text")
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.odt"), None) shouldBe
+        Detected(MimeType("application/vnd.oasis.opendocument.text"))
     }
 
     "properly detect MS-Word file" in {
-      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.docx"), None) shouldBe MimeType(
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.docx"), None) shouldBe
+        Detected(MimeType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
     }
 
     "properly detect XHTML file" in {
-      tikaMimeTypeDetector
-        .detect(this.getClass.getResourceAsStream("/test.xhtml"), Some("test.xhtml")) shouldBe MimeType("application/xhtml+xml")
+      tikaMimeTypeDetector.detect(this.getClass.getResourceAsStream("/test.xhtml"), Some("test.xhtml")) shouldBe
+        Detected(MimeType("application/xhtml+xml"))
     }
 
     "detect files with html extension as html" in {
       tikaMimeTypeDetector
-        .detect(new ByteArrayInputStream("""<html><head></head></html>"""".getBytes), Some("test.html")) shouldBe MimeType("text/html")
+        .detect(new ByteArrayInputStream("""<html><head></head></html>"""".getBytes), Some("test.html")) shouldBe
+          Detected(MimeType("text/html"))
     }
   }
 }

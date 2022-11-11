@@ -18,7 +18,7 @@ package services.tika
 
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.metadata.{Metadata, TikaCoreProperties}
-import services.{MimeType, MimeTypeDetector}
+import services.{DetectedMimeType, MimeType, MimeTypeDetector}
 
 import java.io.InputStream
 import javax.inject.Singleton
@@ -29,17 +29,25 @@ class TikaMimeTypeDetector extends MimeTypeDetector {
   private val config   = TikaConfig.getDefaultConfig
   private val detector = config.getDetector
 
-  def detect(inputStream: InputStream, fileName: Option[String]): MimeType = {
+  def detect(inputStream: InputStream, fileName: Option[String]): DetectedMimeType = {
     import org.apache.tika.io.TikaInputStream
 
     val tikaInputStream = TikaInputStream.get(inputStream)
 
     val metadata = new Metadata()
     fileName.foreach(name => metadata.add(TikaCoreProperties.RESOURCE_NAME_KEY, name))
+
     val detectionResult = detector.detect(tikaInputStream, metadata)
+    val mimeType        = MimeType(s"${detectionResult.getType}/${detectionResult.getSubtype}")
+
+    val detectedMimeType =
+      if (tikaInputStream.getLength > 0)
+        DetectedMimeType.Detected(mimeType)
+      else
+        DetectedMimeType.DefaultFallback(mimeType)
 
     tikaInputStream.close()
 
-    MimeType(s"${detectionResult.getType}/${detectionResult.getSubtype}")
+    detectedMimeType
   }
 }

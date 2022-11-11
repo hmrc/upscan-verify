@@ -48,17 +48,30 @@ class FileTypeCheckingService @Inject()(
 
     val consumingService = objectMetadata.consumingService
     val maybeFilename    = objectMetadata.originalFilename
-    val mimeType         = mimeTypeDetector.detect(objectContent.inputStream, maybeFilename)
+    val detectedMimeType = mimeTypeDetector.detect(objectContent.inputStream, maybeFilename)
 
     addCheckingTimeMetrics(endTimer)
 
-    val result = for {
-      _ <- validateMimeType(mimeType, consumingService, location)
-      _ <- validateFileExtension(mimeType, consumingService, location, maybeFilename)
-    } yield {
-      metrics.defaultRegistry.counter("validTypeFileUpload").inc()
-      FileAllowed(mimeType, endTimer())
-    }
+    val result =
+      detectedMimeType match {
+        case DetectedMimeType.Detected(mimeType) =>
+          for {
+            _ <- validateMimeType(mimeType, consumingService, location)
+            _ <- validateFileExtension(mimeType, consumingService, location, maybeFilename)
+          } yield {
+            metrics.defaultRegistry.counter("validTypeFileUpload").inc()
+            FileAllowed(mimeType, endTimer())
+          }
+        case DetectedMimeType.DefaultFallback(mimeType) =>
+          withLoggingDetails(ld) {
+            logger.info(
+              s"File with key=[${location.objectKey}] was uploaded with 0 bytes and as such is not subject to [$consumingService]'s permitted MIME types config"
+            )
+          }
+          metrics.defaultRegistry.counter("validTypeFileUpload").inc()
+          Right(FileAllowed(mimeType, endTimer()))
+      }
+
     Future.successful(result)
   }
 

@@ -17,7 +17,7 @@
 package services.tika
 
 import org.scalatest.{Assertions, EitherValues, GivenWhenThen}
-import services.DetectedMimeType.{DefaultFallback, Detected}
+import services.DetectedMimeType.{EmptyLength, Detected}
 import services.MimeType
 import test.UnitSpec
 
@@ -46,7 +46,7 @@ class TikaMimeTypeDetectorSpec extends UnitSpec with Assertions with GivenWhenTh
 
     "properly handle empty file" in {
       tikaMimeTypeDetector.detect(new ByteArrayInputStream(Array.emptyByteArray), None) shouldBe
-        DefaultFallback(MimeType("application/octet-stream"))
+        EmptyLength(MimeType("application/octet-stream"))
     }
 
     "properly detect PNG file" in {

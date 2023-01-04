@@ -44,35 +44,38 @@ class FileTypeCheckingService @Inject()(
   def scan(location: S3ObjectLocation, objectContent: ObjectContent, objectMetadata: InboundObjectMetadata)(
     implicit ld: LoggingDetails): Future[Either[FileTypeError, FileAllowed]] = {
 
-    implicit val endTimer = timer()
+    implicit val endTimer: Timer = timer()
 
     val consumingService = objectMetadata.consumingService
     val maybeFilename    = objectMetadata.originalFilename
     val detectedMimeType = mimeTypeDetector.detect(objectContent.inputStream, maybeFilename)
 
     addCheckingTimeMetrics(endTimer)
+    logZeroLengthFiles(detectedMimeType, location, consumingService)
 
-    val result =
-      detectedMimeType match {
-        case DetectedMimeType.Detected(mimeType) =>
-          for {
-            _ <- validateMimeType(mimeType, consumingService, location)
-            _ <- validateFileExtension(mimeType, consumingService, location, maybeFilename)
-          } yield {
-            metrics.defaultRegistry.counter("validTypeFileUpload").inc()
-            FileAllowed(mimeType, endTimer())
-          }
-        case DetectedMimeType.DefaultFallback(mimeType) =>
-          withLoggingDetails(ld) {
-            logger.info(
-              s"File with key=[${location.objectKey}] was uploaded with 0 bytes and as such is not subject to [$consumingService]'s permitted MIME types config"
-            )
-          }
-          metrics.defaultRegistry.counter("validTypeFileUpload").inc()
-          Right(FileAllowed(mimeType, endTimer()))
-      }
+    val mimeType = detectedMimeType.value
 
+    val result = for {
+      _ <- validateMimeType(mimeType, consumingService, location)
+      _ <- validateFileExtension(mimeType, consumingService, location, maybeFilename)
+    } yield {
+      metrics.defaultRegistry.counter("validTypeFileUpload").inc()
+      FileAllowed(mimeType, endTimer())
+    }
     Future.successful(result)
+  }
+
+  private def logZeroLengthFiles(detectedMimeType: DetectedMimeType, location: S3ObjectLocation, consumingService: Option[String])(
+    implicit ld: LoggingDetails): Unit = {
+    detectedMimeType match {
+      case _ :DetectedMimeType.EmptyLength =>
+        withLoggingDetails(ld) {
+          logger.info(
+            s"File with key=[${location.objectKey}] was uploaded with 0 bytes for consuming service [$consumingService]"
+          )
+        }
+      case _ => ()
+    }
   }
 
   private def validateMimeType(mimeType: MimeType, consumingService: Option[String], location: S3ObjectLocation)(

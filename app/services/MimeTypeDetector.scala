@@ -24,9 +24,11 @@ trait MimeTypeDetector {
   def detect(inputStream: InputStream, fileName: Option[String]): DetectedMimeType
 }
 
-sealed trait DetectedMimeType
+sealed trait DetectedMimeType {
+  def value: MimeType
+}
 
 object DetectedMimeType {
   final case class Detected(value: MimeType) extends DetectedMimeType
-  final case class DefaultFallback(value: MimeType) extends DetectedMimeType
+  final case class EmptyLength(value: MimeType) extends DetectedMimeType
 }

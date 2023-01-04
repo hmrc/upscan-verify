@@ -44,7 +44,7 @@ class TikaMimeTypeDetector extends MimeTypeDetector {
       if (tikaInputStream.getLength > 0)
         DetectedMimeType.Detected(mimeType)
       else
-        DetectedMimeType.DefaultFallback(mimeType)
+        DetectedMimeType.EmptyLength(mimeType)
 
     tikaInputStream.close()
 

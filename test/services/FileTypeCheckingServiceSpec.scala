@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -240,10 +240,12 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithI
       metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
 
     }
-    "return valid result when MIME type cannot be determined due to a 0 byte upload" in {
 
-      Given("an uploaded file with a valid MIME type for the service")
+    "return invalid result when MIME type cannot be determined due to a 0 byte upload" in {
+
+      Given("an uploaded file with a invalid MIME type for the service (application/octet-stream)")
       val serviceName = "valid-test-service"
+      val allowedMimeTypes = List("application/pdf")
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
       val content = ObjectContent(new ByteArrayInputStream(Array.emptyByteArray), 0)
@@ -253,6 +255,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithI
       val detector = new TikaMimeTypeDetector()
 
       val configuration = mock[ServiceConfiguration]
+      when(configuration.allowedMimeTypes(serviceName)).thenReturn(Some(allowedMimeTypes))
 
       val metrics = metricsStub()
       val mockFilenameValidator = mock[FileNameValidator]
@@ -261,16 +264,17 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithI
       When("the file is checked")
       val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
 
-      Then("a valid result should be returned")
-      result shouldBe Right(
-        FileAllowed(
+      Then("an incorrect file type result should be returned")
+      result shouldBe Left(
+        NotAllowedMimeType(
           fileMimeType,
+          Some("valid-test-service"),
           Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:32Z")))
       )
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.counter("validTypeFileUpload").getCount shouldBe 1
-      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount shouldBe 0
+      metrics.defaultRegistry.counter("validTypeFileUpload").getCount shouldBe 0
+      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount shouldBe 1
       metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
     }
   }

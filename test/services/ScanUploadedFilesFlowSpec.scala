@@ -17,15 +17,14 @@
 package services
 
 import java.time.Instant
-
 import com.amazonaws.AmazonServiceException
 import com.codahale.metrics.MetricRegistry
-import com.kenshoo.play.metrics.Metrics
 import model._
 import org.scalatest.GivenWhenThen
 import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.logging.LoggingDetails
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import util.logging.LoggingDetails
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -48,7 +47,6 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
   def metricsStub() = new Metrics {
     override val defaultRegistry: MetricRegistry = new MetricRegistry
 
-    override def toJson: String = ???
   }
 
   "ScanUploadedFilesFlow" should {
@@ -89,7 +87,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       val result = flow.processMessage(message)
 
       Then("processing result is success")
-      Await.result(result.value, 10 seconds).isRight shouldBe true
+      Await.result(result.value, 10.seconds).isRight shouldBe true
 
       And("scanning result handler is called")
       verify(scanningResultHandler)
@@ -135,7 +133,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       val result = flow.processMessage(message)
 
       Then("result should be a failure")
-      Await.result(result.value, 10 seconds).isLeft shouldBe true
+      Await.result(result.value, 10.seconds).isLeft shouldBe true
 
       And("file checking service should not be invoked")
       verifyNoMoreInteractions(fileCheckingService)
@@ -168,7 +166,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       val result = flow.processMessage(message)
 
       Then("result should be a failure")
-      Await.result(result.value, 10 seconds).isLeft shouldBe true
+      Await.result(result.value, 10.seconds).isLeft shouldBe true
 
       And("file checking service should not be invoked")
       verifyZeroInteractions(fileCheckingService)
@@ -210,7 +208,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       val result = flow.processMessage(message)
 
       Then("processing result is success")
-      Await.result(result.value, 10 seconds).isLeft shouldBe true
+      Await.result(result.value, 10.seconds).isLeft shouldBe true
 
       And("scanning result handler is not invoked")
       verifyZeroInteractions(scanningResultHandler)

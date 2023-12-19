@@ -17,7 +17,6 @@
 package services
 
 import cats.syntax.either._
-import com.kenshoo.play.metrics.Metrics
 import config.ServiceConfiguration
 import model.FileTypeError.{NotAllowedFileExtension, NotAllowedMimeType}
 import model.Timings.{Timer, timer}
@@ -25,6 +24,7 @@ import model._
 import play.api.Logging
 import services.tika.FileNameValidator
 import uk.gov.hmrc.http.logging.LoggingDetails
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import util.logging.WithLoggingDetails.withLoggingDetails
 
 import java.time.Clock

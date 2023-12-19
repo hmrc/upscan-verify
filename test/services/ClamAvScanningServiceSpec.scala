@@ -18,15 +18,14 @@ package services
 
 import java.io.{ByteArrayInputStream, FilterInputStream, InputStream}
 import java.time.{Duration => _, _}
-
 import com.codahale.metrics.MetricRegistry
-import com.kenshoo.play.metrics.Metrics
 import model.{FileInfected, S3ObjectLocation, Timings}
 import org.scalatest.{Assertions, GivenWhenThen}
 import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
 import uk.gov.hmrc.http.logging.LoggingDetails
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import util.logging.LoggingDetails
 
 import scala.concurrent.duration._
@@ -43,8 +42,6 @@ class ClamAvScanningServiceSpec extends UnitSpec with Assertions with GivenWhenT
 
     def metricsStub() = new Metrics {
       override val defaultRegistry: MetricRegistry = new MetricRegistry
-
-      override def toJson: String = ???
     }
 
     val checksumInputStreamFactoryStub = new ChecksumComputingInputStreamFactory {

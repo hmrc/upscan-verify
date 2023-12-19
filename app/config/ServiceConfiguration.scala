@@ -20,7 +20,7 @@ import com.typesafe.config.ConfigObject
 import javax.inject.Inject
 import play.api.{ConfigLoader, Configuration}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 
 trait ServiceConfiguration {
@@ -54,19 +54,19 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
 
   override def inboundQueueUrl: String = getRequired(configuration.getOptional[String](_), "aws.sqs.queue.inbound")
 
-  override def awsRegion = getRequired(configuration.getOptional[String](_), "aws.s3.region")
+  override def awsRegion: String = getRequired(configuration.getOptional[String](_), "aws.s3.region")
 
-  override def useContainerCredentials = configuration.getOptional[Boolean]("aws.useContainerCredentials").getOrElse(true)
+  override def useContainerCredentials: Boolean = configuration.getOptional[Boolean]("aws.useContainerCredentials").getOrElse(true)
 
-  override def accessKeyId = getRequired(configuration.getOptional[String](_), "aws.accessKeyId")
+  override def accessKeyId: String = getRequired(configuration.getOptional[String](_), "aws.accessKeyId")
 
-  override def secretAccessKey = getRequired(configuration.getOptional[String](_), "aws.secretAccessKey")
+  override def secretAccessKey: String = getRequired(configuration.getOptional[String](_), "aws.secretAccessKey")
 
-  override def sessionToken = configuration.getOptional[String]("aws.sessionToken")
+  override def sessionToken: Option[String] = configuration.getOptional[String]("aws.sessionToken")
 
-  override def retryInterval = getRequired(readDurationAsMillis, "aws.sqs.retry.interval").milliseconds
+  override def retryInterval: FiniteDuration = getRequired(readDurationAsMillis, "aws.sqs.retry.interval").milliseconds
 
-  override def outboundBucket = getRequired(configuration.getOptional[String](_), "aws.s3.bucket.outbound")
+  override def outboundBucket: String = getRequired(configuration.getOptional[String](_), "aws.s3.bucket.outbound")
 
   override def quarantineBucket: String = getRequired(configuration.getOptional[String](_), "aws.s3.bucket.quarantine")
 

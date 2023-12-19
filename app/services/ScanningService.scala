@@ -17,17 +17,16 @@
 package services
 
 import java.time.{Clock, Instant}
-import java.util.concurrent.TimeUnit
-import com.kenshoo.play.metrics.Metrics
-
 import javax.inject.Inject
 import model._
 import play.api.Logging
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.http.logging.LoggingDetails
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import util.logging.WithLoggingDetails.withLoggingDetails
 
+import java.util.concurrent.TimeUnit
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 

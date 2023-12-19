@@ -18,11 +18,11 @@ package services
 
 import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
-
 import cats.implicits._
-import com.kenshoo.play.metrics.Metrics
+
 import javax.inject.Inject
 import model.Message
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import util.logging.LoggingDetails
 import utils.MonadicUtils._
 

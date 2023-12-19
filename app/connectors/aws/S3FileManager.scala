@@ -27,7 +27,7 @@ import services.{FileManager, InboundObjectMetadata, ObjectContent, OutboundObje
 import uk.gov.hmrc.http.logging.LoggingDetails
 import util.logging.WithLoggingDetails.withLoggingDetails
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.{ExecutionContext, Future}
 
 class S3FileManager @Inject()(s3Client: AmazonS3)(implicit ec: ExecutionContext) extends FileManager with Logging {

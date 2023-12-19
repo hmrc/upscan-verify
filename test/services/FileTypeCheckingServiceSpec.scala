@@ -23,6 +23,7 @@ import model._
 import org.scalatest.GivenWhenThen
 import services.tika.{FileNameValidator, TikaMimeTypeDetector}
 import test.{UnitSpec, WithIncrementingClock}
+import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import util.logging.LoggingDetails
 
@@ -35,7 +36,7 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithI
 
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
-  implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
+  implicit val ld: HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   def metricsStub() = new Metrics {
     override val defaultRegistry: MetricRegistry = new MetricRegistry

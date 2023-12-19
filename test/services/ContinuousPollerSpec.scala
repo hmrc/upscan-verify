@@ -29,7 +29,7 @@ import scala.concurrent.duration.FiniteDuration
 
 class ContinuousPollerSpec extends UnitSpec with Eventually {
 
-  implicit def actorSystem = ActorSystem()
+  implicit def actorSystem: ActorSystem = ActorSystem()
 
   val serviceConfiguration = new ServiceConfiguration {
     override def accessKeyId: String = ???

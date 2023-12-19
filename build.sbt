@@ -1,7 +1,8 @@
 import com.typesafe.sbt.packager.Keys.{dockerBaseImage, dockerRepository, dockerUpdateLatest}
 import play.sbt.PlayImport.PlayKeys.playDefaultPort
-import sbt.Keys._
-import sbt._
+import sbt.Keys.*
+import sbt.*
+import uk.gov.hmrc.DefaultBuildSettings
 import uk.gov.hmrc.DefaultBuildSettings.integrationTestSettings
 import uk.gov.hmrc.sbtdistributables.SbtDistributablesPlugin
 import uk.gov.hmrc.sbtdistributables.SbtDistributablesPlugin.publishingSettings
@@ -21,13 +22,16 @@ lazy val microservice = Project("upscan-verify", file("."))
     , "-Wconf:cat=unused&src=.*routes.*:s" //silence  private val defaultPrefix in class Routes is never used
     )
   )
-  .settings(publishingSettings: _*)
-  .configs(IntegrationTest)
-  .settings(integrationTestSettings(): _*)
   .settings(resolvers += Resolver.jcenterRepo)
   .settings(parallelExecution in Test := false)
-  .settings(IntegrationTest / resourceDirectory := baseDirectory.value / "it" / "resources")
   .settings(
     dockerUpdateLatest := true,
     dockerBaseImage := "artefacts.tax.service.gov.uk/hmrc-jre:latest",
     dockerRepository := Some("artefacts.tax.service.gov.uk"))
+
+lazy val it = project
+  .enablePlugins(PlayScala)
+  .dependsOn(microservice % "test->test") // the "test->test" allows reusing test code and test dependencies
+  .settings(DefaultBuildSettings.itSettings)
+  .settings(libraryDependencies ++= AppDependencies())
+

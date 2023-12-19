@@ -79,7 +79,7 @@ class XmlDetectorSpec extends UnitSpec with GivenWhenThen {
 
   private def readAll(is : InputStream): String =  {
     val reader = new BufferedReader(new InputStreamReader(is))
-    Stream.continually(reader.readLine()).takeWhile(_ != null).mkString("\n")
+    LazyList.continually(reader.readLine()).takeWhile(_ != null).mkString("\n")
   }
 
 }

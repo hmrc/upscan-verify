@@ -117,8 +117,7 @@ class FileTypeCheckingService @Inject()(
       }
       .getOrElse(Right(()))
 
-  private def addCheckingTimeMetrics(implicit timer: Timer) {
-    val interval = timer().difference
-    metrics.defaultRegistry.timer("fileTypeCheckingTime").update(interval, TimeUnit.MILLISECONDS)
-  }
+  private def addCheckingTimeMetrics(implicit timer: Timer): Unit =
+    metrics.defaultRegistry.timer("fileTypeCheckingTime").update(timer().difference, TimeUnit.MILLISECONDS)
+
 }

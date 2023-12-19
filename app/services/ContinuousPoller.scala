@@ -31,7 +31,7 @@ import scala.util.{Failure, Success}
 trait PollingJob {
   def run(): Future[Unit]
 
-  def jobName(): String = this.getClass.getName
+  def jobName: String = this.getClass.getName
 }
 
 class ContinuousPoller @Inject()(job: PollingJob, serviceConfiguration: ServiceConfiguration)(

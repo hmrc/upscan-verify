@@ -17,11 +17,11 @@
 package services
 
 import cats.implicits._
-import com.kenshoo.play.metrics.Metrics
 
 import javax.inject.Inject
 import model.Message
 import play.api.Logging
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import util.logging.LoggingDetails
 import util.logging.WithLoggingDetails.withLoggingDetails
 import utils.MonadicUtils

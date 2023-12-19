@@ -25,7 +25,7 @@ import model.Message
 import play.api.Logging
 import services.QueueConsumer
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.{ExecutionContext, Future}
 
 class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS,

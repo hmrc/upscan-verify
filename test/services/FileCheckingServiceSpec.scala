@@ -99,7 +99,7 @@ class FileCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithIncre
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(Left(FileInfected("Virus", checksum, Timings(clock.instant(), clock.instant())))))
 
-      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe
+      Await.result(fileCheckingService.check(location, metadata), 30.seconds) shouldBe
         Left(FileRejected(Left(FileInfected("Virus", checksum, Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))))))
 
       verifyZeroInteractions(fileTypeCheckingService)
@@ -116,7 +116,7 @@ class FileCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithIncre
 
       when(fileTypeCheckingService.scan(location, content, metadata)).thenReturn(Future.successful(Left(NotAllowedMimeType(MimeType("application/xml"), Some("valid-test-service"), Timings(clock.instant(), clock.instant())))))
 
-      Await.result(fileCheckingService.check(location, metadata), 30 seconds) shouldBe Left(
+      Await.result(fileCheckingService.check(location, metadata), 30.seconds) shouldBe Left(
 
         FileRejected(
           Right(NoVirusFound("CHECKSUM", Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1)))),

@@ -17,8 +17,8 @@
 package services
 
 import javax.inject.Inject
-import akka.actor.{Actor, ActorSystem, PoisonPill, Props}
-import akka.event.Logging
+import org.apache.pekko.event.Logging
+import org.apache.pekko.actor._
 import config.ServiceConfiguration
 import play.api.Logging
 import play.api.inject.ApplicationLifecycle
@@ -31,7 +31,7 @@ import scala.util.{Failure, Success}
 trait PollingJob {
   def run(): Future[Unit]
 
-  def jobName(): String = this.getClass.getName
+  def jobName: String = this.getClass.getName
 }
 
 class ContinuousPoller @Inject()(job: PollingJob, serviceConfiguration: ServiceConfiguration)(

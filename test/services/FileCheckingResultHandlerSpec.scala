@@ -132,7 +132,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
         handler
           .handleCheckingResult(inboundObjectDetails,
             Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)), receivedAt),
-        10 seconds
+        10.seconds
       )
 
       Then("file should be copied from inbound bucket to outbound bucket")
@@ -171,7 +171,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
           handler.handleCheckingResult(
             inboundObjectDetails,
             Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)), receivedAt),
-          10 seconds
+          10.seconds
         )
 
       Then("original file should not be deleted from inbound bucket")
@@ -215,7 +215,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
           handler.handleCheckingResult(
             inboundObjectDetails,
             Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)), receivedAt),
-          10 seconds
+          10.seconds
         )
 
       Then("the process fails")
@@ -336,7 +336,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
             .handleCheckingResult(
               InboundObjectDetails(inboundObjectMetadata, clientIp, file),
               Left(FileRejected(Left(FileInfected("There is a virus", checksum, virusScanTimings)))), receivedAt),
-          10 seconds
+          10.seconds
         )
 
       Then("the process fails")

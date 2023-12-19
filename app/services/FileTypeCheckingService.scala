@@ -17,7 +17,6 @@
 package services
 
 import cats.syntax.either._
-import com.kenshoo.play.metrics.Metrics
 import config.ServiceConfiguration
 import model.FileTypeError.{NotAllowedFileExtension, NotAllowedMimeType}
 import model.Timings.{Timer, timer}
@@ -25,6 +24,7 @@ import model._
 import play.api.Logging
 import services.tika.FileNameValidator
 import uk.gov.hmrc.http.logging.LoggingDetails
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import util.logging.WithLoggingDetails.withLoggingDetails
 
 import java.time.Clock
@@ -117,8 +117,7 @@ class FileTypeCheckingService @Inject()(
       }
       .getOrElse(Right(()))
 
-  private def addCheckingTimeMetrics(implicit timer: Timer) {
-    val interval = timer().difference
-    metrics.defaultRegistry.timer("fileTypeCheckingTime").update(interval, TimeUnit.MILLISECONDS)
-  }
+  private def addCheckingTimeMetrics(implicit timer: Timer): Unit =
+    metrics.defaultRegistry.timer("fileTypeCheckingTime").update(timer().difference, TimeUnit.MILLISECONDS)
+
 }

@@ -17,12 +17,12 @@
 package services
 
 import com.codahale.metrics.MetricRegistry
-import com.kenshoo.play.metrics.Metrics
 
 import java.time.Instant
 import model.Message
 import org.scalatest.GivenWhenThen
 import test.UnitSpec
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import utils.MonadicUtils
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -39,7 +39,6 @@ class QueueProcessingFlowSpec extends UnitSpec with GivenWhenThen {
     val metricsStub = new Metrics {
       override val defaultRegistry: MetricRegistry = new MetricRegistry
 
-      override def toJson: String = ???
     }
 
     val queueProcessingFlow =
@@ -67,7 +66,7 @@ class QueueProcessingFlowSpec extends UnitSpec with GivenWhenThen {
     And("processing of one message fails")
 
     When("the orchestrator is called")
-    Await.result(queueProcessingFlow.run(), 30 seconds)
+    Await.result(queueProcessingFlow.run(), 30.seconds)
 
     Then("the queue consumer should poll for messages")
     verify(queueConsumer).poll()

@@ -17,13 +17,14 @@
 package services
 
 import com.codahale.metrics.MetricRegistry
-import com.kenshoo.play.metrics.Metrics
 import config.ServiceConfiguration
 import model.FileTypeError.{NotAllowedFileExtension, NotAllowedMimeType}
 import model._
 import org.scalatest.GivenWhenThen
 import services.tika.{FileNameValidator, TikaMimeTypeDetector}
 import test.{UnitSpec, WithIncrementingClock}
+import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import util.logging.LoggingDetails
 
 import java.io.{ByteArrayInputStream, InputStream}
@@ -35,12 +36,10 @@ class FileTypeCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithI
 
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
-  implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
+  implicit val ld: HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   def metricsStub() = new Metrics {
     override val defaultRegistry: MetricRegistry = new MetricRegistry
-
-    override def toJson: String = ???
   }
 
   "FileTypeCheckingService" should {

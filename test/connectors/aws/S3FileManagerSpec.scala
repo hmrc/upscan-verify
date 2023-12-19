@@ -19,11 +19,10 @@ package connectors.aws
 import java.io.{ByteArrayInputStream, InputStream}
 import java.nio.charset.StandardCharsets.UTF_8
 import java.time.Instant
-
 import util.logging.LoggingDetails
+
 import java.util
 import java.util.{Calendar, GregorianCalendar}
-
 import com.amazonaws.SdkClientException
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model._
@@ -34,10 +33,12 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.{Assertions, GivenWhenThen}
 import services._
 import test.UnitSpec
+import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.jdk.CollectionConverters._
 
 class S3FileManagerSpec
     extends UnitSpec
@@ -48,7 +49,7 @@ class S3FileManagerSpec
   private val awsLastModified      = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
   private val metadataLastModified = awsLastModified.toInstant
 
-  implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
+  implicit val ld: HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   "S3FileManager" should {
     "allow to copy file from inbound bucket to outbound bucket" in {
@@ -329,7 +330,6 @@ class S3FileManagerSpec
     }
 
     "return failure if put to quarantine bucket fails" in {
-      import scala.collection.JavaConverters._
 
       Given("a valid file location and details of an error")
       val inboundLocation  = S3ObjectLocation("inboundBucket", "file", Some("version"))

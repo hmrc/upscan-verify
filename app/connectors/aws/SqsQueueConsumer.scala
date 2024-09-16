@@ -37,6 +37,7 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS,
     val receiveMessageRequest = new ReceiveMessageRequest(configuration.inboundQueueUrl)
       .withMaxNumberOfMessages(configuration.processingBatchSize)
       .withWaitTimeSeconds(20)
+      .withVisibilityTimeout(configuration.inboundQueueVisibilityTimeout)
       .withAttributeNames("All")
 
     val receiveMessageResult: Future[ReceiveMessageResult] =

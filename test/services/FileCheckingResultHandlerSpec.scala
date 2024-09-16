@@ -106,7 +106,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
 
       override def defaultAllowedMimeTypes: List[String] = ???
 
-      override def inboundQueueVisibilityTimeout: Int = ???
+      override def inboundQueueVisibilityTimeout: Duration = ???
     }
 
     "Move clean file from inbound bucket to outbound bucket" in {

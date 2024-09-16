@@ -38,6 +38,7 @@ class SqsQueueConsumerSpec extends UnitSpec with Assertions with GivenWhenThen w
 
   private val configuration = mock[ServiceConfiguration]
   when(configuration.inboundQueueUrl).thenReturn("Test.aws.sqs.queue")
+  when(configuration.inboundQueueVisibilityTimeout).thenReturn(30.seconds)
   when(configuration.processingBatchSize).thenReturn(1)
 
   private def sqsMessages(messageCount: Int): JList[SqsMessage] = {

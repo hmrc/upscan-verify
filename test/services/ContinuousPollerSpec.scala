@@ -55,6 +55,8 @@ class ContinuousPollerSpec extends UnitSpec with Eventually {
     override def allowedMimeTypes(serviceName: String): Option[List[String]] = ???
 
     override def defaultAllowedMimeTypes: List[String] = ???
+
+    override def inboundQueueVisibilityTimeout: Duration = ???
   }
 
   "QueuePollingJob" should {

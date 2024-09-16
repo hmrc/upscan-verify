@@ -30,6 +30,8 @@ trait ServiceConfiguration {
 
   def inboundQueueUrl: String
 
+  def inboundQueueVisibilityTimeout: Duration
+
   def accessKeyId: String
 
   def secretAccessKey: String
@@ -53,6 +55,8 @@ trait ServiceConfiguration {
 class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) extends ServiceConfiguration {
 
   override def inboundQueueUrl: String = getRequired(configuration.getOptional[String](_), "aws.sqs.queue.inbound")
+
+  override def inboundQueueVisibilityTimeout: Duration = getRequired(configuration.getOptional[Duration](_), "aws.sqs.queue.visibilityTimeout")
 
   override def awsRegion: String = getRequired(configuration.getOptional[String](_), "aws.s3.region")
 

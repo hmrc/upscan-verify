@@ -21,6 +21,8 @@ import com.amazonaws.AmazonServiceException
 import com.codahale.metrics.MetricRegistry
 import model._
 import org.scalatest.GivenWhenThen
+import org.mockito.ArgumentMatchers.{any, eq => eqTo}
+import org.mockito.Mockito.{verify, verifyNoInteractions, verifyNoMoreInteractions, when}
 import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.logging.LoggingDetails
@@ -169,7 +171,7 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       Await.result(result.value, 10.seconds).isLeft shouldBe true
 
       And("file checking service should not be invoked")
-      verifyZeroInteractions(fileCheckingService)
+      verifyNoInteractions(fileCheckingService)
 
       And("the metrics should not be updated")
       metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 0
@@ -211,13 +213,12 @@ class ScanUploadedFilesFlowSpec extends UnitSpec with GivenWhenThen with WithInc
       Await.result(result.value, 10.seconds).isLeft shouldBe true
 
       And("scanning result handler is not invoked")
-      verifyZeroInteractions(scanningResultHandler)
+      verifyNoInteractions(scanningResultHandler)
 
       And("the metrics should not be updated")
       metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()    shouldBe 0
       metrics.defaultRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 0
       metrics.defaultRegistry.timer("upscanVerifyProcessing").getSnapshot.size()  shouldBe 0
     }
-
   }
 }

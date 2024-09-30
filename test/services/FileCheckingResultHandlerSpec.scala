@@ -20,7 +20,9 @@ import config.ServiceConfiguration
 import model.FileTypeError.{NotAllowedFileExtension, NotAllowedMimeType}
 import model._
 import org.apache.commons.io.IOUtils
-import org.mockito.captor.ArgCaptor
+import org.mockito.ArgumentCaptor
+import org.mockito.ArgumentMatchers.{any, eq => eqTo}
+import org.mockito.Mockito.{when, verify, verifyNoMoreInteractions, verifyNoInteractions}
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import test.{UnitSpec, WithIncrementingClock}
@@ -138,13 +140,12 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       )
 
       Then("file should be copied from inbound bucket to outbound bucket")
-      val locationCaptor = ArgCaptor[S3ObjectLocation]
-      verify(fileManager).copyObject(eqTo(file), locationCaptor, eqTo(outboundObjectMetadata))(any[LoggingDetails])
-      locationCaptor.value.bucket shouldBe configuration.outboundBucket
+      val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
+      verify(fileManager).copyObject(eqTo(file), locationCaptor.capture(), eqTo(outboundObjectMetadata))(any[LoggingDetails])
+      locationCaptor.getValue.bucket shouldBe configuration.outboundBucket
 
       And("file should be removed from inbound bucket")
       verify(fileManager).delete(file)
-
     }
 
     "Not delete file from outbound bucket if copying failed" in {
@@ -260,17 +261,17 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       verify(rejectionNotifier).notifyFileInfected(file, checksum, fileSize, uploadedAt, details, None)
 
       And("file metadata and error details are stored in the quarantine bucket")
-      val locationCaptor = ArgCaptor[S3ObjectLocation]
-      val contentCaptor = ArgCaptor[InputStream]
+      val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
+      val contentCaptor = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
         .writeObject(
           eqTo(file),
-          locationCaptor,
-          contentCaptor,
+          locationCaptor.capture(),
+          contentCaptor.capture(),
           eqTo(outboundObjectMetadata))(any[LoggingDetails])
-      IOUtils.toString(contentCaptor.value, UTF_8) shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
+      IOUtils.toString(contentCaptor.getValue, UTF_8) shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
 
-      locationCaptor.value.bucket shouldBe configuration.quarantineBucket
+      locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 
       And("infected file is deleted")
       verify(fileManager).delete(file)
@@ -305,7 +306,7 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
         )
 
       Then("file is not deleted")
-      verifyZeroInteractions(fileManager)
+      verifyNoInteractions(fileManager)
 
       And("the whole process fails")
       result.value.get.isFailure shouldBe true
@@ -384,17 +385,17 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
 
       And("file metadata and error details are stored in the quarantine bucket")
 
-      val locationCaptor = ArgCaptor[S3ObjectLocation]
-      val streamCaptor = ArgCaptor[InputStream]
+      val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
+      val streamCaptor = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
         .writeObject(
           eqTo(file),
-          locationCaptor,
-          streamCaptor,
+          locationCaptor.capture(),
+          streamCaptor.capture(),
           eqTo(outboundObjectMetadata))(any[LoggingDetails])
-      IOUtils.toString(streamCaptor.value, UTF_8) shouldBe
+      IOUtils.toString(streamCaptor.getValue, UTF_8) shouldBe
         """{"failureReason":"REJECTED","message":"MIME type [application/pdf] is not allowed for service: [valid-test-service]"}"""
-      locationCaptor.value.bucket shouldBe configuration.quarantineBucket
+      locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 
       And("incorrectly typed file is deleted")
       verify(fileManager).delete(file)
@@ -440,17 +441,17 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
 
       And("file metadata and error details are stored in the quarantine bucket")
 
-      val locationCaptor = ArgCaptor[S3ObjectLocation]
-      val streamCaptor = ArgCaptor[InputStream]
+      val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
+      val streamCaptor = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
         .writeObject(
           eqTo(file),
-          locationCaptor,
-          streamCaptor,
+          locationCaptor.capture(),
+          streamCaptor.capture(),
           eqTo(outboundObjectMetadata))(any[LoggingDetails])
-      IOUtils.toString(streamCaptor.value, UTF_8) shouldBe
+      IOUtils.toString(streamCaptor.getValue, UTF_8) shouldBe
         """{"failureReason":"REJECTED","message":"File extension [foo] is not allowed for mime-type [text/plain], service: [valid-test-service]"}"""
-      locationCaptor.value.bucket shouldBe configuration.quarantineBucket
+      locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 
       And("incorrectly typed file is deleted")
       verify(fileManager).delete(file)

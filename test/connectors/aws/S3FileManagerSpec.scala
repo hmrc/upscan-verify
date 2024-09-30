@@ -28,7 +28,9 @@ import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model._
 import model.S3ObjectLocation
 import org.apache.commons.io.IOUtils
-import org.mockito.captor.ArgCaptor
+import org.mockito.ArgumentCaptor
+import org.mockito.ArgumentMatchers.{any, eq => eqTo}
+import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when, doThrow}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.{Assertions, GivenWhenThen}
 import services._
@@ -41,10 +43,10 @@ import scala.concurrent.{Await, Future}
 import scala.jdk.CollectionConverters._
 
 class S3FileManagerSpec
-    extends UnitSpec
-    with Assertions
-    with GivenWhenThen
-    with Eventually {
+  extends UnitSpec
+     with Assertions
+     with GivenWhenThen
+     with Eventually {
 
   private val awsLastModified      = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
   private val metadataLastModified = awsLastModified.toInstant
@@ -75,12 +77,12 @@ class S3FileManagerSpec
         2.seconds)
 
       Then("the S3 copy method of AWS client should be called")
-      val argumentCaptor = ArgCaptor[CopyObjectRequest]
-      verify(s3client).copyObject(argumentCaptor)
+      val argumentCaptor = ArgumentCaptor.forClass(classOf[CopyObjectRequest])
+      verify(s3client).copyObject(argumentCaptor.capture())
       verifyNoMoreInteractions(s3client)
 
       And("proper version of the file has been downloaded")
-      val request = argumentCaptor.value
+      val request = argumentCaptor.getValue
 
       request.getSourceBucketName      shouldBe inboundLocation.bucket
       request.getSourceKey             shouldBe inboundLocation.objectKey
@@ -172,9 +174,9 @@ class S3FileManagerSpec
         .InboundObjectMetadata(Map("callbackUrl" -> "http://some.callback.url"), metadataLastModified, fileSize = 0)
 
       And("proper version of the file has been downloaded")
-      val argumentCaptor = ArgCaptor[GetObjectMetadataRequest]
-      verify(s3client).getObjectMetadata(argumentCaptor)
-      val getObjectMetadataRequest = argumentCaptor.value
+      val argumentCaptor = ArgumentCaptor.forClass(classOf[GetObjectMetadataRequest])
+      verify(s3client).getObjectMetadata(argumentCaptor.capture())
+      val getObjectMetadataRequest = argumentCaptor.getValue
 
       getObjectMetadataRequest.getBucketName shouldBe "inboundBucket"
       getObjectMetadataRequest.getKey        shouldBe "file"
@@ -237,9 +239,9 @@ class S3FileManagerSpec
       }
 
       And("proper version of the file has been downloaded")
-      val argumentCaptor = ArgCaptor[GetObjectRequest]
-      verify(s3client).getObject(argumentCaptor)
-      val getObjectRequest = argumentCaptor.value
+      val argumentCaptor = ArgumentCaptor.forClass(classOf[GetObjectRequest])
+      verify(s3client).getObject(argumentCaptor.capture())
+      val getObjectRequest = argumentCaptor.getValue
 
       getObjectRequest.getBucketName shouldBe "inboundBucket"
       getObjectRequest.getKey        shouldBe "file"
@@ -363,14 +365,14 @@ class S3FileManagerSpec
       val result = Await.ready(fileManager.writeObject(inboundLocation, outboundLocation, content, metadata), 2.seconds)
 
       And("a new S3 object with details set as contents and object metadata set should be created")
-      val metadataCaptor = ArgCaptor[ObjectMetadata]
-      verify(s3client).putObject(any[String], any[String], any[InputStream], metadataCaptor)
+      val metadataCaptor = ArgumentCaptor.forClass(classOf[ObjectMetadata])
+      verify(s3client).putObject(any[String], any[String], any[InputStream], metadataCaptor.capture())
 
       And("the new object should contain metadata copied from inbound object")
-      metadataCaptor.value.getUserMetadata.asScala shouldBe metadata.items
+      metadataCaptor.getValue.getUserMetadata.asScala shouldBe metadata.items
 
       And("the new object shouldn't contain any other metadata of the inbound object")
-      metadataCaptor.value.getContentType shouldBe null
+      metadataCaptor.getValue.getContentType shouldBe null
 
       And("only users metadata have been copied")
 

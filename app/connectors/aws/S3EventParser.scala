@@ -49,16 +49,17 @@ class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessagePars
   case class S3Details(bucketName: String, objectKey: String, versionId: Option[String])
 
   implicit val s3reads: Reads[S3Details] =
-    ((JsPath \ "bucket" \ "name").read[String] and
-      (JsPath \ "object" \ "key").read[String] and
-      (JsPath \ "object" \ "versionId").read[String].map(Some(_).filterNot(_.equals("null"))))(S3Details.apply _)
+    ( (__ \ "bucket" \ "name"     ).read[String]
+    ~ (__ \ "object" \ "key"      ).read[String]
+    ~ (__ \ "object" \ "versionId").read[String].map(Some(_).filterNot(_.equals("null")))
+    )(S3Details.apply _)
 
   implicit val requestParametersReads: Reads[RequestParameters] = Json.reads[RequestParameters]
 
   implicit val reads: Reads[S3EventNotificationRecord] = Json.reads[S3EventNotificationRecord]
 
   implicit val messageReads: Reads[S3EventNotification] =
-    (JsPath \ "Records").read[Seq[S3EventNotificationRecord]].map(S3EventNotification)
+    (__ \ "Records").read[Seq[S3EventNotificationRecord]].map(S3EventNotification.apply)
 
   override def parse(message: Message): Future[FileUploadEvent] =
     for {

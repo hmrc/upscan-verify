@@ -25,7 +25,7 @@ import test.UnitSpec
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.Duration
 
 class ContinuousPollerSpec extends UnitSpec with Eventually {
 

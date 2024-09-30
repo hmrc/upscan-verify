@@ -24,6 +24,8 @@ import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{Message => SqsMessage, _}
 import config.ServiceConfiguration
 import model.Message
+import org.mockito.ArgumentMatchers.{any, eq => eqTo}
+import org.mockito.Mockito.{when, verify}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{Assertions, GivenWhenThen}
 import test.{UnitSpec, WithIncrementingClock}

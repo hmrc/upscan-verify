@@ -21,6 +21,7 @@ import model.FileTypeError.NotAllowedMimeType
 import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
 import model._
+import org.mockito.Mockito.{verifyNoInteractions, when}
 import org.scalatest.GivenWhenThen
 import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.http.logging.LoggingDetails
@@ -35,7 +36,6 @@ class FileCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithIncre
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
   "File checking service" should {
-
     implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
     val content = ObjectContent(new ByteArrayInputStream("TEST".getBytes), "TEST".length)
@@ -102,7 +102,7 @@ class FileCheckingServiceSpec extends UnitSpec with GivenWhenThen with WithIncre
       Await.result(fileCheckingService.check(location, metadata), 30.seconds) shouldBe
         Left(FileRejected(Left(FileInfected("Virus", checksum, Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))))))
 
-      verifyZeroInteractions(fileTypeCheckingService)
+      verifyNoInteractions(fileTypeCheckingService)
     }
 
     "return failed file type scanning if virus not found but invalid file type" in {

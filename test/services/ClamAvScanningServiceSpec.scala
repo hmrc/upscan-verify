@@ -22,6 +22,8 @@ import com.codahale.metrics.MetricRegistry
 import model.{FileInfected, S3ObjectLocation, Timings}
 import org.scalatest.{Assertions, GivenWhenThen}
 import test.{UnitSpec, WithIncrementingClock}
+import org.mockito.ArgumentMatchers.{any, eq => eqTo}
+import org.mockito.Mockito.{when, verify}
 import uk.gov.hmrc.clamav.model.{Clean, Infected}
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
 import uk.gov.hmrc.http.HeaderCarrier

@@ -20,6 +20,7 @@ import com.codahale.metrics.MetricRegistry
 import config.ServiceConfiguration
 import model.FileTypeError.{NotAllowedFileExtension, NotAllowedMimeType}
 import model._
+import org.mockito.Mockito.when
 import org.scalatest.GivenWhenThen
 import services.tika.{FileNameValidator, TikaMimeTypeDetector}
 import test.{UnitSpec, WithIncrementingClock}

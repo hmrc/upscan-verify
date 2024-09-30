@@ -24,7 +24,8 @@ import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{ReceiveMessageRequest, ReceiveMessageResult}
 import javax.inject.Provider
 import org.mockito.ArgumentMatchersSugar.any
-import org.mockito.MockitoSugar.{mock, when}
+import org.mockito.Mockito.when
+import org.scalatestplus.mockito.MockitoSugar
 import play.api.inject.{Binding, Module}
 import play.api.{Configuration, Environment}
 

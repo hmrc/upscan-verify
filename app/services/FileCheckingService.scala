@@ -49,13 +49,13 @@ class FileCheckingService @Inject()(
 
   private def virusScan(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata)(
     implicit ld: LoggingDetails): Future[Either[FileInfected, NoVirusFound]] =
-    fileManager.withObjectContent(location) { objectContent: ObjectContent =>
+    fileManager.withObjectContent(location) { (objectContent: ObjectContent) =>
       virusScanningService.scan(location, objectContent, objectMetadata)
     }
 
   private def fileType(location: S3ObjectLocation, objectMetadata: InboundObjectMetadata)(
     implicit ld: LoggingDetails): Future[Either[FileTypeError, FileAllowed]] =
-    fileManager.withObjectContent(location) { objectContent: ObjectContent =>
+    fileManager.withObjectContent(location) { (objectContent: ObjectContent) =>
       fileTypeCheckingService.scan(location, objectContent, objectMetadata)
     }
 

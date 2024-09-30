@@ -23,10 +23,11 @@ import com.amazonaws.services.s3.model.{PutObjectResult, S3Object}
 import com.amazonaws.util.StringInputStream
 import modules.MockAWSClientModule
 import org.apache.commons.io.IOUtils
-import org.mockito.scalatest.MockitoSugar
+import org.mockito.Mockito.when
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.play.guice.GuiceOneServerPerSuite
 import play.api.Application
 import play.api.inject.guice.{GuiceApplicationBuilder, GuiceableModuleConversions}

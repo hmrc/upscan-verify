@@ -16,16 +16,12 @@
 
 package config
 
-import javax.inject.Inject
 import play.api.Configuration
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 
+import javax.inject.Inject
 
-class PlayClamAvConfig @Inject()(configuration: Configuration) extends ClamAvConfig {
-  val host: String = getRequired(configuration.getOptional[String](_), "clam.antivirus.host")
-  val port: Int = getRequired(configuration.getOptional[Int](_), "clam.antivirus.port")
-  val timeout: Int = getRequired(configuration.getOptional[Int](_), "clam.antivirus.timeout")
-
-  private def getRequired[T](function: String => Option[T], key: String) =
-    function(key).getOrElse(throw new IllegalStateException(s"$key missing"))
-}
+class PlayClamAvConfig @Inject()(configuration: Configuration) extends ClamAvConfig:
+  val host   : String = configuration.get[String]("clam.antivirus.host")
+  val port   : Int    = configuration.get[Int]("clam.antivirus.port")
+  val timeout: Int    = configuration.get[Int]("clam.antivirus.timeout")

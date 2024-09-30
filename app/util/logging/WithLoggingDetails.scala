@@ -19,18 +19,14 @@ package util.logging
 import org.slf4j.MDC
 import uk.gov.hmrc.http.logging.LoggingDetails
 
-object WithLoggingDetails {
-  def withLoggingDetails[T](context: LoggingDetails)(block: => T): T = {
+object WithLoggingDetails:
+  def withLoggingDetails[T](context: LoggingDetails)(block: => T): T =
     val previous = Option(MDC.getCopyOfContextMap)
-    context.mdcData.foreach {
+    context.mdcData.foreach:
       case (k, v) => MDC.put(k, v)
-    }
-    try {
+
+    try
       block
-    } finally {
+    finally
       MDC.clear()
       previous.foreach(MDC.setContextMap)
-    }
-  }
-
-}

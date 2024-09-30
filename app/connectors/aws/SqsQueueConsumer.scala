@@ -16,24 +16,27 @@
 
 package connectors.aws
 
-import java.time.{Clock, Instant}
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, ReceiveMessageRequest, ReceiveMessageResult}
 import config.ServiceConfiguration
-import javax.inject.Inject
 import model.Message
 import play.api.Logging
 import services.QueueConsumer
 
+import java.time.{Clock, Instant}
+import javax.inject.Inject
 import scala.jdk.CollectionConverters._
 import scala.concurrent.{ExecutionContext, Future}
 
-class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS,
-                                 configuration: ServiceConfiguration,
-                                 clock: Clock)
-                                (implicit ec: ExecutionContext) extends QueueConsumer with Logging {
+class SqsQueueConsumer @Inject()(
+  sqsClient    : AmazonSQS,
+  configuration: ServiceConfiguration,
+  clock        : Clock
+)(implicit
+  ec: ExecutionContext
+) extends QueueConsumer with Logging:
 
-  override def poll(): Future[List[Message]] = {
+  override def poll(): Future[List[Message]] =
     val receiveMessageRequest = new ReceiveMessageRequest(configuration.inboundQueueUrl)
       .withMaxNumberOfMessages(configuration.processingBatchSize)
       .withWaitTimeSeconds(20)
@@ -43,30 +46,27 @@ class SqsQueueConsumer @Inject()(sqsClient: AmazonSQS,
     val receiveMessageResult: Future[ReceiveMessageResult] =
       Future(sqsClient.receiveMessage(receiveMessageRequest))
 
-    receiveMessageResult map { result =>
+    receiveMessageResult.map: result =>
       val receivedAt = clock.instant()
 
-      result.getMessages.asScala.toList.map { sqsMessage =>
-        if (logger.isDebugEnabled) {
+      result.getMessages.asScala.toList.map: sqsMessage =>
+        if logger.isDebugEnabled then
           logger.debug(
             s"Received message with id: [${sqsMessage.getMessageId}] and receiptHandle: [${sqsMessage.getReceiptHandle}], message details:\n "
-              + sqsMessage.toString)
-        }
-        val queueTimestamp = sqsMessage.getAttributes.asScala.get("SentTimestamp").map(s => Instant.ofEpochMilli(s.toLong))
-        if(queueTimestamp.isEmpty){
-          logger.warn(s"SentTimestamp is missing from the message attribute. Message id = ${sqsMessage.getMessageId}")
-        }
-        Message(sqsMessage.getMessageId, sqsMessage.getBody, sqsMessage.getReceiptHandle, receivedAt, queueTimestamp)
-      }
-    }
-  }
+              + sqsMessage.toString
+          )
 
-  override def confirm(message: Message): Future[Unit] = {
+        val queueTimestamp = sqsMessage.getAttributes.asScala.get("SentTimestamp").map(s => Instant.ofEpochMilli(s.toLong))
+
+        if queueTimestamp.isEmpty then
+          logger.warn(s"SentTimestamp is missing from the message attribute. Message id = ${sqsMessage.getMessageId}")
+
+        Message(sqsMessage.getMessageId, sqsMessage.getBody, sqsMessage.getReceiptHandle, receivedAt, queueTimestamp)
+
+  override def confirm(message: Message): Future[Unit] =
     val deleteMessageRequest = new DeleteMessageRequest(configuration.inboundQueueUrl, message.receiptHandle)
-    Future {
+    Future:
       sqsClient.deleteMessage(deleteMessageRequest)
       logger.debug(
-        s"Deleted message from Queue: [${configuration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}].")
-    }
-  }
-}
+        s"Deleted message from Queue: [${configuration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}]."
+      )

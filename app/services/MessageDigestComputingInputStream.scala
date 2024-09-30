@@ -16,72 +16,61 @@
 
 package services
 
+import org.apache.commons.codec.binary.Hex
+
 import java.io.{FilterInputStream, InputStream}
 import java.security.MessageDigest
 
-import org.apache.commons.codec.binary.Hex
-
-trait ChecksumComputingInputStreamFactory {
+trait ChecksumComputingInputStreamFactory:
   def create(source: InputStream): InputStream with ChecksumSource
-}
 
-object SHA256ChecksumComputingInputStreamFactory extends ChecksumComputingInputStreamFactory {
+object SHA256ChecksumComputingInputStreamFactory extends ChecksumComputingInputStreamFactory:
   def create(source: InputStream): InputStream with ChecksumSource =
     new MessageDigestComputingInputStream(source, "SHA-256")
-}
 
-trait ChecksumSource {
+trait ChecksumSource:
   def getChecksum(): String
-}
 
-class MessageDigestComputingInputStream(inputStream: InputStream, digestType: String)
-    extends FilterInputStream(inputStream)
-    with ChecksumSource {
+class MessageDigestComputingInputStream(
+  inputStream: InputStream,
+  digestType : String
+) extends FilterInputStream(inputStream)
+     with ChecksumSource:
 
   val digest = MessageDigest.getInstance(digestType)
 
-  override def read: Int = {
+  override def read: Int =
     val result = this.in.read
-    if (result != -1) {
+    if result != -1 then
       digest.update(result.toByte)
-    }
     result
-  }
 
-  override def read(buffer: Array[Byte], start: Int, end: Int): Int = {
+  override def read(buffer: Array[Byte], start: Int, end: Int): Int =
     val count = this.in.read(buffer, start, end)
-    if (count != -1) {
+    if count != -1 then
       digest.update(buffer, start, count)
-    }
     count
-  }
 
-  override def skip(count: Long): Long = {
+  override def skip(count: Long): Long =
     val readBuffer = new Array[Byte](512)
 
     @scala.annotation.tailrec
-    def skipByReading(skippedSoFar: Long): Long = {
+    def skipByReading(skippedSoFar: Long): Long =
       val remaining = count - skippedSoFar
-      if (remaining > 0) {
+      if remaining > 0 then
         val nowRetrieved = read(readBuffer, 0, Math.min(remaining, readBuffer.length).toInt)
-        if (nowRetrieved == -1L) {
+        if nowRetrieved == -1L then
           skippedSoFar
-        } else {
+        else
           skipByReading(skippedSoFar + nowRetrieved)
-        }
-      } else {
+      else
         skippedSoFar
-      }
-    }
 
     skipByReading(0)
-  }
 
-  override def reset() = {
+  override def reset() =
     this.in.reset()
     digest.reset()
-  }
 
   def getChecksum(): String =
     Hex.encodeHexString(digest.digest())
-}

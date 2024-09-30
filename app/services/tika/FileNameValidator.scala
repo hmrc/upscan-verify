@@ -25,19 +25,24 @@ import services.MimeType
 import javax.inject.Singleton
 
 @Singleton
-class FileNameValidator(configuration: Configuration) {
+class FileNameValidator(configuration: Configuration):
 
   type FileExtension = String
 
-  def this() = this(Configuration(ConfigFactory.parseResources("extensionsAllowList.conf")))
+  def this() =
+    this(Configuration(ConfigFactory.parseResources("extensionsAllowList.conf")))
 
-  private val mimeTypes = configuration.get[Map[String, Seq[String]]]("allowedExtensions")
+  private val mimeTypes =
+    configuration.get[Map[String, Seq[String]]]("allowedExtensions")
 
   def validate(mimeType: MimeType, filename: String): Either[FileExtension, Unit] =
     fileExtension(filename).fold(().asRight[FileExtension])(validateMimeType(mimeType))
 
-  private def fileExtension(filename: String): Option[String] = Option(FilenameUtils.getExtension(filename)).filter(_.nonEmpty)
+  private def fileExtension(filename: String): Option[String] =
+    Option(FilenameUtils.getExtension(filename)).filter(_.nonEmpty)
 
   private def validateMimeType(mimeType: MimeType)(fileExtension: String): Either[FileExtension, Unit] =
-    if (mimeTypes.get(mimeType.value).forall(_.contains(fileExtension))) Right(()) else Left(fileExtension)
-}
+    if mimeTypes.get(mimeType.value).forall(_.contains(fileExtension)) then
+      Right(())
+    else
+      Left(fileExtension)

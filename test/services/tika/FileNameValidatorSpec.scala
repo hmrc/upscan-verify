@@ -16,54 +16,53 @@
 
 package services.tika
 
-import org.scalatest.matchers.must.Matchers
-import org.scalatest.wordspec.AnyWordSpecLike
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 import play.api.Configuration
 import services.MimeType
 
 import java.util.UUID.randomUUID
 
-class FileNameValidatorSpecs extends AnyWordSpecLike with Matchers {
+class FileNameValidatorSpec
+  extends AnyWordSpec
+     with Matchers:
 
-  "checkIfAllowed" must {
-    "return Unit if no mime type is defined" in {
-      validator(Map.empty).validate(randomMimeType(), randomFilename().toString) mustBe Right(())
-    }
+  "checkIfAllowed" should:
+    "return Unit if no mime type is defined" in:
+      validator(Map.empty).validate(randomMimeType(), randomFilename().toString) shouldBe Right(())
 
-    "return Unit if mime type under test is not defined" in {
+    "return Unit if mime type under test is not defined" in:
       validator(Map(randomMimeType() -> Set(randomString())))
-        .validate(randomMimeType(), randomFilename().toString) mustBe Right(())
-    }
+        .validate(randomMimeType(), randomFilename().toString) shouldBe Right(())
 
-    "return Unit if filename doesn't have any extension" in {
+    "return Unit if filename doesn't have any extension" in:
       val mediaType = randomMimeType()
       validator(Map(mediaType -> Set(randomString())))
-        .validate(mediaType, randomString()) mustBe Right(())
-    }
+        .validate(mediaType, randomString()) shouldBe Right(())
 
-    "return Unit if mime type is defined for the filename extension" in {
+    "return Unit if mime type is defined for the filename extension" in:
       val mediaType = randomMimeType()
       val filename  = randomFilename()
       validator(Map(mediaType -> Set(randomString(), randomString(), filename.extension)))
-        .validate(mediaType, filename.toString) mustBe Right(())
-    }
+        .validate(mediaType, filename.toString) shouldBe Right(())
 
-    "return file's extension if mime type is not defined for the filename extension" in {
+    "return file's extension if mime type is not defined for the filename extension" in:
       val mediaType = randomMimeType()
       val filename  = randomFilename()
       validator(Map(mediaType -> Set(randomString(), randomString(), randomString())))
-        .validate(mediaType, filename.toString) mustBe Left(filename.extension)
-    }
-  }
+        .validate(mediaType, filename.toString) shouldBe Left(filename.extension)
 
   private def randomMimeType() = MimeType(randomString())
   private def randomString()   = randomUUID().toString
   private def randomFilename() = Filename()
 
-  private case class Filename(basename: String = randomString(), extension: String = randomString()) {
+  private case class Filename(
+    basename : String = randomString(),
+    extension: String = randomString()
+  ):
     override def toString = s"$basename.$extension"
-  }
 
   private def validator(map: Map[MimeType, Set[String]]) =
-    new FileNameValidator(Configuration.from(Map("allowedExtensions" -> map.map(kv => kv._1.value -> kv._2))))
-}
+    new FileNameValidator(Configuration.from(Map(
+      "allowedExtensions" -> map.map(kv => kv._1.value -> kv._2)
+    )))

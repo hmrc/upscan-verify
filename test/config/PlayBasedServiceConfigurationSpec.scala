@@ -21,11 +21,13 @@ import org.scalatest.{Assertions, GivenWhenThen}
 import play.api.Configuration
 import test.UnitSpec
 
-class PlayBasedServiceConfigurationSpec extends UnitSpec with Assertions with GivenWhenThen {
+class PlayBasedServiceConfigurationSpec
+  extends UnitSpec
+     with Assertions
+     with GivenWhenThen:
 
-  "PlayBasedServiceConfiguration" should {
-
-    "parse consuming service configuration" in {
+  "PlayBasedServiceConfiguration" should:
+    "parse consuming service configuration" in:
       val config = parseConfig(
         """
           |fileTypesFilter.allowedMimeTypes = [
@@ -35,19 +37,16 @@ class PlayBasedServiceConfigurationSpec extends UnitSpec with Assertions with Gi
           |]
           |""".stripMargin)
 
-      config.allowedMimeTypes("test-user-agent-one") shouldBe Some(List("pdf", "jpg"))
-      config.allowedMimeTypes("test-user-agent-two") shouldBe Some(List("docx", "odt"))
+      config.allowedMimeTypes("test-user-agent-one")   shouldBe Some(List("pdf", "jpg"))
+      config.allowedMimeTypes("test-user-agent-two")   shouldBe Some(List("docx", "odt"))
       config.allowedMimeTypes("test-user-agent-three") shouldBe Some(List("png"))
-    }
 
-    "parse empty consuming service configuration" in {
+    "parse empty consuming service configuration" in:
       val config = parseConfig("fileTypesFilter.allowedMimeTypes = []")
       config.allowedMimeTypes("anything") shouldBe None
-    }
 
-    "parse missing consuming service configuration" in {
+    "parse missing consuming service configuration" in:
       parseConfig("").allowedMimeTypes("anything") shouldBe None
-    }
 
     /*
      * This is a change of behaviour introduced during the Play 2.6 upgrade.
@@ -55,25 +54,23 @@ class PlayBasedServiceConfigurationSpec extends UnitSpec with Assertions with Gi
      * 'Configuration error[String: 1: Configuration key 'fileTypesFilter.allowedMimeTypes' is set to null but expected LIST]'.
      * We now interpret 'null' the same as 'empty' or 'missing'.
      */
-    "parse null consuming service configuration" in {
+    "parse null consuming service configuration" in:
       parseConfig("fileTypesFilter.allowedMimeTypes = null").allowedMimeTypes("anything") shouldBe None
-    }
 
-    "parse defaultAllowedMimeTypes if specified" in {
+    "parse defaultAllowedMimeTypes if specified" in:
       val config = parseConfig(
         """
           |fileTypesFilter.defaultAllowedMimeTypes = "docx,odt"
-          |""".stripMargin)
+          |""".stripMargin
+      )
 
       config.defaultAllowedMimeTypes shouldBe List("docx", "odt")
-    }
 
-    "parse empty defaultAllowedMimeTypes" in {
+    "parse empty defaultAllowedMimeTypes" in:
       val config = parseConfig("")
       config.defaultAllowedMimeTypes shouldBe Nil
-    }
 
-    "throw an error for badly formatted consuming service configuration (upon initialisation of the class)" in {
+    "throw an error for badly formatted consuming service configuration (upon initialisation of the class)" in:
       val config = Configuration(ConfigFactory.parseString(
         """
           |fileTypesFilter.allowedMimeTypes = [
@@ -84,13 +81,12 @@ class PlayBasedServiceConfigurationSpec extends UnitSpec with Assertions with Gi
           |""".stripMargin
       ))
 
-      val result = intercept[Exception] {
-        new PlayBasedServiceConfiguration(config)
-      }
+      val result =
+        intercept[Exception]:
+          new PlayBasedServiceConfiguration(config)
+
       result.getMessage shouldBe "Configuration key not correctly configured: fileTypesFilter.allowedMimeTypes, " +
         "errors: Could not parse config object for services configuration: Map(something-else -> Just a badly configured object)"
-    }
-  }
 
-  def parseConfig(s: String) = new PlayBasedServiceConfiguration(Configuration(ConfigFactory.parseString(s)))
-}
+  def parseConfig(s: String) =
+    new PlayBasedServiceConfiguration(Configuration(ConfigFactory.parseString(s)))

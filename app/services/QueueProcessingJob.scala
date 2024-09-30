@@ -17,8 +17,6 @@
 package services
 
 import cats.implicits._
-
-import javax.inject.Inject
 import model.Message
 import play.api.Logging
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
@@ -26,45 +24,47 @@ import util.logging.LoggingDetails
 import util.logging.WithLoggingDetails.withLoggingDetails
 import utils.MonadicUtils
 
+import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 
-class QueueProcessingJob @Inject()(consumer: QueueConsumer, messageProcessor: MessageProcessor, metrics: Metrics)(
-  implicit ec: ExecutionContext)
-    extends PollingJob
-    with Logging {
+class QueueProcessingJob @Inject()(
+  consumer        : QueueConsumer,
+  messageProcessor: MessageProcessor,
+  metrics         : Metrics
+)(implicit
+  ec: ExecutionContext
+) extends PollingJob
+     with Logging:
 
-  private val queueThroughput = metrics.defaultRegistry.meter("verifyThroughput")
+  private val queueThroughput =
+    metrics.defaultRegistry.meter("verifyThroughput")
 
-  def run(): Future[Unit] = {
-    val outcomes = for {
-      messages        <- consumer.poll()
-      messageOutcomes <- Future.sequence { messages.map(processMessage) }
-    } yield messageOutcomes
+  def run(): Future[Unit] =
+    val outcomes =
+      for
+        messages        <- consumer.poll()
+        messageOutcomes <- Future.traverse(messages)(processMessage)
+      yield messageOutcomes
 
     outcomes.map(_ => ())
-  }
 
-  private def processMessage(message: Message): Future[Unit] = {
+  private def processMessage(message: Message): Future[Unit] =
 
-    val outcome = for {
-      context <- messageProcessor.processMessage(message)
-      _ <- MonadicUtils.withContext(consumer.confirm(message), context)
-      _ = queueThroughput.mark()
-    } yield ()
+    val outcome =
+      for
+        context <- messageProcessor.processMessage(message)
+        _       <- MonadicUtils.withContext(consumer.confirm(message), context)
+        _       =  queueThroughput.mark()
+      yield ()
 
-    outcome.value.map {
+    outcome.value.map:
       case Right(_) =>
         ()
       case Left(ExceptionWithContext(exception, Some(context))) =>
-        withLoggingDetails(LoggingDetails.fromMessageContext(context)) {
+        withLoggingDetails(LoggingDetails.fromMessageContext(context)):
           logger.error(
             s"Failed to process message '${message.id}' for Key=[${context.fileReference}], cause ${exception.getMessage}",
             exception
           )
-        }
       case Left(ExceptionWithContext(exception, None)) =>
         logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)
-    }
-  }
-
-}

@@ -20,7 +20,6 @@ import model.{FileUploadEvent, Message}
 
 import scala.concurrent.Future
 
-trait MessageParser {
+trait MessageParser:
 
   def parse(message: Message): Future[FileUploadEvent]
-}

@@ -16,20 +16,21 @@
 
 package services
 
-import java.io.ByteArrayInputStream
-
 import org.apache.commons.codec.digest.DigestUtils
 import org.scalatest.GivenWhenThen
 import test.UnitSpec
 
+import java.io.ByteArrayInputStream
 import scala.collection.mutable
 
-class MessageDigestComputingInputStreamSpec extends UnitSpec with GivenWhenThen {
+class MessageDigestComputingInputStreamSpec
+  extends UnitSpec
+     with GivenWhenThen:
 
   val bytes = "0123456789".getBytes
 
-  "MessageDigestComputingInputStream" should {
-    "allow to read the data from the source stream" in {
+  "MessageDigestComputingInputStream" should:
+    "allow to read the data from the source stream" in:
       val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
 
       var b      = is.read
@@ -39,11 +40,9 @@ class MessageDigestComputingInputStreamSpec extends UnitSpec with GivenWhenThen 
         b = is.read
       }
 
-      buffer.toArray should be(bytes)
-    }
+      buffer.toArray shouldBe bytes
 
-    "allow to bulk read data from the source stream" in {
-
+    "allow to bulk read data from the source stream" in:
       val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
 
       val buffer = new Array[Byte](100)
@@ -52,11 +51,9 @@ class MessageDigestComputingInputStreamSpec extends UnitSpec with GivenWhenThen 
       is.read(buffer, 5, 20) shouldBe 5
       is.read(buffer, 5, 10) shouldBe -1
 
-      buffer.slice(0, bytes.length) should be(bytes)
-    }
+      buffer.slice(0, bytes.length) shouldBe bytes
 
-    "allow to reset the stream in source stream allows to do that" in {
-
+    "allow to reset the stream in source stream allows to do that" in:
       val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
 
       val buffer = new Array[Byte](10)
@@ -66,12 +63,9 @@ class MessageDigestComputingInputStreamSpec extends UnitSpec with GivenWhenThen 
 
       is.read(buffer, 0, 10) shouldBe 10
 
-      buffer.slice(0, bytes.length) should be(bytes)
+      buffer.slice(0, bytes.length) shouldBe bytes
 
-    }
-
-    "allow to skip some part of the stream" in {
-
+    "allow to skip some part of the stream" in:
       val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
 
       val buffer = new Array[Byte](5)
@@ -80,9 +74,8 @@ class MessageDigestComputingInputStreamSpec extends UnitSpec with GivenWhenThen 
       is.read(buffer, 0, 5) shouldBe 5
 
       buffer should be(bytes.slice(5, 10))
-    }
 
-    "properly compute checksum when reading byte by byte" in {
+    "properly compute checksum when reading byte by byte" in:
       val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
 
       var b      = is.read
@@ -93,9 +86,8 @@ class MessageDigestComputingInputStreamSpec extends UnitSpec with GivenWhenThen 
       }
 
       is.getChecksum() shouldBe DigestUtils.sha256Hex(bytes)
-    }
 
-    "properly compute checksum when bulk reading" in {
+    "properly compute checksum when bulk reading" in:
       val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
 
       val buffer = new Array[Byte](100)
@@ -104,9 +96,8 @@ class MessageDigestComputingInputStreamSpec extends UnitSpec with GivenWhenThen 
       is.read(buffer, 5, 20)
 
       is.getChecksum() shouldBe DigestUtils.sha256Hex(bytes)
-    }
 
-    "properly compute checksum when skipping and reading" in {
+    "properly compute checksum when skipping and reading" in:
       val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
 
       val buffer = new Array[Byte](5)
@@ -115,9 +106,8 @@ class MessageDigestComputingInputStreamSpec extends UnitSpec with GivenWhenThen 
       is.read(buffer, 0, 5)
 
       is.getChecksum() shouldBe DigestUtils.sha256Hex(bytes)
-    }
 
-    "should honour resetting when computing checksum" in {
+    "should honour resetting when computing checksum" in:
       val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
 
       val buffer = new Array[Byte](10)
@@ -128,9 +118,5 @@ class MessageDigestComputingInputStreamSpec extends UnitSpec with GivenWhenThen 
       is.read(buffer, 0, 10)
 
       is.getChecksum() shouldBe DigestUtils.sha256Hex(bytes)
-    }
 
     //TODO What about getting checksum when stream wasn't fully read
-  }
-
-}

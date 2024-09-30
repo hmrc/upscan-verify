@@ -16,8 +16,6 @@
 
 package services
 
-import java.time.{Clock, Instant}
-import javax.inject.Inject
 import model._
 import play.api.Logging
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
@@ -26,52 +24,66 @@ import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import util.logging.WithLoggingDetails.withLoggingDetails
 
+import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
-case class NoVirusFound(checksum: String, virusScanTimings: Timings)
+case class NoVirusFound(
+  checksum        : String,
+  virusScanTimings: Timings
+)
 
-trait ScanningService {
-  def scan(location: S3ObjectLocation, objectContent: ObjectContent, objectMetadata: InboundObjectMetadata)(
-    implicit ld: LoggingDetails): Future[Either[FileInfected, NoVirusFound]]
-}
+trait ScanningService:
+  def scan(
+    location      : S3ObjectLocation,
+    objectContent : ObjectContent,
+    objectMetadata: InboundObjectMetadata
+  )(implicit
+    ld: LoggingDetails
+  ): Future[Either[FileInfected, NoVirusFound]]
 
 class ClamAvScanningService @Inject()(
-  clamClientFactory: ClamAntiVirusFactory,
+  clamClientFactory                       : ClamAntiVirusFactory,
   messageDigestComputingInputStreamFactory: ChecksumComputingInputStreamFactory,
-  metrics: Metrics,
-  clock: Clock)(implicit executionContext: ExecutionContext) extends ScanningService with Logging {
+  metrics                                 : Metrics,
+  clock                                   : Clock
+)(implicit
+  executionContext: ExecutionContext
+) extends ScanningService
+     with Logging:
 
-  override def scan(location: S3ObjectLocation, fileContent: ObjectContent, metadata: InboundObjectMetadata)(
-    implicit ld: LoggingDetails): Future[Either[FileInfected, NoVirusFound]] = {
+  override def scan(
+    location   : S3ObjectLocation,
+    fileContent: ObjectContent,
+    metadata   : InboundObjectMetadata
+  )(implicit
+    ld         : LoggingDetails
+  ): Future[Either[FileInfected, NoVirusFound]] =
 
     val startTime       = clock.instant()
     val antivirusClient = clamClientFactory.getClient()
 
     val inputStream = messageDigestComputingInputStreamFactory.create(fileContent.inputStream)
 
-    for {
-      scanResult <- antivirusClient.sendAndCheck(location.objectKey, inputStream, fileContent.length.toInt).map {
-                     case Clean =>
-                       metrics.defaultRegistry.counter("cleanFileUpload").inc()
-                       Right(NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
-                     case Infected(message) =>
-                       withLoggingDetails(ld) {
-                         logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
-                       }
-                       metrics.defaultRegistry.counter("quarantineFileUpload").inc()
-                       Left(FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant())))
-                   }
-    } yield {
+    for
+      scanResult <- antivirusClient
+                      .sendAndCheck(location.objectKey, inputStream, fileContent.length.toInt)
+                      .map:
+                        case Clean =>
+                          metrics.defaultRegistry.counter("cleanFileUpload").inc()
+                          Right(NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
+                        case Infected(message) =>
+                          withLoggingDetails(ld):
+                            logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
+                          metrics.defaultRegistry.counter("quarantineFileUpload").inc()
+                          Left(FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant())))
+    yield
       addScanningTimeMetrics(startTime, clock.instant())
       scanResult
-    }
-  }
 
-  private def addScanningTimeMetrics(startTime: Instant, endTime: Instant): Unit = {
+  private def addScanningTimeMetrics(startTime: Instant, endTime: Instant): Unit =
     metrics.defaultRegistry
       .timer("scanningTime")
       .update(endTime.toEpochMilli - startTime.toEpochMilli, TimeUnit.MILLISECONDS)
-  }
-}

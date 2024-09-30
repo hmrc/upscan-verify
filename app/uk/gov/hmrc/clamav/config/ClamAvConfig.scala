@@ -17,7 +17,7 @@
 package uk.gov.hmrc.clamav.config
 
 trait ClamAvConfig {
-  val host: String
-  val port: Int
+  val host   : String
+  val port   : Int
   val timeout: Int
 }

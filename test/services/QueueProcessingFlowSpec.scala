@@ -18,41 +18,42 @@ package services
 
 import com.codahale.metrics.MetricRegistry
 
-import java.time.Instant
 import model.Message
 import org.scalatest.GivenWhenThen
-import org.mockito.ArgumentMatchers.{any, eq => eqTo}
+import org.scalatest.concurrent.ScalaFutures
+import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when}
 import test.UnitSpec
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import utils.MonadicUtils
 
+import java.time.Instant
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
-class QueueProcessingFlowSpec extends UnitSpec with GivenWhenThen {
+class QueueProcessingFlowSpec
+  extends UnitSpec
+     with GivenWhenThen
+     with ScalaFutures:
 
-  "get messages from the queue consumer, and confirm successfully processed and do not confirm unsuccessfully processed" in {
-
+  "get messages from the queue consumer, and confirm successfully processed and do not confirm unsuccessfully processed" in:
     val queueConsumer    = mock[QueueConsumer]
     val messageProcessor = mock[MessageProcessor]
 
-    val metricsStub = new Metrics {
-      override val defaultRegistry: MetricRegistry = new MetricRegistry
-
-    }
+    val metricsStub = new Metrics:
+      override val defaultRegistry: MetricRegistry =
+        new MetricRegistry
 
     val queueProcessingFlow =
       new QueueProcessingJob(queueConsumer, messageProcessor, metricsStub)
 
     Given("there are three message in a message queue")
-    val validMessage1  = Message("ID1", "VALID-BODY", "RECEIPT-1", Instant.now(), None)
+    val validMessage1  = Message("ID1", "VALID-BODY"  , "RECEIPT-1", Instant.now(), None)
     val invalidMessage = Message("ID2", "INVALID-BODY", "RECEIPT-2", Instant.now(), None)
-    val validMessage2  = Message("ID3", "VALID-BODY", "RECEIPT-3", Instant.now(), None)
+    val validMessage2  = Message("ID3", "VALID-BODY"  , "RECEIPT-3", Instant.now(), None)
 
     when(queueConsumer.poll()).thenReturn(Future.successful(List(validMessage1, invalidMessage, validMessage2)))
-    when(queueConsumer.confirm(any[Message])).thenReturn(Future.successful(()))
+    when(queueConsumer.confirm(any[Message])).thenReturn(Future.unit)
 
     And("processing of two messages succeeds")
     val context = MessageContext("TEST")
@@ -68,7 +69,7 @@ class QueueProcessingFlowSpec extends UnitSpec with GivenWhenThen {
     And("processing of one message fails")
 
     When("the orchestrator is called")
-    Await.result(queueProcessingFlow.run(), 30.seconds)
+    queueProcessingFlow.run().futureValue
 
     Then("the queue consumer should poll for messages")
     verify(queueConsumer).poll()
@@ -84,7 +85,3 @@ class QueueProcessingFlowSpec extends UnitSpec with GivenWhenThen {
 
     And("invalid messages are not confirmed")
     verifyNoMoreInteractions(queueConsumer)
-
-  }
-
-}

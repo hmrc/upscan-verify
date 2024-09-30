@@ -21,7 +21,7 @@ import services.{ExceptionWithContext, MessageContext}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-object MonadicUtils {
+object MonadicUtils:
 
   type FutureEitherWithContext[T] = EitherT[Future, ExceptionWithContext, T]
 
@@ -31,11 +31,13 @@ object MonadicUtils {
   def withoutContext[T](f: Future[T])(implicit ec: ExecutionContext): FutureEitherWithContext[T] =
     toFutureEitherWithContext(f, None)
 
-  private def toFutureEitherWithContext[T](f: Future[T], context: Option[MessageContext])
-                                          (implicit ec: ExecutionContext): FutureEitherWithContext[T] = {
-    val futureEither: Future[Either[ExceptionWithContext, T]] =
-      f.map(Right(_))
+  private def toFutureEitherWithContext[T](
+    f      : Future[T],
+    context: Option[MessageContext]
+  )(implicit
+    ec     : ExecutionContext
+  ): FutureEitherWithContext[T] =
+    EitherT:
+      f
+        .map(Right.apply)
         .recover { case error: Exception => Left(ExceptionWithContext(error, context)) }
-    EitherT(futureEither)
-  }
-}

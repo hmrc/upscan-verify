@@ -20,13 +20,22 @@ import java.time.{Clock, Duration, Instant, ZoneId}
 import java.util.concurrent.atomic.AtomicLong
 
 // Clock impl that increments the time by "increment" for each call to "instant".
-class IncrementingClock(baseTimeInMillis: Long, increment: Duration, zoneId: ZoneId = ZoneId.systemDefault()) extends Clock {
+class IncrementingClock(
+  baseTimeInMillis: Long,
+  increment       : Duration,
+  zoneId          : ZoneId = ZoneId.systemDefault()
+) extends Clock:
 
   private val baseMillis = new AtomicLong(baseTimeInMillis)
 
-  override def getZone: ZoneId = zoneId
-  override def withZone(newZoneId: ZoneId): Clock = new IncrementingClock(baseMillis.get(), increment, zoneId)
-  override def instant(): Instant = Instant.ofEpochMilli(baseMillis.getAndAdd(increment.toMillis))
+  override def getZone: ZoneId =
+    zoneId
 
-  protected[test] def reset() = baseMillis.set(baseTimeInMillis)
-}
+  override def withZone(newZoneId: ZoneId): Clock =
+    new IncrementingClock(baseMillis.get(), increment, zoneId)
+
+  override def instant(): Instant =
+    Instant.ofEpochMilli(baseMillis.getAndAdd(increment.toMillis))
+
+  protected[test] def reset() =
+    baseMillis.set(baseTimeInMillis)

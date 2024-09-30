@@ -20,42 +20,41 @@ import org.slf4j.MDC
 import test.UnitSpec
 import uk.gov.hmrc.http.HeaderCarrier
 
-class WithLoggingDetailsSpec extends UnitSpec {
-  "loggingWithDetails" should {
-    "add details to logging context " in {
+class WithLoggingDetailsSpec extends UnitSpec:
+
+  "loggingWithDetails" should:
+    "add details to logging context " in:
       MDC.put("key1", "old-val")
-      val loggingDetails = new HeaderCarrier() {
-        override lazy val mdcData: Map[String, String] = super.mdcData + ("key1" -> "new-val") + ("key2" -> "some-val")
-      }
-      WithLoggingDetails.withLoggingDetails(loggingDetails) {
+      val loggingDetails = new HeaderCarrier():
+        override lazy val mdcData: Map[String, String] =
+          super.mdcData + ("key1" -> "new-val") + ("key2" -> "some-val")
+
+      WithLoggingDetails.withLoggingDetails(loggingDetails) :
         MDC.get("key1") shouldBe "new-val"
         MDC.get("key2") shouldBe "some-val"
-      }
-    }
 
-    "restore previous context if it exists" in {
+    "restore previous context if it exists" in:
       MDC.put("key1", "old-val")
-      val loggingDetails = new HeaderCarrier() {
-        override lazy val mdcData: Map[String, String] = super.mdcData + ("key1" -> "new-val") + ("key2" -> "some-val")
-      }
+      val loggingDetails = new HeaderCarrier():
+        override lazy val mdcData: Map[String, String] =
+          super.mdcData + ("key1" -> "new-val") + ("key2" -> "some-val")
+
       WithLoggingDetails.withLoggingDetails(loggingDetails) {
         //do nothing
       }
+
       MDC.get("key1") shouldBe "old-val"
       MDC.get("key2") shouldBe null
 
-    }
-
-    "clear context if there was no previous one" in {
+    "clear context if there was no previous one" in:
       MDC.clear()
-      val loggingDetails = new HeaderCarrier() {
-        override lazy val mdcData: Map[String, String] = super.mdcData + ("key1" -> "new-val") + ("key2" -> "some-val")
-      }
-      WithLoggingDetails.withLoggingDetails(loggingDetails) {
+      val loggingDetails = new HeaderCarrier():
+        override lazy val mdcData: Map[String, String] =
+          super.mdcData + ("key1" -> "new-val") + ("key2" -> "some-val")
+
+      WithLoggingDetails.withLoggingDetails(loggingDetails){
         //do nothing
       }
+
       MDC.get("key1") shouldBe null
       MDC.get("key2") shouldBe null
-    }
-  }
-}

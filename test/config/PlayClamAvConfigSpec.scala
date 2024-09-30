@@ -19,45 +19,48 @@ package config
 import play.api.Configuration
 import test.UnitSpec
 
-class PlayClamAvConfigSpec extends UnitSpec {
+class PlayClamAvConfigSpec extends UnitSpec:
 
-  "PlayClamAvConfig" should {
-    "load the configuration values from the play application config if all values are present" in {
-      val configuration: Configuration = Configuration.from(
-        Map("clam.antivirus.host" -> "avscan", "clam.antivirus.port" -> 3310, "clam.antivirus.timeout" -> 5000)
-      )
+  "PlayClamAvConfig" should:
+    "load the configuration values from the play application config if all values are present" in:
+      val configuration: Configuration =
+        Configuration.from(Map(
+          "clam.antivirus.host"    -> "avscan",
+          "clam.antivirus.port"    -> 3310,
+          "clam.antivirus.timeout" -> 5000
+        ))
 
       val clamAvConfig = new PlayClamAvConfig(configuration)
-      clamAvConfig.host shouldBe "avscan"
-      clamAvConfig.port shouldBe 3310
+      clamAvConfig.host    shouldBe "avscan"
+      clamAvConfig.port    shouldBe 3310
       clamAvConfig.timeout shouldBe 5000
-    }
 
-    "throw an exception if there is no clam host" in {
-      val configuration: Configuration = Configuration.from(
-        Map("clam.antivirus.port" -> 3310, "clam.antivirus.timeout" -> 5000)
-      )
-      intercept[Exception] {
-        new PlayClamAvConfig(configuration)
-      }
-    }
+    "throw an exception if there is no clam host" in:
+      val configuration: Configuration =
+        Configuration.from(Map(
+          "clam.antivirus.port"    -> 3310,
+          "clam.antivirus.timeout" -> 5000
+        ))
 
-    "throw an exception if there is no clam port" in {
-      val configuration: Configuration = Configuration.from(
-        Map("clam.antivirus.host" -> "avscan", "clam.antivirus.timeout" -> 5000)
-      )
-      intercept[Exception] {
+      intercept[Exception]:
         new PlayClamAvConfig(configuration)
-      }
-    }
 
-    "throw an exception if there is no clam timeeout" in {
-      val configuration: Configuration = Configuration.from(
-        Map("clam.antivirus.host" -> "avscan", "clam.antivirus.port" -> 3310)
-      )
-      intercept[Exception] {
+    "throw an exception if there is no clam port" in:
+      val configuration: Configuration =
+        Configuration.from(Map(
+          "clam.antivirus.host"    -> "avscan",
+          "clam.antivirus.timeout" -> 5000
+        ))
+
+      intercept[Exception]:
         new PlayClamAvConfig(configuration)
-      }
-    }
-  }
-}
+
+    "throw an exception if there is no clam timeeout" in:
+      val configuration: Configuration =
+        Configuration.from(Map(
+          "clam.antivirus.host" -> "avscan",
+          "clam.antivirus.port" -> 3310
+        ))
+
+      intercept[Exception]:
+        new PlayClamAvConfig(configuration)

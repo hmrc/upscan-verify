@@ -25,7 +25,7 @@ import services.ContinuousPollingActor.Poll
 
 import javax.inject.Inject
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success}
 
 trait PollingJob:
@@ -36,7 +36,7 @@ trait PollingJob:
 class ContinuousPoller @Inject()(
   job                 : PollingJob,
   serviceConfiguration: ServiceConfiguration
-)(implicit
+)(using
   actorSystem         : ActorSystem,
   applicationLifecycle: ApplicationLifecycle
 ) extends Logging:

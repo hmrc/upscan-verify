@@ -32,12 +32,12 @@ class SqsQueueConsumer @Inject()(
   sqsClient    : AmazonSQS,
   configuration: ServiceConfiguration,
   clock        : Clock
-)(implicit
-  ec: ExecutionContext
+)(using
+  ExecutionContext
 ) extends QueueConsumer with Logging:
 
   override def poll(): Future[List[Message]] =
-    val receiveMessageRequest = new ReceiveMessageRequest(configuration.inboundQueueUrl)
+    val receiveMessageRequest = ReceiveMessageRequest(configuration.inboundQueueUrl)
       .withMaxNumberOfMessages(configuration.processingBatchSize)
       .withWaitTimeSeconds(20)
       .withVisibilityTimeout(configuration.inboundQueueVisibilityTimeout.toSeconds.toInt)
@@ -64,7 +64,7 @@ class SqsQueueConsumer @Inject()(
         Message(sqsMessage.getMessageId, sqsMessage.getBody, sqsMessage.getReceiptHandle, receivedAt, queueTimestamp)
 
   override def confirm(message: Message): Future[Unit] =
-    val deleteMessageRequest = new DeleteMessageRequest(configuration.inboundQueueUrl, message.receiptHandle)
+    val deleteMessageRequest = DeleteMessageRequest(configuration.inboundQueueUrl, message.receiptHandle)
     Future:
       sqsClient.deleteMessage(deleteMessageRequest)
       logger.debug(

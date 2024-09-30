@@ -28,8 +28,8 @@ trait WithIncrementingClock extends BeforeAndAfterEach:
   lazy val zoneId       : ZoneId = ZoneId.systemDefault()
   lazy val tickIncrement: Duration = Duration.ofSeconds(1)
 
-  implicit lazy val clock: IncrementingClock =
-    new IncrementingClock(Clock.fixed(clockStart, zoneId).millis(), tickIncrement)
+  lazy val clock: IncrementingClock =
+    IncrementingClock(Clock.fixed(clockStart, zoneId).millis(), tickIncrement)
 
   override protected def beforeEach(): Unit =
     clock.reset()

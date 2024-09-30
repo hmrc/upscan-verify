@@ -24,7 +24,7 @@ import java.io.InputStream
 
 class XmlDetector extends Detector:
 
-  val extractor = new XmlRootExtractor
+  val extractor = XmlRootExtractor()
 
   override def detect(input: InputStream, metadata: Metadata): MediaType =
     if filenameHasHtmlExtension(metadata) then

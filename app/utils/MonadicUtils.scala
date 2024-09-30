@@ -25,17 +25,17 @@ object MonadicUtils:
 
   type FutureEitherWithContext[T] = EitherT[Future, ExceptionWithContext, T]
 
-  def withContext[T](f: Future[T], context: MessageContext)(implicit ec: ExecutionContext): FutureEitherWithContext[T] =
+  def withContext[T](f: Future[T], context: MessageContext)(using ExecutionContext): FutureEitherWithContext[T] =
     toFutureEitherWithContext(f, Some(context))
 
-  def withoutContext[T](f: Future[T])(implicit ec: ExecutionContext): FutureEitherWithContext[T] =
+  def withoutContext[T](f: Future[T])(using ExecutionContext): FutureEitherWithContext[T] =
     toFutureEitherWithContext(f, None)
 
   private def toFutureEitherWithContext[T](
     f      : Future[T],
     context: Option[MessageContext]
-  )(implicit
-    ec     : ExecutionContext
+  )(using
+    ExecutionContext
   ): FutureEitherWithContext[T] =
     EitherT:
       f

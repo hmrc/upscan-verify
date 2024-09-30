@@ -27,7 +27,7 @@ class S3EventMessageParserSpec
   extends UnitSpec
      with ScalaFutures:
 
-  val parser = new S3EventParser()
+  val parser = S3EventParser()
 
   "MessageParser" should:
     "properly parse valid S3 event message" in:

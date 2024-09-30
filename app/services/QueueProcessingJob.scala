@@ -31,8 +31,8 @@ class QueueProcessingJob @Inject()(
   consumer        : QueueConsumer,
   messageProcessor: MessageProcessor,
   metrics         : Metrics
-)(implicit
-  ec: ExecutionContext
+)(using
+  ExecutionContext
 ) extends PollingJob
      with Logging:
 

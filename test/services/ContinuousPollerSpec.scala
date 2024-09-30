@@ -28,8 +28,6 @@ import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 
 class ContinuousPollerSpec extends UnitSpec with Eventually:
 
-  implicit def actorSystem: ActorSystem = ActorSystem()
-
   val serviceConfiguration = new ServiceConfiguration:
     override def accessKeyId: String = ???
 
@@ -59,15 +57,18 @@ class ContinuousPollerSpec extends UnitSpec with Eventually:
 
   "QueuePollingJob" should:
     "continuously poll the queue" in:
-      val callCount = new AtomicInteger(0)
+      given actorSystem: ActorSystem = ActorSystem()
+
+      val callCount = AtomicInteger(0)
 
       val orchestrator: PollingJob =
         new PollingJob:
-          override def run() = Future.successful(callCount.incrementAndGet())
+          override def run() =
+            Future.successful(callCount.incrementAndGet())
 
-      val serviceLifecycle = new DefaultApplicationLifecycle()
+      val serviceLifecycle = DefaultApplicationLifecycle()
 
-      new ContinuousPoller(orchestrator, serviceConfiguration)(actorSystem, serviceLifecycle)
+      ContinuousPoller(orchestrator, serviceConfiguration)(using actorSystem, serviceLifecycle)
 
       eventually:
         callCount.get() > 5
@@ -75,19 +76,21 @@ class ContinuousPollerSpec extends UnitSpec with Eventually:
       serviceLifecycle.stop()
 
     "recover from failure after some time" in:
-      val callCount = new AtomicInteger(0)
+      given actorSystem: ActorSystem = ActorSystem()
+
+      val callCount = AtomicInteger(0)
 
       val orchestrator: PollingJob =
         new PollingJob:
           override def run() =
             if callCount.get() == 1 then
-              Future.failed(new RuntimeException("Planned failure"))
+              Future.failed(RuntimeException("Planned failure"))
             else
               Future.successful(callCount.incrementAndGet())
 
-      val serviceLifecycle = new DefaultApplicationLifecycle()
+      val serviceLifecycle = DefaultApplicationLifecycle()
 
-      new ContinuousPoller(orchestrator, serviceConfiguration)(actorSystem, serviceLifecycle)
+      ContinuousPoller(orchestrator, serviceConfiguration)(using actorSystem, serviceLifecycle)
 
       eventually:
         callCount.get() > 5

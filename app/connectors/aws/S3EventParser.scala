@@ -29,7 +29,7 @@ import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessageParser with Logging:
+class S3EventParser @Inject() ()(using ExecutionContext) extends MessageParser with Logging:
 
   case class S3EventNotification(
     records: Seq[S3EventNotificationRecord]
@@ -52,19 +52,22 @@ class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessagePars
   case class S3Details(
     bucketName: String,
     objectKey : String,
-    versionId : Option[String])
+    versionId : Option[String]
+  )
 
-  implicit val s3reads: Reads[S3Details] =
+  given Reads[S3Details] =
     ( (__ \ "bucket" \ "name"     ).read[String]
     ~ (__ \ "object" \ "key"      ).read[String]
     ~ (__ \ "object" \ "versionId").read[String].map(Some(_).filterNot(_.equals("null")))
     )(S3Details.apply _)
 
-  implicit val requestParametersReads: Reads[RequestParameters] = Json.reads[RequestParameters]
+  given Reads[RequestParameters] =
+    Json.reads[RequestParameters]
 
-  implicit val reads: Reads[S3EventNotificationRecord] = Json.reads[S3EventNotificationRecord]
+  given Reads[S3EventNotificationRecord] =
+    Json.reads[S3EventNotificationRecord]
 
-  implicit val messageReads: Reads[S3EventNotification] =
+  given Reads[S3EventNotification] =
     (__ \ "Records").read[Seq[S3EventNotificationRecord]].map(S3EventNotification.apply)
 
   override def parse(message: Message): Future[FileUploadEvent] =
@@ -76,7 +79,7 @@ class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessagePars
 
   private def asFuture[T](input: JsResult[T]): Future[T] =
     input.fold(
-      errors => Future.failed(new Exception(s"Cannot parse the message: [${errors.toString()}].")),
+      errors => Future.failed(Exception(s"Cannot parse the message: [${errors.toString()}].")),
       result => Future.successful(result)
     )
 
@@ -95,4 +98,4 @@ class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessagePars
         Future.successful(event)
 
       case _ =>
-        Future.failed(new Exception(s"Unexpected records in event: [${result.records.toString}]."))
+        Future.failed(Exception(s"Unexpected records in event: [${result.records.toString}]."))

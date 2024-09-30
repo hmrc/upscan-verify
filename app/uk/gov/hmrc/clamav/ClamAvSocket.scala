@@ -30,7 +30,7 @@ private[clamav] class ClamAvSocket(
 ) extends Connection
      with Logging:
 
-  private def terminate()(implicit ec: ExecutionContext): Future[Unit] =
+  private def terminate()(using ExecutionContext): Future[Unit] =
     Future
       .apply:
         socket.close()
@@ -47,29 +47,29 @@ private[clamav] object ClamAvSocket:
 
   private def openSocket(
     config: ClamAvConfig
-  )(implicit
-    ec    : ExecutionContext
+  )(using
+    ExecutionContext
   ): Future[ClamAvSocket] =
     Future:
-      val sock = new Socket
+      val sock = Socket()
       sock.setSoTimeout(config.timeout)
       sock.setKeepAlive(true)
 
-      val address: InetSocketAddress = new InetSocketAddress(config.host, config.port)
+      val address: InetSocketAddress = InetSocketAddress(config.host, config.port)
       sock.connect(address)
 
-      new ClamAvSocket(
+      ClamAvSocket(
         sock,
         in  = sock.getInputStream,
-        out = new DataOutputStream(sock.getOutputStream)
+        out = DataOutputStream(sock.getOutputStream)
       )
 
   def withSocket[T](
     config: ClamAvConfig
   )(
     function: Connection => Future[T]
-  )(implicit
-    ec: ExecutionContext
+  )(using
+    ExecutionContext
   ): Future[T] =
     for
       socket <- openSocket(config)

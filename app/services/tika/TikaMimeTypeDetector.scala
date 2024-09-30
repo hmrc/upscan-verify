@@ -34,7 +34,7 @@ class TikaMimeTypeDetector extends MimeTypeDetector:
 
     val tikaInputStream = TikaInputStream.get(inputStream)
 
-    val metadata = new Metadata()
+    val metadata = Metadata()
     fileName.foreach(name => metadata.add(TikaCoreProperties.RESOURCE_NAME_KEY, name))
 
     val detectionResult = detector.detect(tikaInputStream, metadata)

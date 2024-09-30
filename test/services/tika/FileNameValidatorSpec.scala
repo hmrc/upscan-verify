@@ -63,6 +63,6 @@ class FileNameValidatorSpec
     override def toString = s"$basename.$extension"
 
   private def validator(map: Map[MimeType, Set[String]]) =
-    new FileNameValidator(Configuration.from(Map(
+    FileNameValidator(Configuration.from(Map(
       "allowedExtensions" -> map.map(kv => kv._1.value -> kv._2)
     )))

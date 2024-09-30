@@ -83,10 +83,10 @@ class PlayBasedServiceConfigurationSpec
 
       val result =
         intercept[Exception]:
-          new PlayBasedServiceConfiguration(config)
+          PlayBasedServiceConfiguration(config)
 
       result.getMessage shouldBe "Configuration key not correctly configured: fileTypesFilter.allowedMimeTypes, " +
         "errors: Could not parse config object for services configuration: Map(something-else -> Just a badly configured object)"
 
   def parseConfig(s: String) =
-    new PlayBasedServiceConfiguration(Configuration(ConfigFactory.parseString(s)))
+    PlayBasedServiceConfiguration(Configuration(ConfigFactory.parseString(s)))

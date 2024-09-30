@@ -21,7 +21,7 @@ import play.api.{ConfigLoader, Configuration}
 
 import javax.inject.Inject
 import scala.jdk.CollectionConverters._
-import scala.concurrent.duration._
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 trait ServiceConfiguration:
   def quarantineBucket: String
@@ -112,7 +112,7 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
         case _ =>
           Left(s"Could not parse config object for services configuration: $serviceAsMap")
 
-    implicit val configObjectListConfigLoader: ConfigLoader[List[ConfigObject]] = ConfigLoader(_.getObjectList).map(_.asScala.toList)
+    given ConfigLoader[List[ConfigObject]] = ConfigLoader(_.getObjectList).map(_.asScala.toList)
 
     val key                     = "fileTypesFilter.allowedMimeTypes"
     val servicesConfigArray     = configuration.getOptional[List[ConfigObject]](key).getOrElse(Nil)
@@ -123,4 +123,4 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
         val allowed = serviceAllowedMimeTypes.collect({ case Right(allowedMimeTypes) => allowedMimeTypes })
         ConsumingServicesConfiguration(allowed)
       case errors =>
-        throw new Exception(s"Configuration key not correctly configured: $key, errors: ${errors.mkString(", ")}")
+        throw Exception(s"Configuration key not correctly configured: $key, errors: ${errors.mkString(", ")}")

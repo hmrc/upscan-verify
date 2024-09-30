@@ -46,18 +46,18 @@ class S3FileManagerSpec
      with Eventually
      with ScalaFutures:
 
-  private val awsLastModified      = new GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
+  private val awsLastModified      = GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
   private val metadataLastModified = awsLastModified.toInstant
 
-  implicit val ld: HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
+  given HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   "S3FileManager" should:
     "allow to copy file from inbound bucket to outbound bucket" in:
       val s3client: AmazonS3 = mock[AmazonS3]
       when(s3client.copyObject(any[CopyObjectRequest]))
-        .thenReturn(new CopyObjectResult())
+        .thenReturn(CopyObjectResult())
 
-      val fileManager      = new S3FileManager(s3client)
+      val fileManager      = S3FileManager(s3client)
       val inboundLocation  = S3ObjectLocation("inboundBucket", "file", Some("version"))
       val outboundLocation = S3ObjectLocation("outboundBucket", "outboundLocation", None)
 
@@ -67,7 +67,7 @@ class S3FileManagerSpec
         inboundLocation
       )
 
-      val metadata = ValidOutboundObjectMetadata(inboundDetails, "checksum", MimeType("application/xml"), Map.empty)
+      val metadata = OutboundObjectMetadata.valid(inboundDetails, "checksum", MimeType("application/xml"), Map.empty)
 
       When("copying the file is requested")
       fileManager
@@ -99,8 +99,8 @@ class S3FileManagerSpec
       )
 
       val s3client = mock[AmazonS3]
-      when(s3client.copyObject(any[CopyObjectRequest])).thenThrow(new RuntimeException("exception"))
-      val fileManager = new S3FileManager(s3client)
+      when(s3client.copyObject(any[CopyObjectRequest])).thenThrow(RuntimeException("exception"))
+      val fileManager = S3FileManager(s3client)
 
       When("copying the file is requested")
       val result =
@@ -108,7 +108,7 @@ class S3FileManagerSpec
           .copyObject(
             inboundLocation,
             outboundLocation,
-            ValidOutboundObjectMetadata(inboundDetails, "CHECKSUM", MimeType("application/xml"), Map.empty)
+            OutboundObjectMetadata.valid(inboundDetails, "CHECKSUM", MimeType("application/xml"), Map.empty)
           )
 
       Then("error is returned")
@@ -116,7 +116,7 @@ class S3FileManagerSpec
 
     "allow to delete non versioned file" in:
       val s3client: AmazonS3 = mock[AmazonS3]
-      val fileManager        = new S3FileManager(s3client)
+      val fileManager        = S3FileManager(s3client)
 
       When("deleting the file is requested")
       fileManager.delete(S3ObjectLocation("inboundBucket", "file", None)).futureValue
@@ -127,7 +127,7 @@ class S3FileManagerSpec
 
     "allow to delete versioned file" in:
       val s3client: AmazonS3 = mock[AmazonS3]
-      val fileManager        = new S3FileManager(s3client)
+      val fileManager        = S3FileManager(s3client)
 
       When("deleting the file is requested")
       fileManager.delete(S3ObjectLocation("inboundBucket", "file", Some("version"))).futureValue
@@ -138,11 +138,11 @@ class S3FileManagerSpec
 
     "allow to retrieve objects metadata" in:
       val s3client: AmazonS3 = mock[AmazonS3]
-      val fileManager        = new S3FileManager(s3client)
+      val fileManager        = S3FileManager(s3client)
 
-      val userMetadata = new java.util.HashMap[String, String]()
+      val userMetadata = java.util.HashMap[String, String]()
       userMetadata.put("callbackUrl", "http://some.callback.url")
-      val fileMetadata = new ObjectMetadata()
+      val fileMetadata = ObjectMetadata()
       fileMetadata.setUserMetadata(userMetadata)
       fileMetadata.setLastModified(awsLastModified)
 
@@ -169,8 +169,8 @@ class S3FileManagerSpec
     "return error if deleting the file failed" in:
       val s3client: AmazonS3 = mock[AmazonS3]
       Given("deleting file would fail")
-      doThrow(new RuntimeException("exception")).when(s3client).deleteObject(any[String], any[String])
-      val fileManager = new S3FileManager(s3client)
+      doThrow(RuntimeException("exception")).when(s3client).deleteObject(any[String], any[String])
+      val fileManager = S3FileManager(s3client)
 
       When("deleting the file is requested")
       val result = fileManager.delete(S3ObjectLocation("inboundBucket", "file", None))
@@ -189,10 +189,10 @@ class S3FileManagerSpec
           super.close()
           s3ObjectClosed = true
 
-      val fileInputStream = new ByteArrayInputStream(byteArray)
+      val fileInputStream = ByteArrayInputStream(byteArray)
       s3Object.setObjectContent(fileInputStream)
 
-      val fileMetadata = new ObjectMetadata()
+      val fileMetadata = ObjectMetadata()
       fileMetadata.setContentLength(byteArray.length)
       s3Object.setObjectMetadata(fileMetadata)
 
@@ -200,7 +200,7 @@ class S3FileManagerSpec
       when(s3client.getObject(any[GetObjectRequest])).thenReturn(s3Object)
 
       Given("a valid file location")
-      val fileManager = new S3FileManager(s3client)
+      val fileManager = S3FileManager(s3client)
 
       When("the bytes are requested")
       def readingFunction(f: ObjectContent): Future[(String, Long)] =
@@ -236,8 +236,8 @@ class S3FileManagerSpec
           super.close()
           s3ObjectClosed = true
 
-      s3Object.setObjectContent(new ByteArrayInputStream(byteArray))
-      val fileMetadata = new ObjectMetadata()
+      s3Object.setObjectContent(ByteArrayInputStream(byteArray))
+      val fileMetadata = ObjectMetadata()
       fileMetadata.setContentLength(byteArray.length)
       s3Object.setObjectMetadata(fileMetadata)
 
@@ -245,10 +245,10 @@ class S3FileManagerSpec
       when(s3client.getObject(any[GetObjectRequest])).thenReturn(s3Object)
 
       Given("a valid file location")
-      val fileManager = new S3FileManager(s3client)
+      val fileManager = S3FileManager(s3client)
 
       When("the file has been read")
-      fileManager.withObjectContent(fileLocation)(_ => Future.failed(new RuntimeException("expected failure")))
+      fileManager.withObjectContent(fileLocation)(_ => Future.failed(RuntimeException("expected failure")))
         .failed.futureValue
 
       And("stream has been closed")
@@ -257,13 +257,13 @@ class S3FileManagerSpec
 
     "return error if file retrieval fails" in:
       val fileLocation = S3ObjectLocation("inboundBucket", "file", None)
-      val expectedGetObjectRequest = new GetObjectRequest(fileLocation.bucket, fileLocation.objectKey)
+      val expectedGetObjectRequest = GetObjectRequest(fileLocation.bucket, fileLocation.objectKey)
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      when(s3client.getObject(eqTo(expectedGetObjectRequest))).thenThrow(new RuntimeException("exception"))
+      when(s3client.getObject(eqTo(expectedGetObjectRequest))).thenThrow(RuntimeException("exception"))
 
       Given("a call to the S3 client errors")
-      val fileManager = new S3FileManager(s3client)
+      val fileManager = S3FileManager(s3client)
 
       When("the bytes are requested")
       val result = fileManager.withObjectContent(fileLocation)(Future.successful)
@@ -287,12 +287,12 @@ class S3FileManagerSpec
       )
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      val fileManager        = new S3FileManager(s3client)
+      val fileManager        = S3FileManager(s3client)
 
       When("a call to copy to quarantine is made")
-      val content = new ByteArrayInputStream("This is a dirty file".getBytes)
+      val content = ByteArrayInputStream("This is a dirty file".getBytes)
 
-      val metadata = ValidOutboundObjectMetadata(inboundDetails, "checksum", MimeType("application/xml"), Map.empty)
+      val metadata = OutboundObjectMetadata.valid(inboundDetails, "checksum", MimeType("application/xml"), Map.empty)
 
       fileManager.writeObject(inboundLocation, outboundLocation, content, metadata).futureValue
 
@@ -315,14 +315,14 @@ class S3FileManagerSpec
 
       val s3client: AmazonS3 = mock[AmazonS3]
       when(s3client.putObject(any[String], any[String], any[InputStream], any[ObjectMetadata]))
-        .thenThrow(new SdkClientException("This is a put exception"))
+        .thenThrow(SdkClientException("This is a put exception"))
 
-      val fileManager = new S3FileManager(s3client)
+      val fileManager = S3FileManager(s3client)
 
       When("a call to copy to quarantine is made")
-      val content = new ByteArrayInputStream("This is a dirty file".getBytes)
+      val content = ByteArrayInputStream("This is a dirty file".getBytes)
 
-      val metadata = ValidOutboundObjectMetadata(
+      val metadata = OutboundObjectMetadata.valid(
         inboundDetails,
         "checksum",
         MimeType("application/xml"),

@@ -29,40 +29,40 @@ class XmlDetectorSpec
      with GivenWhenThen:
 
   "XMLDetector" should:
-    val xmlDetector = new XmlDetector
+    val xmlDetector = XmlDetector()
 
     "detect XML file with XML declaration as XML" in:
       val xml = """<?xml version="1.0" encoding="UTF-8"?><test></test>"""
-      val is = new ByteArrayInputStream(xml.getBytes)
-      xmlDetector.detect(is, new Metadata()) shouldBe MediaType.APPLICATION_XML
+      val is  = ByteArrayInputStream(xml.getBytes)
+      xmlDetector.detect(is, Metadata()) shouldBe MediaType.APPLICATION_XML
 
     "detect XML file without XML declaration as XML" in:
       val xml = """<test></test>"""
-      val is = new ByteArrayInputStream(xml.getBytes)
-      xmlDetector.detect(is, new Metadata()) shouldBe MediaType.APPLICATION_XML
+      val is  = ByteArrayInputStream(xml.getBytes)
+      xmlDetector.detect(is, Metadata()) shouldBe MediaType.APPLICATION_XML
 
     "detect non-XML file as octet stream" in:
       val xml = """NOT XML"""
-      val is = new ByteArrayInputStream(xml.getBytes)
-      xmlDetector.detect(is, new Metadata()) shouldBe MediaType.OCTET_STREAM
+      val is  = ByteArrayInputStream(xml.getBytes)
+      xmlDetector.detect(is, Metadata()) shouldBe MediaType.OCTET_STREAM
 
     "detect file with .html extension as octet stream" in:
-      val metadata = new Metadata()
+      val metadata = Metadata()
       metadata.add(TikaCoreProperties.RESOURCE_NAME_KEY, "test.html")
-      xmlDetector.detect(new ByteArrayInputStream("""<html></html>""".getBytes), metadata) shouldBe MediaType.OCTET_STREAM
+      xmlDetector.detect(ByteArrayInputStream("""<html></html>""".getBytes), metadata) shouldBe MediaType.OCTET_STREAM
 
     "detect file with .htm extension as octet stream" in:
-      val metadata = new Metadata()
+      val metadata = Metadata()
       metadata.add(TikaCoreProperties.RESOURCE_NAME_KEY, "test.htm")
-      xmlDetector.detect(new ByteArrayInputStream("""<html></html>""".getBytes), metadata) shouldBe MediaType.OCTET_STREAM
+      xmlDetector.detect(ByteArrayInputStream("""<html></html>""".getBytes), metadata) shouldBe MediaType.OCTET_STREAM
 
     "reset input stream after processing" in:
       val xml = """<test></test>"""
-      val is = new ByteArrayInputStream(xml.getBytes)
+      val is  = ByteArrayInputStream(xml.getBytes)
 
       When("Detector analyzed the file")
 
-      xmlDetector.detect(is, new Metadata())
+      xmlDetector.detect(is, Metadata())
 
       Then("it still should be possible to read the file from the beginning")
 
@@ -70,5 +70,5 @@ class XmlDetectorSpec
       retrievedFileContent shouldBe xml
 
   private def readAll(is : InputStream): String =
-    val reader = new BufferedReader(new InputStreamReader(is))
+    val reader = BufferedReader(InputStreamReader(is))
     LazyList.continually(reader.readLine()).takeWhile(_ != null).mkString("\n")

@@ -31,7 +31,7 @@ class MessageDigestComputingInputStreamSpec
 
   "MessageDigestComputingInputStream" should:
     "allow to read the data from the source stream" in:
-      val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
+      val is = MessageDigestComputingInputStream(ByteArrayInputStream(bytes), "SHA-256")
 
       var b      = is.read
       val buffer = mutable.Buffer[Byte]()
@@ -43,7 +43,7 @@ class MessageDigestComputingInputStreamSpec
       buffer.toArray shouldBe bytes
 
     "allow to bulk read data from the source stream" in:
-      val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
+      val is = MessageDigestComputingInputStream(ByteArrayInputStream(bytes), "SHA-256")
 
       val buffer = new Array[Byte](100)
 
@@ -54,7 +54,7 @@ class MessageDigestComputingInputStreamSpec
       buffer.slice(0, bytes.length) shouldBe bytes
 
     "allow to reset the stream in source stream allows to do that" in:
-      val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
+      val is = MessageDigestComputingInputStream(ByteArrayInputStream(bytes), "SHA-256")
 
       val buffer = new Array[Byte](10)
 
@@ -66,7 +66,7 @@ class MessageDigestComputingInputStreamSpec
       buffer.slice(0, bytes.length) shouldBe bytes
 
     "allow to skip some part of the stream" in:
-      val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
+      val is = MessageDigestComputingInputStream(ByteArrayInputStream(bytes), "SHA-256")
 
       val buffer = new Array[Byte](5)
 
@@ -76,7 +76,7 @@ class MessageDigestComputingInputStreamSpec
       buffer should be(bytes.slice(5, 10))
 
     "properly compute checksum when reading byte by byte" in:
-      val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
+      val is = MessageDigestComputingInputStream(ByteArrayInputStream(bytes), "SHA-256")
 
       var b      = is.read
       val buffer = mutable.Buffer[Byte]()
@@ -88,7 +88,7 @@ class MessageDigestComputingInputStreamSpec
       is.getChecksum() shouldBe DigestUtils.sha256Hex(bytes)
 
     "properly compute checksum when bulk reading" in:
-      val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
+      val is = MessageDigestComputingInputStream(ByteArrayInputStream(bytes), "SHA-256")
 
       val buffer = new Array[Byte](100)
 
@@ -98,7 +98,7 @@ class MessageDigestComputingInputStreamSpec
       is.getChecksum() shouldBe DigestUtils.sha256Hex(bytes)
 
     "properly compute checksum when skipping and reading" in:
-      val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
+      val is = MessageDigestComputingInputStream(ByteArrayInputStream(bytes), "SHA-256")
 
       val buffer = new Array[Byte](5)
 
@@ -108,7 +108,7 @@ class MessageDigestComputingInputStreamSpec
       is.getChecksum() shouldBe DigestUtils.sha256Hex(bytes)
 
     "should honour resetting when computing checksum" in:
-      val is = new MessageDigestComputingInputStream(new ByteArrayInputStream(bytes), "SHA-256")
+      val is = MessageDigestComputingInputStream(ByteArrayInputStream(bytes), "SHA-256")
 
       val buffer = new Array[Byte](10)
 

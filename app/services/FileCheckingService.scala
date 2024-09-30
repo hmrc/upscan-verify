@@ -28,8 +28,8 @@ class FileCheckingService @Inject()(
   fileManager            : FileManager,
   virusScanningService   : ScanningService,
   fileTypeCheckingService: FileTypeCheckingService
-)(implicit
-  ec: ExecutionContext
+)(using
+  ExecutionContext
 ):
 
   private val logger = Logger(getClass)
@@ -37,7 +37,7 @@ class FileCheckingService @Inject()(
   def check(
     location      : S3ObjectLocation,
     objectMetadata: InboundObjectMetadata
-  )(implicit
+  )(using
     ld: LoggingDetails
   ): Future[Either[FileRejected, FileValidationSuccess]] =
 
@@ -57,8 +57,8 @@ class FileCheckingService @Inject()(
   private def virusScan(
     location      : S3ObjectLocation,
     objectMetadata: InboundObjectMetadata
-  )(implicit
-    ld: LoggingDetails
+  )(using
+    LoggingDetails
   ): Future[Either[FileInfected, NoVirusFound]] =
     fileManager.withObjectContent(location): (objectContent: ObjectContent) =>
       virusScanningService.scan(location, objectContent, objectMetadata)
@@ -66,8 +66,8 @@ class FileCheckingService @Inject()(
   private def fileType(
     location: S3ObjectLocation,
     objectMetadata: InboundObjectMetadata
-  )(implicit
-    ld: LoggingDetails
+  )(using
+    LoggingDetails
   ): Future[Either[FileTypeError, FileAllowed]] =
     fileManager.withObjectContent(location): (objectContent: ObjectContent) =>
       fileTypeCheckingService.scan(location, objectContent, objectMetadata)

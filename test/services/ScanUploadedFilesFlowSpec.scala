@@ -41,17 +41,17 @@ class ScanUploadedFilesFlowSpec
 
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
-  implicit val ld: HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
+  given  HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   val parser: MessageParser = new MessageParser:
     override def parse(message: Message) =
       message.body match
         case "VALID-BODY" => Future.successful(FileUploadEvent(S3ObjectLocation("bucket", message.id, None), "127.0.0.1"))
-        case _            => Future.failed(new Exception("Invalid body"))
+        case _            => Future.failed(Exception("Invalid body"))
 
   def metricsStub() = new Metrics:
     override val defaultRegistry: MetricRegistry =
-      new MetricRegistry
+      MetricRegistry()
 
   "ScanUploadedFilesFlow" should:
     "scan and post-process valid message" in:
@@ -68,7 +68,7 @@ class ScanUploadedFilesFlowSpec
       val fileCheckingService   = mock[FileCheckingService]
       val metrics: Metrics      = metricsStub()
       val flow =
-        new ScanUploadedFilesFlow(
+        ScanUploadedFilesFlow(
           parser,
           fileManager,
           fileCheckingService,
@@ -77,14 +77,14 @@ class ScanUploadedFilesFlowSpec
           clock
         )
 
-      when(fileManager.getObjectMetadata(eqTo(location))(any[LoggingDetails]))
+      when(fileManager.getObjectMetadata(eqTo(location))(using any[LoggingDetails]))
         .thenReturn(Future.successful(inboundObjectMetadata))
 
-      when(fileCheckingService.check(any[S3ObjectLocation], any[InboundObjectMetadata])(any[LoggingDetails]))
+      when(fileCheckingService.check(any[S3ObjectLocation], any[InboundObjectMetadata])(using any[LoggingDetails]))
         .thenReturn(Future.successful(processingResult))
 
       when(scanningResultHandler.handleCheckingResult(
-        any[InboundObjectDetails], any[Either[FileRejected, FileValidationSuccess]], any[Instant])(any[LoggingDetails]))
+        any[InboundObjectDetails], any[Either[FileRejected, FileValidationSuccess]], any[Instant])(using any[LoggingDetails]))
         .thenReturn(Future.unit)
 
       When("message is handled")
@@ -98,8 +98,8 @@ class ScanUploadedFilesFlowSpec
         .handleCheckingResult(
           eqTo(InboundObjectDetails(inboundObjectMetadata, "127.0.0.1", location)),
           eqTo(processingResult),
-          any[Instant])(any[LoggingDetails]
-        )
+          any[Instant]
+        )(using any[LoggingDetails])
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.timer("uploadToScanComplete").getSnapshot.size()        shouldBe 1
@@ -117,7 +117,7 @@ class ScanUploadedFilesFlowSpec
       val fileCheckingService = mock[FileCheckingService]
       val metrics: Metrics    = metricsStub()
       val flow =
-        new ScanUploadedFilesFlow(
+        ScanUploadedFilesFlow(
           parser,
           fileManager,
           fileCheckingService,
@@ -128,8 +128,8 @@ class ScanUploadedFilesFlowSpec
 
       And("the fileManager fails to return file metadata for the message")
 
-      when(fileManager.getObjectMetadata(eqTo(location))(any[LoggingDetails]))
-        .thenReturn(Future.failed(new AmazonServiceException("Expected exception")))
+      when(fileManager.getObjectMetadata(eqTo(location))(using any[LoggingDetails]))
+        .thenReturn(Future.failed(AmazonServiceException("Expected exception")))
 
       When("message is processed")
       val result = flow.processMessage(message)
@@ -154,7 +154,7 @@ class ScanUploadedFilesFlowSpec
       val fileCheckingService = mock[FileCheckingService]
       val metrics: Metrics    = metricsStub()
       val flow =
-        new ScanUploadedFilesFlow(
+        ScanUploadedFilesFlow(
           parser,
           fileManager,
           fileCheckingService,
@@ -189,7 +189,7 @@ class ScanUploadedFilesFlowSpec
       val fileCheckingService   = mock[FileCheckingService]
       val metrics: Metrics      = metricsStub()
       val flow =
-        new ScanUploadedFilesFlow(
+        ScanUploadedFilesFlow(
           parser,
           fileManager,
           fileCheckingService,
@@ -198,11 +198,11 @@ class ScanUploadedFilesFlowSpec
           clock
         )
 
-      when(fileManager.getObjectMetadata(eqTo(location))(any[LoggingDetails]))
+      when(fileManager.getObjectMetadata(eqTo(location))(using any[LoggingDetails]))
         .thenReturn(Future.successful(inboundObjectMetadata))
 
-      when(fileCheckingService.check(any[S3ObjectLocation], any[InboundObjectMetadata])(any[LoggingDetails]))
-        .thenReturn(Future.failed(new RuntimeException("Expected exception")))
+      when(fileCheckingService.check(any[S3ObjectLocation], any[InboundObjectMetadata])(using any[LoggingDetails]))
+        .thenReturn(Future.failed(RuntimeException("Expected exception")))
 
       When("message is handled")
       val result = flow.processMessage(message)

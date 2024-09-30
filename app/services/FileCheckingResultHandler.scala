@@ -17,7 +17,6 @@
 package services
 
 import config.ServiceConfiguration
-import model.FileTypeError.{NotAllowedFileExtension, NotAllowedMimeType}
 import model._
 import play.api.Logging
 import play.api.libs.json.Json
@@ -35,15 +34,15 @@ class FileCheckingResultHandler @Inject()(
   rejectionNotifier: RejectionNotifier,
   configuration    : ServiceConfiguration,
   clock            : Clock
-)(implicit
-  ec: ExecutionContext
+)(using
+  ExecutionContext
 ) extends Logging:
 
   def handleCheckingResult(
     objectDetails    : InboundObjectDetails,
     result           : Either[FileRejected, FileValidationSuccess],
     messageReceivedAt: Instant
-  )(implicit ld: LoggingDetails): Future[Unit] =
+  )(using ld: LoggingDetails): Future[Unit] =
     withLoggingDetails(ld) {
       logger.info(s"Handling check result for Key=[${objectDetails.location.objectKey}] Result=[$result]")
     }
@@ -54,12 +53,12 @@ class FileCheckingResultHandler @Inject()(
       case Left(FileRejected(Left(FileInfected(errorMessage, checksum, virusScanTimings)), None)) =>
         handleInfected(objectDetails, errorMessage)(checksum, messageReceivedAt, virusScanTimings)
 
-      case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(NotAllowedMimeType(mime, consumingService, fileTypeTimings)))) =>
+      case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(FileTypeError.NotAllowedMimeType(mime, consumingService, fileTypeTimings)))) =>
         val errorMessage =
           s"MIME type [${mime.value}] is not allowed for service: [${consumingService.getOrElse("No service name provided")}]"
         handleFileTypeError(objectDetails, errorMessage, consumingService)(checksum, messageReceivedAt, virusScanTimings, fileTypeTimings)
 
-      case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(NotAllowedFileExtension(mime, extension, consumingService, fileTypeTimings)))) =>
+      case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(FileTypeError.NotAllowedFileExtension(mime, extension, consumingService, fileTypeTimings)))) =>
         val errorMessage =
           s"File extension [$extension] is not allowed for mime-type [${mime.value}], service: [${consumingService.getOrElse("No service name provided")}]"
         handleFileTypeError(objectDetails, errorMessage, consumingService)(checksum, messageReceivedAt, virusScanTimings, fileTypeTimings)
@@ -77,9 +76,9 @@ class FileCheckingResultHandler @Inject()(
     messageReceivedAt: Instant,
     virusScanTimings: Timings,
     fileTypeTimings: Timings
-  )(implicit
-    ec: ExecutionContext,
-    ld: LoggingDetails
+  )(using
+    ExecutionContext,
+    LoggingDetails
   ): Future[Unit] =
 
     def metadata(key: String): Option[(String, String)] =
@@ -93,7 +92,7 @@ class FileCheckingResultHandler @Inject()(
             .copyObject(
               details.location,
               targetLocation,
-              ValidOutboundObjectMetadata(
+              OutboundObjectMetadata.valid(
                 details,
                 checksum,
                 mimeType,
@@ -112,16 +111,16 @@ class FileCheckingResultHandler @Inject()(
     checksum         : String,
     messageReceivedAt: Instant,
     virusScanTimings : Timings
-  )(implicit
-    ec               : ExecutionContext,
-    ld             : LoggingDetails
+  )(using
+    ExecutionContext,
+    LoggingDetails
   ): Future[Unit] =
 
     def metadata(key: String): Option[(String, String)] =
       details.metadata.items.get(key).map(s"x-amz-meta-${key}" -> _)
 
-    val fileCheckingError = ErrorMessage(Quarantine, errorMessage)
-    val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
+    val fileCheckingError = ErrorMessage(FileCheckingError.Quarantine, errorMessage)
+    val objectContent     = ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
     val targetLocation    =
       S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None)
 
@@ -131,7 +130,7 @@ class FileCheckingResultHandler @Inject()(
              details.location,
              targetLocation,
              objectContent,
-             InvalidOutboundObjectMetadata(
+             OutboundObjectMetadata.invalid(
               details,
               timingsMetadata("x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings)
                 ++ metadata("upscan-initiate-received")
@@ -142,23 +141,23 @@ class FileCheckingResultHandler @Inject()(
     yield ()
 
   private def handleFileTypeError(
-    details: InboundObjectDetails,
-    errorMessage: String,
-    serviceName: Option[String]
+    details          : InboundObjectDetails,
+    errorMessage     : String,
+    serviceName      : Option[String]
   )(
-    checksum: String,
+    checksum         : String,
     messageReceivedAt: Instant,
-    virusScanTimings: Timings,
-    fileTypeTimings: Timings
-  )(implicit
-    ec: ExecutionContext,
-    ld: LoggingDetails
+    virusScanTimings : Timings,
+    fileTypeTimings  : Timings
+  )(using
+    ExecutionContext,
+    LoggingDetails
   ): Future[Unit] =
     def metadata(key: String): Option[(String, String)] =
       details.metadata.items.get(key).map(s"x-amz-meta-${key}" -> _)
 
-    val fileCheckingError = ErrorMessage(Rejected, errorMessage)
-    val objectContent     = new ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
+    val fileCheckingError = ErrorMessage(FileCheckingError.Rejected, errorMessage)
+    val objectContent     = ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
     val targetLocation    =
       S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None)
 
@@ -168,7 +167,7 @@ class FileCheckingResultHandler @Inject()(
              details.location,
              targetLocation,
              objectContent,
-             InvalidOutboundObjectMetadata(
+             OutboundObjectMetadata.invalid(
                details,
                timingsMetadata("x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings, Some(fileTypeTimings))
                  ++ metadata("upscan-initiate-received")
@@ -185,7 +184,7 @@ class FileCheckingResultHandler @Inject()(
     fileTypeTimingsOpt: Option[Timings] = None
   ): Map[String,String] =
     virusScanTimings.asMetadata("virusscan")
-      ++ fileTypeTimingsOpt.map{_.asMetadata("filetype")}.getOrElse(Map.empty)
+      ++ fileTypeTimingsOpt.fold(Map.empty)(_.asMetadata("filetype"))
       ++ Map(
            "x-amz-meta-upscan-verify-received" -> messageReceivedAt.toString(),
            queueMetadataKey                    -> clock.instant().toString()

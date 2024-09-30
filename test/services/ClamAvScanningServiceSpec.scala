@@ -23,7 +23,7 @@ import org.mockito.Mockito.when
 import org.scalatest.{Assertions, GivenWhenThen}
 import org.scalatest.concurrent.ScalaFutures
 import test.{UnitSpec, WithIncrementingClock}
-import uk.gov.hmrc.clamav.model.{Clean, Infected}
+import uk.gov.hmrc.clamav.model.ScanningResult
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.logging.LoggingDetails
@@ -43,14 +43,15 @@ class ClamAvScanningServiceSpec
      with WithIncrementingClock
      with ScalaFutures:
 
-  implicit val ld: HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
+  given HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
   "ClamAvScanningService" should:
 
     def metricsStub() = new Metrics:
-      override val defaultRegistry: MetricRegistry = new MetricRegistry
+      override val defaultRegistry: MetricRegistry =
+        new MetricRegistry()
 
     val checksumInputStreamFactoryStub = new ChecksumComputingInputStreamFactory:
       override def create(source: InputStream): InputStream with ChecksumSource =
@@ -59,22 +60,22 @@ class ClamAvScanningServiceSpec
 
     "return success if file can be retrieved and scan result clean" in:
       val client = mock[ClamAntiVirus]
-      when(client.sendAndCheck(any[String], any[InputStream], any[Int])(any[LoggingDetails], any[ExecutionContext]))
-        .thenReturn(Future.successful(Clean))
+      when(client.sendAndCheck(any[String], any[InputStream], any[Int])(using any[LoggingDetails], any[ExecutionContext]))
+        .thenReturn(Future.successful(ScanningResult.Clean))
 
       val factory = mock[ClamAntiVirusFactory]
       when(factory.getClient())
         .thenReturn(client)
 
       val metrics         = metricsStub()
-      val scanningService = new ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics, clock)
+      val scanningService = ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics, clock)
 
       Given("a file location pointing to a clean file")
       val fileLocation = S3ObjectLocation("inboundBucket", "file", None)
 
       And("file content with metadata")
       val content      = "Hello World".getBytes
-      val fileContent  = ObjectContent(new ByteArrayInputStream(content), content.length)
+      val fileContent  = ObjectContent(ByteArrayInputStream(content), content.length)
       val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
       val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified, content.length)
 
@@ -91,22 +92,22 @@ class ClamAvScanningServiceSpec
 
     "return infected if file can be retrieved and scan result infected" in:
       val client = mock[ClamAntiVirus]
-      when(client.sendAndCheck(any[String], any[InputStream], any[Int])(any[LoggingDetails], any[ExecutionContext]))
-        .thenReturn(Future.successful(Infected("File dirty")))
+      when(client.sendAndCheck(any[String], any[InputStream], any[Int])(using any[LoggingDetails], any[ExecutionContext]))
+        .thenReturn(Future.successful(ScanningResult.Infected("File dirty")))
 
       val factory = mock[ClamAntiVirusFactory]
       when(factory.getClient())
         .thenReturn(client)
 
       val metrics         = metricsStub()
-      val scanningService = new ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics, clock)
+      val scanningService = ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics, clock)
 
       Given("a file location pointing to a clean file")
       val fileLocation = S3ObjectLocation("inboundBucket", "file", None)
 
       And("file content with metadata")
       val content      = "Hello World".getBytes
-      val fileContent  = ObjectContent(new ByteArrayInputStream(content), content.length)
+      val fileContent  = ObjectContent(ByteArrayInputStream(content), content.length)
       val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
       val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified, content.length)
 

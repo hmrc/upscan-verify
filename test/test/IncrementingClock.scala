@@ -26,13 +26,13 @@ class IncrementingClock(
   zoneId          : ZoneId = ZoneId.systemDefault()
 ) extends Clock:
 
-  private val baseMillis = new AtomicLong(baseTimeInMillis)
+  private val baseMillis = AtomicLong(baseTimeInMillis)
 
   override def getZone: ZoneId =
     zoneId
 
   override def withZone(newZoneId: ZoneId): Clock =
-    new IncrementingClock(baseMillis.get(), increment, zoneId)
+    IncrementingClock(baseMillis.get(), increment, zoneId)
 
   override def instant(): Instant =
     Instant.ofEpochMilli(baseMillis.getAndAdd(increment.toMillis))

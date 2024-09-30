@@ -30,7 +30,7 @@ class PlayClamAvConfigSpec extends UnitSpec:
           "clam.antivirus.timeout" -> 5000
         ))
 
-      val clamAvConfig = new PlayClamAvConfig(configuration)
+      val clamAvConfig = PlayClamAvConfig(configuration)
       clamAvConfig.host    shouldBe "avscan"
       clamAvConfig.port    shouldBe 3310
       clamAvConfig.timeout shouldBe 5000
@@ -43,7 +43,7 @@ class PlayClamAvConfigSpec extends UnitSpec:
         ))
 
       intercept[Exception]:
-        new PlayClamAvConfig(configuration)
+        PlayClamAvConfig(configuration)
 
     "throw an exception if there is no clam port" in:
       val configuration: Configuration =
@@ -53,7 +53,7 @@ class PlayClamAvConfigSpec extends UnitSpec:
         ))
 
       intercept[Exception]:
-        new PlayClamAvConfig(configuration)
+        PlayClamAvConfig(configuration)
 
     "throw an exception if there is no clam timeeout" in:
       val configuration: Configuration =
@@ -63,4 +63,4 @@ class PlayClamAvConfigSpec extends UnitSpec:
         ))
 
       intercept[Exception]:
-        new PlayClamAvConfig(configuration)
+        PlayClamAvConfig(configuration)

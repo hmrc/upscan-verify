@@ -19,7 +19,7 @@ package uk.gov.hmrc.clamav
 import org.apache.commons.io.IOUtils
 import play.api.Logger
 import uk.gov.hmrc.clamav.config.ClamAvConfig
-import uk.gov.hmrc.clamav.model.{ClamAvException, Clean, Infected, ScanningResult}
+import uk.gov.hmrc.clamav.model.{ClamAvException, ScanningResult}
 import uk.gov.hmrc.http.logging.LoggingDetails
 import util.logging.WithLoggingDetails.withLoggingDetails
 
@@ -30,16 +30,16 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class ClamAntiVirusFactory @Inject()(
   clamAvConfig: ClamAvConfig
-)(implicit
-  ec          : ExecutionContext
+)(using
+  ExecutionContext
 ):
   def getClient(): ClamAntiVirus =
-    new ClamAntiVirusImpl(clamAvConfig)
+    ClamAntiVirusImpl(clamAvConfig)
 
 private[clamav] class ClamAntiVirusImpl(
   clamAvConfig: ClamAvConfig
-)(implicit
-  ec: ExecutionContext
+)(using
+  ExecutionContext
 ) extends ClamAntiVirus:
 
   private val logger                 = Logger(this.getClass)
@@ -52,7 +52,7 @@ private[clamav] class ClamAntiVirusImpl(
     objectKey  : String,
     inputStream: InputStream,
     length     : Int
-  )(implicit
+  )(using
     ld: LoggingDetails,
     ec: ExecutionContext
   ): Future[ScanningResult] =
@@ -73,13 +73,13 @@ private[clamav] class ClamAntiVirusImpl(
           _               =  withLoggingDetails(ld)(logger.info(s"Parse clamav response for Key=[$objectKey] took ${System.currentTimeMillis() - readResTimeMs}ms"))
         yield parsedResponse
     else
-      Future.successful(Clean)
+      Future.successful(ScanningResult.Clean)
 
-  private def sendHandshake(connection: Connection)(implicit ec: ExecutionContext) =
+  private def sendHandshake(connection: Connection)(using ExecutionContext) =
     Future:
       connection.out.write(Handshake.getBytes)
 
-  private def sendRequest(connection: Connection)(stream: InputStream, length: Int)(implicit ec: ExecutionContext) =
+  private def sendRequest(connection: Connection)(stream: InputStream, length: Int)(using ExecutionContext) =
     Future:
       connection.out.writeInt(length)
       IOUtils.copy(stream, connection.out)
@@ -92,7 +92,7 @@ private[clamav] class ClamAntiVirusImpl(
 
   private def parseResponse(response: String) =
     response match
-      case FileCleanResponse             => Future.successful(Clean)
-      case VirusFoundResponse(virus)     => Future.successful(Infected(virus))
-      case ParseableErrorResponse(error) => Future.failed(new ClamAvException(error))
-      case unparseableResponse           => Future.failed(new ClamAvException(s"Unparseable response from ClamAV: [$unparseableResponse]"))
+      case FileCleanResponse             => Future.successful(ScanningResult.Clean)
+      case VirusFoundResponse(virus)     => Future.successful(ScanningResult.Infected(virus))
+      case ParseableErrorResponse(error) => Future.failed(ClamAvException(error))
+      case unparseableResponse           => Future.failed(ClamAvException(s"Unparseable response from ClamAV: [$unparseableResponse]"))

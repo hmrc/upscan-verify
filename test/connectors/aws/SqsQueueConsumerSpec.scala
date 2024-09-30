@@ -48,10 +48,10 @@ class SqsQueueConsumerSpec
     .thenReturn(1)
 
   private def sqsMessages(messageCount: Int): java.util.List[SqsMessage] =
-    val messages: java.util.List[SqsMessage] = new java.util.ArrayList[SqsMessage]()
+    val messages: java.util.List[SqsMessage] = java.util.ArrayList[SqsMessage]()
 
     (1 to messageCount).foreach: index =>
-      val message = new SqsMessage()
+      val message = SqsMessage()
       message.setBody(s"SQS message body: $index")
       message.setReceiptHandle(s"SQS receipt handle: $index")
       message.setMessageId(s"ID$index")
@@ -67,7 +67,7 @@ class SqsQueueConsumerSpec
 
       val sqsClient: AmazonSQS = mock[AmazonSQS]
       when(sqsClient.receiveMessage(any[ReceiveMessageRequest])).thenReturn(messageResult)
-      val consumer = new SqsQueueConsumer(sqsClient, configuration, clock)
+      val consumer = SqsQueueConsumer(sqsClient, configuration, clock)
 
       When("the consumer poll method is called")
       val messages: List[Message] = consumer.poll().futureValue
@@ -88,7 +88,7 @@ class SqsQueueConsumerSpec
 
       val sqsClient: AmazonSQS = mock[AmazonSQS]
       when(sqsClient.receiveMessage(any[ReceiveMessageRequest])).thenReturn(messageResult)
-      val consumer = new SqsQueueConsumer(sqsClient, configuration, clock)
+      val consumer = SqsQueueConsumer(sqsClient, configuration, clock)
 
       When("the consumer poll method is called")
       val messages: List[Message] = consumer.poll().futureValue
@@ -102,9 +102,9 @@ class SqsQueueConsumerSpec
     "handle failing SQS receive messages calls" in:
       Given("a message containing a receipt handle")
       val sqsClient: AmazonSQS = mock[AmazonSQS]
-      when(sqsClient.receiveMessage(any[ReceiveMessageRequest])).thenThrow(new OverLimitException(""))
+      when(sqsClient.receiveMessage(any[ReceiveMessageRequest])).thenThrow(OverLimitException(""))
 
-      val consumer = new SqsQueueConsumer(sqsClient, configuration, clock)
+      val consumer = SqsQueueConsumer(sqsClient, configuration, clock)
 
       When("the consumer confirm method is called")
       val result = consumer.poll()
@@ -122,7 +122,7 @@ class SqsQueueConsumerSpec
 
       val sqsClient: AmazonSQS = mock[AmazonSQS]
       when(sqsClient.receiveMessage(any[ReceiveMessageRequest])).thenReturn(messageResult)
-      val consumer = new SqsQueueConsumer(sqsClient, configuration, clock)
+      val consumer = SqsQueueConsumer(sqsClient, configuration, clock)
 
       val message: Message = consumer.poll().futureValue.head
 
@@ -142,10 +142,10 @@ class SqsQueueConsumerSpec
 
       val sqsClient: AmazonSQS = mock[AmazonSQS]
       when(sqsClient.receiveMessage(any[ReceiveMessageRequest])).thenReturn(messageResult)
-      val consumer = new SqsQueueConsumer(sqsClient, configuration, clock)
+      val consumer = SqsQueueConsumer(sqsClient, configuration, clock)
 
       And("an SQS endpoint which is throwing an error")
-      when(sqsClient.deleteMessage(any[DeleteMessageRequest])).thenThrow(new ReceiptHandleIsInvalidException(""))
+      when(sqsClient.deleteMessage(any[DeleteMessageRequest])).thenThrow(ReceiptHandleIsInvalidException(""))
 
       val message: Message = consumer.poll().futureValue.head
 

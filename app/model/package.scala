@@ -58,7 +58,7 @@ object Timings {
 
   type Timer = () => Timings
 
-  def timer()(implicit clock: Clock): Timer =
+  def timer()(using clock: Clock): Timer =
     val startTime = clock.instant()
     () =>
       Timings(startTime, clock.instant())
@@ -77,39 +77,31 @@ case class FileInfected(
   virusScanTimings: Timings
 )
 
-sealed trait FileTypeError
-
-object FileTypeError {
-  case class NotAllowedMimeType(
+enum FileTypeError:
+  case NotAllowedMimeType(
     typeFound       : MimeType,
     consumingService: Option[String],
     fileTypeTimings : Timings
   ) extends FileTypeError
 
-  case class NotAllowedFileExtension(
+  case NotAllowedFileExtension(
     typeFound       : MimeType,
     fileExtension   : String,
     consumingService: Option[String],
     fileTypeTimings : Timings
   ) extends FileTypeError
-}
 
 case class FileRejected(
   virusScanResult  : Either[FileInfected, NoVirusFound],
   fileTypeResultOpt: Option[FileTypeError]             = None
 )
 
-sealed trait FileCheckingError:
-  def value: String
-
-case object Quarantine extends FileCheckingError:
-  override def value: String = "QUARANTINE"
-
-case object Rejected extends FileCheckingError:
-  override def value: String = "REJECTED"
+enum FileCheckingError(val value: String):
+  case Quarantine extends FileCheckingError("QUARANTINE")
+  case Rejected   extends FileCheckingError("REJECTED")
 
 object FileCheckingError:
-  implicit val fileCheckingErrorWrites: Writes[FileCheckingError] =
+  given Writes[FileCheckingError] =
     (fileCheckingError: FileCheckingError) => JsString(fileCheckingError.value)
 
 case class ErrorMessage(
@@ -118,5 +110,6 @@ case class ErrorMessage(
 )
 
 object ErrorMessage {
-  implicit val errorMessageWrites: Writes[ErrorMessage] = Json.writes[ErrorMessage]
+  given Writes[ErrorMessage] =
+    Json.writes[ErrorMessage]
 }

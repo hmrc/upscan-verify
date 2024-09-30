@@ -34,8 +34,8 @@ trait RejectionNotifier:
     details            : String,
     serviceName        : Option[String],
     customMessagePrefix: String
-  )(implicit
-    ld: LoggingDetails
+  )(using
+    LoggingDetails
   ): Future[Unit]
 
   def notifyFileInfected(
@@ -45,8 +45,8 @@ trait RejectionNotifier:
     fileUploadDatetime: Instant,
     details           : String,
     serviceName       : Option[String]
-  )(implicit
-    ld: LoggingDetails
+  )(using
+    LoggingDetails
   ): Future[Unit] =
     notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "Virus detected in file.")
 
@@ -57,8 +57,8 @@ trait RejectionNotifier:
     fileUploadDatetime: Instant,
     details           : String,
     serviceName       : Option[String]
-  )(implicit
-    ld: LoggingDetails
+  )(using
+    LoggingDetails
   ): Future[Unit] =
     notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "File type is not allowed for this service.")
 
@@ -75,7 +75,7 @@ object LoggingRejectionNotifier
     details            : String,
     serviceName        : Option[String],
     customMessagePrefix: String
-  )(implicit
+  )(using
     ld: LoggingDetails
   ): Future[Unit] =
 

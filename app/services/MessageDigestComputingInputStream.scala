@@ -26,7 +26,7 @@ trait ChecksumComputingInputStreamFactory:
 
 object SHA256ChecksumComputingInputStreamFactory extends ChecksumComputingInputStreamFactory:
   def create(source: InputStream): InputStream with ChecksumSource =
-    new MessageDigestComputingInputStream(source, "SHA-256")
+    MessageDigestComputingInputStream(source, "SHA-256")
 
 trait ChecksumSource:
   def getChecksum(): String

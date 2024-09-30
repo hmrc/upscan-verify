@@ -20,7 +20,7 @@ import com.codahale.metrics.MetricRegistry
 
 import model.Message
 import org.scalatest.GivenWhenThen
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when}
 import test.UnitSpec
@@ -34,7 +34,8 @@ import scala.concurrent.Future
 class QueueProcessingFlowSpec
   extends UnitSpec
      with GivenWhenThen
-     with ScalaFutures:
+     with ScalaFutures
+     with IntegrationPatience:
 
   "get messages from the queue consumer, and confirm successfully processed and do not confirm unsuccessfully processed" in:
     val queueConsumer    = mock[QueueConsumer]
@@ -42,10 +43,10 @@ class QueueProcessingFlowSpec
 
     val metricsStub = new Metrics:
       override val defaultRegistry: MetricRegistry =
-        new MetricRegistry
+        MetricRegistry()
 
     val queueProcessingFlow =
-      new QueueProcessingJob(queueConsumer, messageProcessor, metricsStub)
+      QueueProcessingJob(queueConsumer, messageProcessor, metricsStub)
 
     Given("there are three message in a message queue")
     val validMessage1  = Message("ID1", "VALID-BODY"  , "RECEIPT-1", Instant.now(), None)
@@ -64,7 +65,7 @@ class QueueProcessingFlowSpec
       .thenReturn(MonadicUtils.withContext(Future.successful(context), context))
 
     when(messageProcessor.processMessage(invalidMessage))
-      .thenReturn(MonadicUtils.withContext[MessageContext](Future.failed(new RuntimeException("Exception")), context))
+      .thenReturn(MonadicUtils.withContext[MessageContext](Future.failed(RuntimeException("Exception")), context))
 
     And("processing of one message fails")
 

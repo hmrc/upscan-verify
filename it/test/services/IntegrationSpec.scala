@@ -42,9 +42,9 @@ class IntegrationSpec
      with BeforeAndAfterAll:
 
   override lazy val app: Application =
-    new GuiceApplicationBuilder()
+    GuiceApplicationBuilder()
       .disable(classOf[connectors.aws.AWSClientModule])
-      .overrides(new MockAWSClientModule())
+      .overrides(MockAWSClientModule())
       .build()
 
   lazy val s3 = app.injector.instanceOf[AmazonS3]
@@ -57,22 +57,22 @@ class IntegrationSpec
 
       val getActualResult: S3Object = s3.getObject("myBucket", "myKey")
 
-      getActualResult.contentAsString shouldBe "myContent"
+      contentAsString(getActualResult) shouldBe "myContent"
 
   trait S3TestMock:
-    val putResult: PutObjectResult = new PutObjectResult()
+    val putResult: PutObjectResult = PutObjectResult()
     putResult.setVersionId("0.666")
 
     when(s3.putObject("myBucket", "myKey", "myContent"))
       .thenReturn(putResult)
 
-    val getResult: S3Object = new S3Object()
+    val getResult: S3Object = S3Object()
     getResult.setBucketName("myBucket")
     getResult.setKey("myKey")
-    getResult.setObjectContent(new StringInputStream("myContent"))
+    getResult.setObjectContent(StringInputStream("myContent"))
 
     when(s3.getObject("myBucket", "myKey"))
       .thenReturn(getResult)
 
-  implicit class S3ObjectOps(s3object: S3Object):
-    def contentAsString: String = IOUtils.toString(s3object.getObjectContent, UTF_8)
+  def contentAsString(s3object: S3Object): String =
+    IOUtils.toString(s3object.getObjectContent, UTF_8)

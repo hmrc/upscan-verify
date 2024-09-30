@@ -16,8 +16,6 @@
 
 package services
 
-import model.FileTypeError.NotAllowedMimeType
-
 import model._
 import org.mockito.Mockito.{verifyNoInteractions, when}
 import org.scalatest.GivenWhenThen
@@ -29,8 +27,7 @@ import util.logging.LoggingDetails
 import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 class FileCheckingServiceSpec
   extends UnitSpec
@@ -41,23 +38,23 @@ class FileCheckingServiceSpec
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
   "File checking service" should:
-    implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
+    given LoggingDetails = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
-    val content = ObjectContent(new ByteArrayInputStream("TEST".getBytes), "TEST".length)
+    val content = ObjectContent(ByteArrayInputStream("TEST".getBytes), "TEST".length)
 
     val fileManager = new FileManager:
-      override def delete(objectLocation: S3ObjectLocation)(implicit ld: LoggingDetails): Future[Unit] =
+      override def delete(objectLocation: S3ObjectLocation)(using LoggingDetails): Future[Unit] =
         ???
 
-      override def getObjectMetadata(objectLocation: S3ObjectLocation)(implicit ld: LoggingDetails): Future[InboundObjectMetadata] =
+      override def getObjectMetadata(objectLocation: S3ObjectLocation)(using LoggingDetails): Future[InboundObjectMetadata] =
         ???
 
       override def withObjectContent[T](
         objectLocation: S3ObjectLocation
       )(function: ObjectContent => Future[T]
-      )(implicit ld: LoggingDetails): Future[T] =
+      )(using LoggingDetails): Future[T] =
         if objectLocation.objectKey.contains("exception") then
-          Future.failed(new RuntimeException("Expected exception"))
+          Future.failed(RuntimeException("Expected exception"))
         else
           function(content)
 
@@ -65,16 +62,16 @@ class FileCheckingServiceSpec
         sourceLocation: S3ObjectLocation,
         targetLocation: S3ObjectLocation,
         metadata      : OutboundObjectMetadata
-      )(implicit ld: LoggingDetails): Future[Unit] =
-          ???
+      )(using LoggingDetails): Future[Unit] =
+        ???
 
       override def writeObject(
         sourceLocation: S3ObjectLocation,
         targetLocation: S3ObjectLocation,
         content       : InputStream,
         metadata      : OutboundObjectMetadata
-      )(implicit ld: LoggingDetails): Future[Unit] =
-          ???
+      )(using LoggingDetails): Future[Unit] =
+        ???
 
     val location = S3ObjectLocation("bucket", "file", None)
     val metadata = InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clock.instant(), 0)
@@ -82,7 +79,7 @@ class FileCheckingServiceSpec
     "succeed when virus and file type scanning succeeded" in:
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
-      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
+      val fileCheckingService     = FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant())))))
@@ -101,7 +98,7 @@ class FileCheckingServiceSpec
     "do not check file type if virus found and return virus details" in:
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
-      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
+      val fileCheckingService     = FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
       val checksum: String        = "CHECKSUM"
 
       when(virusScanningService.scan(location, content, metadata))
@@ -115,17 +112,17 @@ class FileCheckingServiceSpec
     "return failed file type scanning if virus not found but invalid file type" in:
       val virusScanningService    = mock[ScanningService]
       val fileTypeCheckingService = mock[FileTypeCheckingService]
-      val fileCheckingService     = new FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
+      val fileCheckingService     = FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant())))))
 
-      when(fileTypeCheckingService.scan(location, content, metadata)).thenReturn(Future.successful(Left(NotAllowedMimeType(MimeType("application/xml"), Some("valid-test-service"), Timings(clock.instant(), clock.instant())))))
+      when(fileTypeCheckingService.scan(location, content, metadata)).thenReturn(Future.successful(Left(FileTypeError.NotAllowedMimeType(MimeType("application/xml"), Some("valid-test-service"), Timings(clock.instant(), clock.instant())))))
 
       fileCheckingService.check(location, metadata).futureValue shouldBe Left(
         FileRejected(
           Right(NoVirusFound("CHECKSUM", Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1)))),
-          Some(NotAllowedMimeType(
+          Some(FileTypeError.NotAllowedMimeType(
             MimeType("application/xml"),
             Some("valid-test-service"),
             Timings(clockStart.plusSeconds(2), clockStart.plusSeconds(3))

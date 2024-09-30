@@ -21,13 +21,10 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.hmrc.clamav.config.ClamAvConfig
-import uk.gov.hmrc.clamav.model.{Clean, Infected}
-import uk.gov.hmrc.http.{Authorization, ForwardedFor, HeaderCarrier, RequestChain, RequestId, SessionId}
-import uk.gov.hmrc.http.logging.LoggingDetails
+import uk.gov.hmrc.clamav.model.ScanningResult
+import uk.gov.hmrc.http.HeaderCarrier
 
 import scala.Array.emptyByteArray
-import scala.concurrent.{Await, Awaitable}
-import scala.concurrent.duration._
 
 /*
  * This integration test requires a clam daemon to be available as per the configuration in instance().
@@ -46,53 +43,53 @@ class ClamAvSpec
 
   private def instance(): ClamAntiVirus =
     val configuration = new ClamAvConfig:
-      override val timeout: Int = 5000
-      override val port: Int    = 3310
-      override val host: String = "avscan"
+      override val timeout: Int    = 5000
+      override val port   : Int    = 3310
+      override val host   : String = "avscan"
 
-    new ClamAntiVirusFactory(configuration).getClient()
+    ClamAntiVirusFactory(configuration).getClient()
 
-  implicit val hc: HeaderCarrier = new HeaderCarrier()
+  given HeaderCarrier = HeaderCarrier()
 
   "Scanning files" should:
     "allow clean files" in:
       val clamAv = instance()
       val bytes  = FileBytes(cleanFile)
 
-      clamAv.sendAndCheck("key", bytes).futureValue shouldBe Clean
+      clamAv.sendAndCheck("key", bytes).futureValue shouldBe ScanningResult.Clean
 
     "allow to scan empty file" in {
       val clamAv = instance()
 
-      clamAv.sendAndCheck("key", emptyByteArray).futureValue shouldBe Clean
+      clamAv.sendAndCheck("key", emptyByteArray).futureValue shouldBe ScanningResult.Clean
     }
 
     "detect a virus in a file" in:
       val clamAv = instance()
       val bytes  = FileBytes(virusFileWithSig)
-      clamAv.sendAndCheck("key", bytes).futureValue shouldBe a [Infected]
+      clamAv.sendAndCheck("key", bytes).futureValue shouldBe a [ScanningResult.Infected]
 
     "allow clean files sent as a stream" in:
       val clamAv = instance()
       val bytes  = FileBytes(cleanFile)
 
-      clamAv.sendAndCheck("key", new ByteArrayInputStream(bytes), bytes.length).futureValue shouldBe Clean
+      clamAv.sendAndCheck("key", ByteArrayInputStream(bytes), bytes.length).futureValue shouldBe ScanningResult.Clean
 
     "detect a virus in a file sent as a stream" in:
       val clamAv = instance()
       val bytes  = FileBytes(virusFileWithSig)
 
-      clamAv.sendAndCheck("key", new ByteArrayInputStream(bytes), bytes.length).futureValue shouldBe a [Infected]
+      clamAv.sendAndCheck("key", ByteArrayInputStream(bytes), bytes.length).futureValue shouldBe a [ScanningResult.Infected]
 
   "Can scan stream without virus" in:
     val clamAv = instance()
 
-    clamAv.sendAndCheck("key", getBytes(payloadSize = 10000)).futureValue shouldBe Clean
+    clamAv.sendAndCheck("key", getBytes(payloadSize = 10000)).futureValue shouldBe ScanningResult.Clean
 
   "Can detect a small stream with a virus at the beginning" in:
     val clamAv = instance()
 
-    clamAv.sendAndCheck("key", getBytes(shouldInsertVirusAtPosition = Some(0))).futureValue shouldBe a [Infected]
+    clamAv.sendAndCheck("key", getBytes(shouldInsertVirusAtPosition = Some(0))).futureValue shouldBe a [ScanningResult.Infected]
 
   private def getBytes(payloadSize: Int = 0, shouldInsertVirusAtPosition: Option[Int] = None) =
     getPayload(payloadSize, shouldInsertVirusAtPosition).getBytes()

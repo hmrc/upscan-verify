@@ -27,16 +27,16 @@ trait ClamAntiVirus:
     objectKey  : String,
     inputStream: InputStream,
     length     : Int
-  )(implicit
-    ld         : LoggingDetails,
-    ec         : ExecutionContext
+  )(using
+    LoggingDetails,
+    ExecutionContext
   ): Future[ScanningResult]
 
   def sendAndCheck(
     objectKey: String,
     bytes    : Array[Byte]
-  )(implicit
-    ld       : LoggingDetails,
-    ec       : ExecutionContext
+  )(using
+    LoggingDetails,
+    ExecutionContext
   ): Future[ScanningResult] =
-    sendAndCheck(objectKey, new ByteArrayInputStream(bytes), bytes.length)
+    sendAndCheck(objectKey, ByteArrayInputStream(bytes), bytes.length)

@@ -19,7 +19,7 @@ package services
 import model._
 import play.api.Logging
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
-import uk.gov.hmrc.clamav.model.{Clean, Infected}
+import uk.gov.hmrc.clamav.model.ScanningResult
 import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import util.logging.WithLoggingDetails.withLoggingDetails
@@ -40,8 +40,8 @@ trait ScanningService:
     location      : S3ObjectLocation,
     objectContent : ObjectContent,
     objectMetadata: InboundObjectMetadata
-  )(implicit
-    ld: LoggingDetails
+  )(using
+    LoggingDetails
   ): Future[Either[FileInfected, NoVirusFound]]
 
 class ClamAvScanningService @Inject()(
@@ -49,8 +49,8 @@ class ClamAvScanningService @Inject()(
   messageDigestComputingInputStreamFactory: ChecksumComputingInputStreamFactory,
   metrics                                 : Metrics,
   clock                                   : Clock
-)(implicit
-  executionContext: ExecutionContext
+)(using
+  ExecutionContext
 ) extends ScanningService
      with Logging:
 
@@ -58,7 +58,7 @@ class ClamAvScanningService @Inject()(
     location   : S3ObjectLocation,
     fileContent: ObjectContent,
     metadata   : InboundObjectMetadata
-  )(implicit
+  )(using
     ld         : LoggingDetails
   ): Future[Either[FileInfected, NoVirusFound]] =
 
@@ -71,10 +71,10 @@ class ClamAvScanningService @Inject()(
       scanResult <- antivirusClient
                       .sendAndCheck(location.objectKey, inputStream, fileContent.length.toInt)
                       .map:
-                        case Clean =>
+                        case ScanningResult.Clean =>
                           metrics.defaultRegistry.counter("cleanFileUpload").inc()
                           Right(NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
-                        case Infected(message) =>
+                        case ScanningResult.Infected(message) =>
                           withLoggingDetails(ld):
                             logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
                           metrics.defaultRegistry.counter("quarantineFileUpload").inc()

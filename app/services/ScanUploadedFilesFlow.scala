@@ -43,8 +43,8 @@ class ScanUploadedFilesFlow @Inject()(
   scanningResultHandler: FileCheckingResultHandler,
   metrics              : Metrics,
   clock                : Clock
-)(implicit
-  ec                   : ExecutionContext
+)(using
+  ExecutionContext
 ) extends MessageProcessor:
 
   def processMessage(message: Message): FutureEitherWithContext[MessageContext] =
@@ -52,10 +52,10 @@ class ScanUploadedFilesFlow @Inject()(
       parsedMessage        <- withoutContext(parser.parse(message))
       context              =  MessageContext(parsedMessage.location.objectKey)
       ld                   =  LoggingDetails.fromMessageContext(context)
-      metadata             <- withContext(fileManager.getObjectMetadata(parsedMessage.location)(ld), context)
+      metadata             <- withContext(fileManager.getObjectMetadata(parsedMessage.location)(using ld), context)
       inboundObjectDetails =  InboundObjectDetails(metadata, parsedMessage.clientIp, parsedMessage.location)
-      scanningResult       <- withContext(fileCheckingService.check(parsedMessage.location, metadata)(ld), context)
-      _                    <- withContext(scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult, message.receivedAt)(ld), context)
+      scanningResult       <- withContext(fileCheckingService.check(parsedMessage.location, metadata)(using ld), context)
+      _                    <- withContext(scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult, message.receivedAt)(using ld), context)
       _                    =  addMetrics(metadata.uploadedTimestamp, message)
     yield context
 

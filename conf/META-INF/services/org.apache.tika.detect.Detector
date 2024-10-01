@@ -1,1 +1,1 @@
-services.tika.detectors.XmlDetector
+uk.gov.hmrc.upscanverify.service.tika.detectors.XmlDetector

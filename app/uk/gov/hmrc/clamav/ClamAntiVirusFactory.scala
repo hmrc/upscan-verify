@@ -21,7 +21,7 @@ import play.api.Logger
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 import uk.gov.hmrc.clamav.model.{ClamAvException, ScanningResult}
 import uk.gov.hmrc.http.logging.LoggingDetails
-import util.logging.WithLoggingDetails.withLoggingDetails
+import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
 
 import java.io.InputStream
 import java.nio.charset.StandardCharsets.UTF_8

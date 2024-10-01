@@ -19,7 +19,5 @@ package services
 import model.Message
 import utils.MonadicUtils.FutureEitherWithContext
 
-trait MessageProcessor {
+trait MessageProcessor:
   def processMessage(message: Message): FutureEitherWithContext[MessageContext]
-
-}

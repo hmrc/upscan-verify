@@ -18,23 +18,23 @@ package connectors.aws
 
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
-import javax.inject.{Inject, Provider}
-import play.api.inject.{Binding, Module}
 import play.api.{Configuration, Environment}
+import play.api.inject.{Binding, Module}
 
-class AWSClientModule extends Module {
+import javax.inject.{Inject, Provider}
+
+class AWSClientModule extends Module:
 
   override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
     Seq(
       bind[AmazonSQS].toProvider[SqsClientProvider],
       bind[AmazonS3].toProvider[S3ClientProvider]
     )
-}
 
-class SqsClientProvider @Inject()() extends Provider[AmazonSQS] {
-  override def get(): AmazonSQS = AmazonSQSClientBuilder.defaultClient()
-}
+class SqsClientProvider @Inject()() extends Provider[AmazonSQS]:
+  override def get(): AmazonSQS =
+    AmazonSQSClientBuilder.defaultClient()
 
-class S3ClientProvider @Inject()() extends Provider[AmazonS3] {
-  override def get(): AmazonS3 = AmazonS3ClientBuilder.defaultClient()
-}
+class S3ClientProvider @Inject()() extends Provider[AmazonS3]:
+  override def get(): AmazonS3 =
+    AmazonS3ClientBuilder.defaultClient()

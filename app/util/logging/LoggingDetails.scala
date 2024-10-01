@@ -22,11 +22,8 @@ import uk.gov.hmrc.http.HeaderCarrier
 /**
   * Convenience methods to create a [[uk.gov.hmrc.http.logging.LoggingDetails]] instance, required by [[uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext]].
   */
-object LoggingDetails {
+object LoggingDetails:
   def fromMessageContext(messageContext: MessageContext): HeaderCarrier =
-    new HeaderCarrier() {
-      override lazy val mdcData
-        : Map[String, String] = super.mdcData + ("file-reference" -> messageContext.fileReference)
-    }
-
-}
+    new HeaderCarrier():
+      override lazy val mdcData: Map[String, String] =
+        super.mdcData + ("file-reference" -> messageContext.fileReference)

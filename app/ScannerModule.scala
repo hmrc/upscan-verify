@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import java.time.Clock
 import config.{PlayBasedServiceConfiguration, PlayClamAvConfig, ServiceConfiguration}
 import connectors.aws.{S3EventParser, S3FileManager, SqsQueueConsumer}
 import play.api.inject.{Binding, Module}
@@ -23,7 +22,9 @@ import services._
 import services.tika.TikaMimeTypeDetector
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 
-class ScannerModule extends Module {
+import java.time.Clock
+
+class ScannerModule extends Module:
   override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
     Seq(
       bind[ServiceConfiguration].to[PlayBasedServiceConfiguration].eagerly(),
@@ -40,4 +41,3 @@ class ScannerModule extends Module {
       bind[ChecksumComputingInputStreamFactory].toInstance(SHA256ChecksumComputingInputStreamFactory),
       bind[Clock].toInstance(Clock.systemDefaultZone())
     )
-}

@@ -22,25 +22,22 @@ import org.apache.tika.mime.MediaType
 
 import java.io.InputStream
 
-class XmlDetector extends Detector {
+class XmlDetector extends Detector:
 
-  val extractor = new XmlRootExtractor
+  val extractor = XmlRootExtractor()
 
   override def detect(input: InputStream, metadata: Metadata): MediaType =
-    if (filenameHasHtmlExtension(metadata)) {
+    if filenameHasHtmlExtension(metadata) then
       MediaType.OCTET_STREAM
-    } else {
+    else
       input.mark(1024)
-      try {
+
+      try
         Option(extractor.extractRootElement(input))
           .fold(MediaType.OCTET_STREAM)(_ => MediaType.APPLICATION_XML)
-      } finally {
+      finally
         input.reset()
-      }
-    }
 
-  private def filenameHasHtmlExtension(metadata: Metadata): Boolean = {
-
-    Option(metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY)).exists(_.toLowerCase.matches(".*\\.htm(l)?"))
-  }
-}
+  private def filenameHasHtmlExtension(metadata: Metadata): Boolean =
+    Option(metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY))
+      .exists(_.toLowerCase.matches(".*\\.htm(l)?"))

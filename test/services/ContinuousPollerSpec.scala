@@ -24,14 +24,11 @@ import play.api.inject.DefaultApplicationLifecycle
 import test.UnitSpec
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 
-class ContinuousPollerSpec extends UnitSpec with Eventually {
+class ContinuousPollerSpec extends UnitSpec with Eventually:
 
-  implicit def actorSystem: ActorSystem = ActorSystem()
-
-  val serviceConfiguration = new ServiceConfiguration {
+  val serviceConfiguration = new ServiceConfiguration:
     override def accessKeyId: String = ???
 
     override def awsRegion: String = ???
@@ -57,51 +54,45 @@ class ContinuousPollerSpec extends UnitSpec with Eventually {
     override def defaultAllowedMimeTypes: List[String] = ???
 
     override def inboundQueueVisibilityTimeout: Duration = ???
-  }
 
-  "QueuePollingJob" should {
-    "continuously poll the queue" in {
+  "QueuePollingJob" should:
+    "continuously poll the queue" in:
+      given actorSystem: ActorSystem = ActorSystem()
 
-      val callCount = new AtomicInteger(0)
+      val callCount = AtomicInteger(0)
 
-      val orchestrator: PollingJob = new PollingJob {
-        override def run() = Future.successful(callCount.incrementAndGet())
-      }
-
-      val serviceLifecycle = new DefaultApplicationLifecycle()
-
-      new ContinuousPoller(orchestrator, serviceConfiguration)(actorSystem, serviceLifecycle)
-
-      eventually {
-        callCount.get() > 5
-      }
-
-      serviceLifecycle.stop()
-
-    }
-
-    "recover from failure after some time" in {
-      val callCount = new AtomicInteger(0)
-
-      val orchestrator: PollingJob = new PollingJob {
-        override def run() =
-          if (callCount.get() == 1) {
-            Future.failed(new RuntimeException("Planned failure"))
-          } else {
+      val orchestrator: PollingJob =
+        new PollingJob:
+          override def run() =
             Future.successful(callCount.incrementAndGet())
-          }
-      }
 
-      val serviceLifecycle = new DefaultApplicationLifecycle()
+      val serviceLifecycle = DefaultApplicationLifecycle()
 
-      new ContinuousPoller(orchestrator, serviceConfiguration)(actorSystem, serviceLifecycle)
+      ContinuousPoller(orchestrator, serviceConfiguration)(using actorSystem, serviceLifecycle)
 
-      eventually {
+      eventually:
         callCount.get() > 5
-      }
 
       serviceLifecycle.stop()
-    }
-  }
 
-}
+    "recover from failure after some time" in:
+      given actorSystem: ActorSystem = ActorSystem()
+
+      val callCount = AtomicInteger(0)
+
+      val orchestrator: PollingJob =
+        new PollingJob:
+          override def run() =
+            if callCount.get() == 1 then
+              Future.failed(RuntimeException("Planned failure"))
+            else
+              Future.successful(callCount.incrementAndGet())
+
+      val serviceLifecycle = DefaultApplicationLifecycle()
+
+      ContinuousPoller(orchestrator, serviceConfiguration)(using actorSystem, serviceLifecycle)
+
+      eventually:
+        callCount.get() > 5
+
+      serviceLifecycle.stop()

@@ -24,24 +24,24 @@ import java.io.InputStream
 import javax.inject.Singleton
 
 @Singleton
-class TikaMimeTypeDetector extends MimeTypeDetector {
+class TikaMimeTypeDetector extends MimeTypeDetector:
 
   private val config   = TikaConfig.getDefaultConfig
   private val detector = config.getDetector
 
-  def detect(inputStream: InputStream, fileName: Option[String]): DetectedMimeType = {
+  def detect(inputStream: InputStream, fileName: Option[String]): DetectedMimeType =
     import org.apache.tika.io.TikaInputStream
 
     val tikaInputStream = TikaInputStream.get(inputStream)
 
-    val metadata = new Metadata()
+    val metadata = Metadata()
     fileName.foreach(name => metadata.add(TikaCoreProperties.RESOURCE_NAME_KEY, name))
 
     val detectionResult = detector.detect(tikaInputStream, metadata)
     val mimeType        = MimeType(s"${detectionResult.getType}/${detectionResult.getSubtype}")
 
     val detectedMimeType =
-      if (tikaInputStream.getLength > 0)
+      if tikaInputStream.getLength > 0 then
         DetectedMimeType.Detected(mimeType)
       else
         DetectedMimeType.EmptyLength(mimeType)
@@ -49,5 +49,3 @@ class TikaMimeTypeDetector extends MimeTypeDetector {
     tikaInputStream.close()
 
     detectedMimeType
-  }
-}

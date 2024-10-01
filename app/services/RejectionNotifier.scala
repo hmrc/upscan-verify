@@ -16,54 +16,70 @@
 
 package services
 
-import java.time.Instant
 import model.S3ObjectLocation
 import play.api.Logging
 import uk.gov.hmrc.http.logging.LoggingDetails
 import util.logging.WithLoggingDetails.withLoggingDetails
 
+import java.time.Instant
 import scala.concurrent.Future
 
-trait RejectionNotifier {
+trait RejectionNotifier:
 
-  def notifyRejection(fileProperties: S3ObjectLocation,
-                      checksum: String,
-                      fileSize: Long,
-                      fileUploadDatetime: Instant,
-                      details: String,
-                      serviceName: Option[String],
-                      customMessagePrefix: String)
-                     (implicit ld: LoggingDetails): Future[Unit]
+  def notifyRejection(
+    fileProperties     : S3ObjectLocation,
+    checksum           : String,
+    fileSize           : Long,
+    fileUploadDatetime : Instant,
+    details            : String,
+    serviceName        : Option[String],
+    customMessagePrefix: String
+  )(using
+    LoggingDetails
+  ): Future[Unit]
 
-  def notifyFileInfected(fileProperties: S3ObjectLocation,
-                         checksum: String,
-                         fileSize: Long,
-                         fileUploadDatetime: Instant,
-                         details: String,
-                         serviceName: Option[String])
-                        (implicit ld: LoggingDetails): Future[Unit] = notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "Virus detected in file.")
+  def notifyFileInfected(
+    fileProperties    : S3ObjectLocation,
+    checksum          : String,
+    fileSize          : Long,
+    fileUploadDatetime: Instant,
+    details           : String,
+    serviceName       : Option[String]
+  )(using
+    LoggingDetails
+  ): Future[Unit] =
+    notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "Virus detected in file.")
 
-  def notifyInvalidFileType(fileProperties: S3ObjectLocation,
-                            checksum: String,
-                            fileSize: Long,
-                            fileUploadDatetime: Instant,
-                            details: String,
-                            serviceName: Option[String])
-                           (implicit ld: LoggingDetails): Future[Unit] = notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "File type is not allowed for this service.")
-}
+  def notifyInvalidFileType(
+    fileProperties    : S3ObjectLocation,
+    checksum          : String,
+    fileSize          : Long,
+    fileUploadDatetime: Instant,
+    details           : String,
+    serviceName       : Option[String]
+  )(using
+    LoggingDetails
+  ): Future[Unit] =
+    notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "File type is not allowed for this service.")
 
 
-object LoggingRejectionNotifier extends RejectionNotifier with Logging {
+object LoggingRejectionNotifier
+  extends RejectionNotifier
+     with Logging:
 
-  override def notifyRejection(fileProperties: S3ObjectLocation,
-                               checksum: String,
-                               fileSize: Long,
-                               fileUploadDatetime: Instant,
-                               details: String,
-                               serviceName: Option[String],
-                               customMessagePrefix: String)
-                              (implicit ld: LoggingDetails): Future[Unit] = {
-    withLoggingDetails(ld) {
+  override def notifyRejection(
+    fileProperties     : S3ObjectLocation,
+    checksum           : String,
+    fileSize           : Long,
+    fileUploadDatetime : Instant,
+    details            : String,
+    serviceName        : Option[String],
+    customMessagePrefix: String
+  )(using
+    ld: LoggingDetails
+  ): Future[Unit] =
+
+    withLoggingDetails(ld):
       logger.warn(
         s"""$customMessagePrefix${serviceName.fold("")(service => s"\nService name: [$service]")}
            |Key: [${fileProperties.objectKey}]${fileProperties.objectVersion.fold("")(version => s"\nVersion: [$version]")}
@@ -74,7 +90,4 @@ object LoggingRejectionNotifier extends RejectionNotifier with Logging {
            |Details: [$details].
          """.stripMargin
       )
-    }
-    Future.successful(())
-  }
-}
+    Future.unit

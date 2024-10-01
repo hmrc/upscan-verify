@@ -17,12 +17,13 @@
 package services
 
 import config.ServiceConfiguration
-import model.FileTypeError.{NotAllowedFileExtension, NotAllowedMimeType}
 import model._
 import org.apache.commons.io.IOUtils
-import org.mockito.captor.ArgCaptor
+import org.mockito.ArgumentCaptor
+import org.mockito.ArgumentMatchers.{any, eq => eqTo}
+import org.mockito.Mockito.{when, verify, verifyNoMoreInteractions, verifyNoInteractions}
 import org.scalatest.GivenWhenThen
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.http.logging.LoggingDetails
 import util.logging.LoggingDetails
@@ -31,10 +32,15 @@ import java.io.InputStream
 import java.nio.charset.StandardCharsets.UTF_8
 import java.time.Instant
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
-class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenWhenThen with WithIncrementingClock {
+class FileCheckingResultHandlerSpec
+  extends UnitSpec
+     with Eventually
+     with GivenWhenThen
+     with WithIncrementingClock
+     with ScalaFutures:
 
   val fileSize: Long = 97
 
@@ -77,11 +83,10 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
     "x-amz-meta-upscan-verify-rejected-queued"   -> "2018-12-04T17:48:35Z"
   )
 
-  "FileCheckingResultHandler" should {
+  "FileCheckingResultHandler" should:
+    given ld: LoggingDetails = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
-    implicit val ld = LoggingDetails.fromMessageContext(MessageContext("TEST"))
-
-    val configuration = new ServiceConfiguration {
+    val configuration = new ServiceConfiguration:
       override def quarantineBucket: String = "quarantine-bucket"
 
       override def retryInterval: FiniteDuration = ???
@@ -107,13 +112,11 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       override def defaultAllowedMimeTypes: List[String] = ???
 
       override def inboundQueueVisibilityTimeout: Duration = ???
-    }
 
-    "Move clean file from inbound bucket to outbound bucket" in {
-
+    "Move clean file from inbound bucket to outbound bucket" in:
       val fileManager: FileManager             = mock[FileManager]
       val rejectionNotifier: RejectionNotifier = mock[RejectionNotifier]
-      val handler                              = new FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
+      val handler                              = FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
 
       Given("there is a clean file")
       val file             = S3ObjectLocation("bucket", "file", None)
@@ -124,35 +127,34 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt, fileSize)
       val inboundObjectDetails  = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
       val outboundObjectMetadata =
-        ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType, allExpectedCheckpoints)
+        OutboundObjectMetadata.valid(inboundObjectDetails, expectedChecksum, expectedMimeType, allExpectedCheckpoints)
 
-      when(fileManager.copyObject(eqTo(file), any[S3ObjectLocation], any[OutboundObjectMetadata])(any[LoggingDetails])).thenReturn(Future.successful(()))
-      when(fileManager.delete(file)).thenReturn(Future.successful(()))
+      when(fileManager.copyObject(eqTo(file), any[S3ObjectLocation], any[OutboundObjectMetadata])(using any[LoggingDetails]))
+        .thenReturn(Future.unit)
+      when(fileManager.delete(file)).thenReturn(Future.unit)
 
       When("when processing scanning result")
-      Await.result(
-        handler
-          .handleCheckingResult(inboundObjectDetails,
-            Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)), receivedAt),
-        10.seconds
-      )
+      handler
+        .handleCheckingResult(
+          inboundObjectDetails,
+          Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)),
+          receivedAt
+        )
+        .futureValue
 
       Then("file should be copied from inbound bucket to outbound bucket")
-      val locationCaptor = ArgCaptor[S3ObjectLocation]
-      verify(fileManager).copyObject(eqTo(file), locationCaptor, eqTo(outboundObjectMetadata))(any[LoggingDetails])
-      locationCaptor.value.bucket shouldBe configuration.outboundBucket
+      val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
+      verify(fileManager).copyObject(eqTo(file), locationCaptor.capture(), eqTo(outboundObjectMetadata))(using any[LoggingDetails])
+      locationCaptor.getValue.bucket shouldBe configuration.outboundBucket
 
       And("file should be removed from inbound bucket")
       verify(fileManager).delete(file)
 
-    }
-
-    "Not delete file from outbound bucket if copying failed" in {
-
+    "Not delete file from outbound bucket if copying failed" in:
       val fileManager: FileManager             = mock[FileManager]
       val rejectionNotifier: RejectionNotifier = mock[RejectionNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
+      val handler = FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
 
       Given("there is a clean file")
       val file                  = S3ObjectLocation("bucket", "file", None)
@@ -163,38 +165,36 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       val inboundObjectDetails  = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
 
       And("copying the file would fail")
-      when(fileManager.copyObject(eqTo(file), any[S3ObjectLocation], any[OutboundObjectMetadata])(any[LoggingDetails]))
-        .thenReturn(Future.failed(new Exception("Copy failed")))
+      when(fileManager.copyObject(eqTo(file), any[S3ObjectLocation], any[OutboundObjectMetadata])(using any[LoggingDetails]))
+        .thenReturn(Future.failed(Exception("Copy failed")))
 
       When("when processing scanning result")
-
       val result =
-        Await.ready(
-          handler.handleCheckingResult(
-            inboundObjectDetails,
-            Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)), receivedAt),
-          10.seconds
+        handler.handleCheckingResult(
+          inboundObjectDetails,
+          Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)),
+          receivedAt
         )
 
-      Then("original file should not be deleted from inbound bucket")
+      Then("the whole process fails")
+      result.failed.futureValue shouldBe a[Throwable]
+
+      And("original file should not be deleted from inbound bucket")
       verify(fileManager).copyObject(
         eqTo(file),
         any[S3ObjectLocation],
-        eqTo(ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType, allExpectedCheckpoints)))(
-        any[LoggingDetails])
+        eqTo(OutboundObjectMetadata.valid(inboundObjectDetails, expectedChecksum, expectedMimeType, allExpectedCheckpoints))
+      )(using
+        any[LoggingDetails]
+      )
       verifyNoMoreInteractions(fileManager)
 
-      And("the whole process fails")
-      result.value.get.isFailure shouldBe true
 
-    }
-
-    "Return failure if deleting a clean file fails" in {
-
+    "Return failure if deleting a clean file fails" in:
       val fileManager: FileManager             = mock[FileManager]
       val rejectionNotifier: RejectionNotifier = mock[RejectionNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
+      val handler = FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
 
       Given("there is a clean file")
       val file             = S3ObjectLocation("bucket", "file", None)
@@ -205,32 +205,28 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt, fileSize)
       val inboundObjectDetails  = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
       val outboundObjectMetadata =
-        ValidOutboundObjectMetadata(inboundObjectDetails, expectedChecksum, expectedMimeType, allExpectedCheckpoints)
+        OutboundObjectMetadata.valid(inboundObjectDetails, expectedChecksum, expectedMimeType, allExpectedCheckpoints)
 
-      when(fileManager.copyObject(eqTo(file), any[S3ObjectLocation], eqTo(outboundObjectMetadata))(any[LoggingDetails]))
-        .thenReturn(Future.successful(()))
-      when(fileManager.delete(file)).thenReturn(Future.failed(new RuntimeException("Expected failure")))
+      when(fileManager.copyObject(eqTo(file), any[S3ObjectLocation], eqTo(outboundObjectMetadata))(using any[LoggingDetails]))
+        .thenReturn(Future.unit)
+      when(fileManager.delete(file)).thenReturn(Future.failed(RuntimeException("Expected failure")))
 
       When("when processing scanning result")
       val result =
-        Await.ready(
-          handler.handleCheckingResult(
-            inboundObjectDetails,
-            Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)), receivedAt),
-          10.seconds
+        handler.handleCheckingResult(
+          inboundObjectDetails,
+          Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)),
+          receivedAt
         )
 
       Then("the process fails")
-      result.value.get.isFailure shouldBe true
+      result.failed.futureValue shouldBe a[Throwable]
 
-    }
-
-    "Create virus notification, add error and metadata to quarantine bucket, and delete infected file in case of virus" in {
-
+    "Create virus notification, add error and metadata to quarantine bucket, and delete infected file in case of virus" in:
       val fileManager: FileManager             = mock[FileManager]
       val rejectionNotifier: RejectionNotifier = mock[RejectionNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
+      val handler = FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
 
       Given("there is an infected file")
       val file = S3ObjectLocation("bucket", "file", None)
@@ -238,50 +234,53 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       val clientIp               = "127.0.0.1"
       val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt, fileSize)
       val inboundObjectDetails   = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
-      val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectDetails, virusFoundExpectedCheckpoints)
+      val outboundObjectMetadata = OutboundObjectMetadata.invalid(inboundObjectDetails, virusFoundExpectedCheckpoints)
 
       val details:  String = "There is a virus"
       val checksum: String = "CHECKSUM"
 
-      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(any[LoggingDetails]))
-        .thenReturn(Future.successful(()))
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(any[LoggingDetails]))
-        .thenReturn(Future.successful(()))
-      when(fileManager.delete(file)).thenReturn(Future.successful(()))
+      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(using any[LoggingDetails]))
+        .thenReturn(Future.unit)
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(using any[LoggingDetails]))
+        .thenReturn(Future.unit)
+      when(fileManager.delete(file))
+        .thenReturn(Future.unit)
 
       When("scanning infected file")
-      Await.result(
-        handler.handleCheckingResult(
-          InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-          Left(FileRejected(Left(FileInfected(details, checksum, virusScanTimings)))), receivedAt),
-        10.seconds)
+        handler
+          .handleCheckingResult(
+            InboundObjectDetails(inboundObjectMetadata, clientIp, file),
+            Left(FileRejected(Left(FileInfected(details, checksum, virusScanTimings)))),
+            receivedAt
+          )
+          .futureValue
 
       Then("notification is created")
       verify(rejectionNotifier).notifyFileInfected(file, checksum, fileSize, uploadedAt, details, None)
 
       And("file metadata and error details are stored in the quarantine bucket")
-      val locationCaptor = ArgCaptor[S3ObjectLocation]
-      val contentCaptor = ArgCaptor[InputStream]
+      val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
+      val contentCaptor = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
         .writeObject(
           eqTo(file),
-          locationCaptor,
-          contentCaptor,
-          eqTo(outboundObjectMetadata))(any[LoggingDetails])
-      IOUtils.toString(contentCaptor.value, UTF_8) shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
+          locationCaptor.capture(),
+          contentCaptor.capture(),
+          eqTo(outboundObjectMetadata)
+        )(using any[LoggingDetails])
+      IOUtils.toString(contentCaptor.getValue, UTF_8) shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
 
-      locationCaptor.value.bucket shouldBe configuration.quarantineBucket
+      locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 
       And("infected file is deleted")
       verify(fileManager).delete(file)
       verifyNoMoreInteractions(fileManager)
-    }
 
-    "Do not delete infected file if notification creation failed (so that we are able to retry)" in {
+    "Do not delete infected file if notification creation failed (so that we are able to retry)" in:
       val fileManager: FileManager             = mock[FileManager]
       val rejectionNotifier: RejectionNotifier = mock[RejectionNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
+      val handler = FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
 
       Given("there is an infected file")
       val file     = S3ObjectLocation("bucket", "file", None)
@@ -291,32 +290,29 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       val checksum: String = "CHECKSUM"
 
       Given("notification service fails")
-      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(any[LoggingDetails]))
-        .thenReturn(Future.failed(new Exception("Notification failed")))
+      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(using any[LoggingDetails]))
+        .thenReturn(Future.failed(Exception("Notification failed")))
 
       When("scanning infected file")
       val result =
-        Await.ready(
-          handler
-            .handleCheckingResult(
-              InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-              Left(FileRejected(Left(FileInfected("There is a virus", checksum, virusScanTimings)))), receivedAt),
-          10.seconds
-        )
+        handler
+          .handleCheckingResult(
+            InboundObjectDetails(inboundObjectMetadata, clientIp, file),
+            Left(FileRejected(Left(FileInfected("There is a virus", checksum, virusScanTimings)))),
+            receivedAt
+          )
 
-      Then("file is not deleted")
-      verifyZeroInteractions(fileManager)
+      Then("the whole process fails")
+      result.failed.futureValue shouldBe a[Throwable]
 
-      And("the whole process fails")
-      result.value.get.isFailure shouldBe true
-    }
+      And("file is not deleted")
+      verifyNoInteractions(fileManager)
 
-    "Return failure if deleting a infected file fails" in {
-
+    "Return failure if deleting a infected file fails" in:
       val fileManager: FileManager             = mock[FileManager]
       val rejectionNotifier: RejectionNotifier = mock[RejectionNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
+      val handler = FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
 
       Given("there is an infected file")
       val clientIp = "127.0.0.1"
@@ -325,31 +321,29 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt, fileSize)
       val checksum: String = "CHECKSUM"
 
-      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(any[LoggingDetails]))
-        .thenReturn(Future.successful(()))
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(any[LoggingDetails])).
-        thenReturn(Future.successful(()))
-      when(fileManager.delete(file)).thenReturn(Future.failed(new RuntimeException("Expected failure")))
+      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(using any[LoggingDetails]))
+        .thenReturn(Future.unit)
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(using any[LoggingDetails])).
+        thenReturn(Future.unit)
+      when(fileManager.delete(file)).thenReturn(Future.failed(RuntimeException("Expected failure")))
 
       When("when processing scanning result")
       val result =
-        Await.ready(
-          handler
-            .handleCheckingResult(
-              InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-              Left(FileRejected(Left(FileInfected("There is a virus", checksum, virusScanTimings)))), receivedAt),
-          10.seconds
-        )
+        handler
+          .handleCheckingResult(
+            InboundObjectDetails(inboundObjectMetadata, clientIp, file),
+            Left(FileRejected(Left(FileInfected("There is a virus", checksum, virusScanTimings)))),
+            receivedAt
+          )
 
       Then("the process fails")
-      result.value.get.isFailure shouldBe true
-    }
+      result.failed.futureValue shouldBe a[Throwable]
 
-    "Add error and metadata to quarantine bucket, and delete incorrect file in case of invalid file mime type" in {
+    "Add error and metadata to quarantine bucket, and delete incorrect file in case of invalid file mime type" in:
       val fileManager: FileManager             = mock[FileManager]
       val rejectionNotifier: RejectionNotifier = mock[RejectionNotifier]
       val clientIp                             = "127.0.0.1"
-      val handler                              = new FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
+      val handler                              = FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
 
       Given("there is a file of a type that is not allowed")
       val file     = S3ObjectLocation("bucket", "file", None)
@@ -357,55 +351,54 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
 
       val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt, fileSize)
       val inboundObjectDetails   = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
-      val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectDetails, fileTypeRejectedExpectedCheckpoints)
+      val outboundObjectMetadata = OutboundObjectMetadata.invalid(inboundObjectDetails, fileTypeRejectedExpectedCheckpoints)
 
-      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(any[LoggingDetails]))
-        .thenReturn(Future.successful(()))
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(any[LoggingDetails]))
-        .thenReturn(Future.successful(()))
-      when(fileManager.delete(file)).thenReturn(Future.successful(()))
+      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(using any[LoggingDetails]))
+        .thenReturn(Future.unit)
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(using any[LoggingDetails]))
+        .thenReturn(Future.unit)
+      when(fileManager.delete(file)).thenReturn(Future.unit)
 
       When("checking incorrectly typed file")
       val serviceName: Option[String] = Some("valid-test-service")
       val checksum: String = "CHECKSUM"
-      Await
-        .result(
-          handler
-            .handleCheckingResult(
-              InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-              Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)),
-                                Some(NotAllowedMimeType(mimeType, serviceName, fileTypeTimings)))), receivedAt
-            ),
-          10.seconds
+      handler
+        .handleCheckingResult(
+          InboundObjectDetails(inboundObjectMetadata, clientIp, file),
+          Left(FileRejected(
+            Right(NoVirusFound(checksum, virusScanTimings)),
+            Some(FileTypeError.NotAllowedMimeType(mimeType, serviceName, fileTypeTimings))
+          )),
+          receivedAt
         )
+        .futureValue
 
       Then("notification is created")
-      verify(rejectionNotifier).notifyInvalidFileType(eqTo(file), eqTo(checksum), eqTo(fileSize), eqTo(uploadedAt), any[String], eqTo(serviceName))(eqTo(ld))
+      verify(rejectionNotifier).notifyInvalidFileType(eqTo(file), eqTo(checksum), eqTo(fileSize), eqTo(uploadedAt), any[String], eqTo(serviceName))(using eqTo(ld))
 
       And("file metadata and error details are stored in the quarantine bucket")
 
-      val locationCaptor = ArgCaptor[S3ObjectLocation]
-      val streamCaptor = ArgCaptor[InputStream]
+      val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
+      val streamCaptor = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
         .writeObject(
           eqTo(file),
-          locationCaptor,
-          streamCaptor,
-          eqTo(outboundObjectMetadata))(any[LoggingDetails])
-      IOUtils.toString(streamCaptor.value, UTF_8) shouldBe
+          locationCaptor.capture(),
+          streamCaptor.capture(),
+          eqTo(outboundObjectMetadata))(using any[LoggingDetails])
+      IOUtils.toString(streamCaptor.getValue, UTF_8) shouldBe
         """{"failureReason":"REJECTED","message":"MIME type [application/pdf] is not allowed for service: [valid-test-service]"}"""
-      locationCaptor.value.bucket shouldBe configuration.quarantineBucket
+      locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 
       And("incorrectly typed file is deleted")
       verify(fileManager).delete(file)
       verifyNoMoreInteractions(fileManager)
-    }
 
-    "Add error and metadata to quarantine bucket, and delete incorrect file in case of invalid file extension" in {
+    "Add error and metadata to quarantine bucket, and delete incorrect file in case of invalid file extension" in:
       val fileManager: FileManager             = mock[FileManager]
       val rejectionNotifier: RejectionNotifier = mock[RejectionNotifier]
       val clientIp                             = "127.0.0.1"
-      val handler                              = new FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
+      val handler                              = FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
 
       Given("there is a file with extension which is not allowed for the file's mime-type")
       val file     = S3ObjectLocation("bucket", "file", None)
@@ -413,53 +406,51 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
 
       val inboundObjectMetadata  = InboundObjectMetadata(Map("someKey" -> "someValue", "original-filename" -> "foo.foo"), uploadedAt, fileSize)
       val inboundObjectDetails   = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
-      val outboundObjectMetadata = InvalidOutboundObjectMetadata(inboundObjectDetails, fileTypeRejectedExpectedCheckpoints)
+      val outboundObjectMetadata = OutboundObjectMetadata.invalid(inboundObjectDetails, fileTypeRejectedExpectedCheckpoints)
 
-      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(any[LoggingDetails]))
-        .thenReturn(Future.successful(()))
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(any[LoggingDetails]))
-        .thenReturn(Future.successful(()))
-      when(fileManager.delete(file)).thenReturn(Future.successful(()))
+      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(using any[LoggingDetails]))
+        .thenReturn(Future.unit)
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(using any[LoggingDetails]))
+        .thenReturn(Future.unit)
+      when(fileManager.delete(file)).thenReturn(Future.unit)
 
       When("checking incorrectly typed file")
       val serviceName: Option[String] = Some("valid-test-service")
       val checksum: String = "CHECKSUM"
-      Await
-        .result(
-          handler
-            .handleCheckingResult(
-              InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-              Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)),
-                                Some(NotAllowedFileExtension(mimeType, "foo", serviceName, fileTypeTimings)))), receivedAt
-            ),
-          10.seconds
+      handler
+        .handleCheckingResult(
+          InboundObjectDetails(inboundObjectMetadata, clientIp, file),
+          Left(FileRejected(
+            Right(NoVirusFound(checksum, virusScanTimings)),
+            Some(FileTypeError.NotAllowedFileExtension(mimeType, "foo", serviceName, fileTypeTimings))
+          )),
+          receivedAt
         )
+        .futureValue
 
       Then("notification is created")
-      verify(rejectionNotifier).notifyInvalidFileType(eqTo(file), eqTo(checksum), eqTo(fileSize), eqTo(uploadedAt), any[String], eqTo(serviceName))(eqTo(ld))
+      verify(rejectionNotifier).notifyInvalidFileType(eqTo(file), eqTo(checksum), eqTo(fileSize), eqTo(uploadedAt), any[String], eqTo(serviceName))(using eqTo(ld))
 
       And("file metadata and error details are stored in the quarantine bucket")
 
-      val locationCaptor = ArgCaptor[S3ObjectLocation]
-      val streamCaptor = ArgCaptor[InputStream]
+      val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
+      val streamCaptor = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
         .writeObject(
           eqTo(file),
-          locationCaptor,
-          streamCaptor,
-          eqTo(outboundObjectMetadata))(any[LoggingDetails])
-      IOUtils.toString(streamCaptor.value, UTF_8) shouldBe
+          locationCaptor.capture(),
+          streamCaptor.capture(),
+          eqTo(outboundObjectMetadata))(using any[LoggingDetails])
+      IOUtils.toString(streamCaptor.getValue, UTF_8) shouldBe
         """{"failureReason":"REJECTED","message":"File extension [foo] is not allowed for mime-type [text/plain], service: [valid-test-service]"}"""
-      locationCaptor.value.bucket shouldBe configuration.quarantineBucket
+      locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 
       And("incorrectly typed file is deleted")
       verify(fileManager).delete(file)
       verifyNoMoreInteractions(fileManager)
-    }
 
-    "Return failure if deleting a file if incorrect type fails" in {
+    "Return failure if deleting a file if incorrect type fails" in:
       Given("there is a file of a type that is not allowed")
-
       val file = S3ObjectLocation("bucket", "file", None)
 
       val inboundObjectMetadata                = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt, fileSize)
@@ -468,33 +459,28 @@ class FileCheckingResultHandlerSpec extends UnitSpec with Eventually with GivenW
       val clientIp                             = "127.0.0.1"
       val rejectionNotifier: RejectionNotifier = mock[RejectionNotifier]
 
-      val handler = new FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
+      val handler = FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
 
       When("copying the file to outbound bucket succeeds")
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(any[LoggingDetails]))
-        .thenReturn(Future.successful(()))
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(using any[LoggingDetails]))
+        .thenReturn(Future.unit)
 
       And("a file manager that fails to delete correctly")
-      when(fileManager.delete(file)).thenReturn(Future.failed(new RuntimeException("Expected failure")))
+      when(fileManager.delete(file)).thenReturn(Future.failed(RuntimeException("Expected failure")))
 
       When("when processing checking result")
-      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(any[LoggingDetails]))
-        .thenReturn(Future.successful(()))
+      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(using any[LoggingDetails]))
+        .thenReturn(Future.unit)
       val result =
-        Await.ready(
-          handler
-            .handleCheckingResult(
-              InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-              Left(FileRejected(Right(NoVirusFound("1234567890", virusScanTimings)),
-                   Some(NotAllowedMimeType(mimeType, Some("valid-test-service"), fileTypeTimings)))), receivedAt
-            ),
-          10.seconds
-        )
+        handler
+          .handleCheckingResult(
+            InboundObjectDetails(inboundObjectMetadata, clientIp, file),
+            Left(FileRejected(
+              Right(NoVirusFound("1234567890", virusScanTimings)),
+              Some(FileTypeError.NotAllowedMimeType(mimeType, Some("valid-test-service"), fileTypeTimings))
+            )),
+            receivedAt
+          )
 
       Then("the process fails")
-      result.value.get.isFailure shouldBe true
-
-    }
-
-  }
-}
+      result.failed.futureValue shouldBe a[Throwable]

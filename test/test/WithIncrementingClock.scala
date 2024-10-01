@@ -21,16 +21,16 @@ import java.time.{Clock, Duration, Instant, ZoneId}
 import org.scalatest.{BeforeAndAfterEach, Suite}
 
 // Clock impl that increments the time by "tickIncrement" for each call to "Clock.instant()".
-trait WithIncrementingClock extends BeforeAndAfterEach { this: Suite =>
+trait WithIncrementingClock extends BeforeAndAfterEach:
+  this: Suite =>
 
   lazy val clockStart   : Instant = Instant.now()
   lazy val zoneId       : ZoneId = ZoneId.systemDefault()
   lazy val tickIncrement: Duration = Duration.ofSeconds(1)
 
-  implicit lazy val clock: IncrementingClock = new IncrementingClock(Clock.fixed(clockStart, zoneId).millis(), tickIncrement)
+  lazy val clock: IncrementingClock =
+    IncrementingClock(Clock.fixed(clockStart, zoneId).millis(), tickIncrement)
 
-  override protected def beforeEach(): Unit = {
+  override protected def beforeEach(): Unit =
     clock.reset()
     super.beforeEach()
-  }
-}

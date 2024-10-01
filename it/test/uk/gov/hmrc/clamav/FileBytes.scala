@@ -21,7 +21,7 @@ import java.io.InputStream
 private [clamav] object FileBytes {
   def apply(filename: String): Array[Byte] =
     read(Option(getClass.getResourceAsStream(filename)).orElse(
-      throw new Exception(s"Could not open stream to: $filename")).get)
+      throw Exception(s"Could not open stream to: $filename")).get)
 
   def read(stream: InputStream): Array[Byte] =
     Iterator.continually(stream.read).takeWhile(_ != -1).take(1000).map(_.toByte).toArray

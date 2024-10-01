@@ -16,13 +16,12 @@
 
 package services
 
-import java.io.InputStream
-import java.time.Instant
-import java.time.format.DateTimeFormatter
-
 import model.S3ObjectLocation
 import uk.gov.hmrc.http.logging.LoggingDetails
 
+import java.io.InputStream
+import java.time.Instant
+import java.time.format.DateTimeFormatter
 import scala.concurrent.Future
 
 case class InboundObjectDetails(
@@ -31,63 +30,89 @@ case class InboundObjectDetails(
   location: S3ObjectLocation
 )
 
-case class InboundObjectMetadata(items: Map[String, String], uploadedTimestamp: Instant, fileSize: Long) {
-  def originalFilename: Option[String] = items.get("original-filename")
-  def consumingService: Option[String] = items.get("consuming-service")
-}
+case class InboundObjectMetadata(
+  items            : Map[String, String],
+  uploadedTimestamp: Instant,
+  fileSize         : Long
+):
+  def originalFilename: Option[String] =
+    items.get("original-filename")
 
-sealed trait OutboundObjectMetadata {
+  def consumingService: Option[String] =
+    items.get("consuming-service")
 
-  final def items: Map[String, String] = detailsOfSourceFile.metadata.items ++ commonMetadata ++ outcomeSpecificMetadata
+case class OutboundObjectMetadata(
+  items: Map[String, String]
+)
 
-  def detailsOfSourceFile: InboundObjectDetails
+object OutboundObjectMetadata:
+  private def commonMetadata(detailsOfSourceFile: InboundObjectDetails): Map[String, String] =
+    detailsOfSourceFile.metadata.items
+      ++ Map(
+        "file-reference" -> detailsOfSourceFile.location.objectKey,
+        "client-ip"      -> detailsOfSourceFile.clientIp
+      )
+      ++ detailsOfSourceFile.location.objectVersion.map("file-version" -> _)
 
-  private def commonMetadata: Map[String, String] =
-    Map("file-reference" -> detailsOfSourceFile.location.objectKey, "client-ip" -> detailsOfSourceFile.clientIp) ++
-      detailsOfSourceFile.location.objectVersion.map(value => "file-version" -> value)
+  def valid(
+    detailsOfSourceFile       : InboundObjectDetails,
+    checksum                  : String,
+    mimeType                  : MimeType,
+    additionalOutboundMetadata: Map[String, String]
+  ): OutboundObjectMetadata =
+    OutboundObjectMetadata(
+      commonMetadata(detailsOfSourceFile)
+        ++ Map(
+          "initiate-date" -> DateTimeFormatter.ISO_INSTANT.format(detailsOfSourceFile.metadata.uploadedTimestamp),
+          "checksum"      -> checksum,
+          "mime-type"     -> mimeType.value
+        )
+        ++ additionalOutboundMetadata
+    )
 
-  def outcomeSpecificMetadata: Map[String, String] = Map.empty
-}
+  def invalid(
+    detailsOfSourceFile       : InboundObjectDetails,
+    additionalOutboundMetadata: Map[String, String]
+  ): OutboundObjectMetadata =
+    OutboundObjectMetadata(
+      commonMetadata(detailsOfSourceFile)
+        ++ Map(
+          "initiate-date" -> DateTimeFormatter.ISO_INSTANT.format(detailsOfSourceFile.metadata.uploadedTimestamp)
+        )
+        ++ additionalOutboundMetadata
+    )
 
-case class ValidOutboundObjectMetadata(detailsOfSourceFile: InboundObjectDetails,
-                                       checksum: String,
-                                       mimeType: MimeType,
-                                       additionalOutboundMetadata: Map[String,String])
-  extends OutboundObjectMetadata {
+case class ObjectContent(
+  inputStream: InputStream,
+  length     : Long
+)
 
-  override lazy val outcomeSpecificMetadata: Map[String, String] = {
-    Map(
-      "initiate-date" -> DateTimeFormatter.ISO_INSTANT.format(detailsOfSourceFile.metadata.uploadedTimestamp),
-      "checksum"      -> checksum,
-      "mime-type"     -> mimeType.value
-    ) ++ additionalOutboundMetadata
-  }
+trait FileManager:
+  def copyObject(
+    sourceLocation: S3ObjectLocation,
+    targetLocation: S3ObjectLocation,
+    metadata      : OutboundObjectMetadata
+  )(using LoggingDetails): Future[Unit]
 
-}
-
-case class InvalidOutboundObjectMetadata(detailsOfSourceFile: InboundObjectDetails,
-                                         additionalOutboundMetadata: Map[String,String]) extends OutboundObjectMetadata {
-  override lazy val outcomeSpecificMetadata: Map[String, String] = {
-    Map(
-      "initiate-date" -> DateTimeFormatter.ISO_INSTANT.format(detailsOfSourceFile.metadata.uploadedTimestamp)
-    ) ++ additionalOutboundMetadata
-  }
-}
-
-case class ObjectContent(inputStream: InputStream, length: Long)
-
-trait FileManager {
-  def copyObject(sourceLocation: S3ObjectLocation, targetLocation: S3ObjectLocation, metadata: OutboundObjectMetadata)(
-    implicit loggingDetails: LoggingDetails): Future[Unit]
   def writeObject(
     sourceLocation: S3ObjectLocation,
     targetLocation: S3ObjectLocation,
-    content: InputStream,
-    metadata: OutboundObjectMetadata)(implicit loggingDetails: LoggingDetails): Future[Unit]
-  def delete(objectLocation: S3ObjectLocation)(implicit loggingDetails: LoggingDetails): Future[Unit]
-  def getObjectMetadata(objectLocation: S3ObjectLocation)(
-    implicit loggingDetails: LoggingDetails): Future[InboundObjectMetadata]
+    content       : InputStream,
+    metadata      : OutboundObjectMetadata
+  )(using LoggingDetails): Future[Unit]
 
-  def withObjectContent[T](objectLocation: S3ObjectLocation)(function: ObjectContent => Future[T])(
-    implicit loggingDetails: LoggingDetails): Future[T]
-}
+  def delete(
+    objectLocation: S3ObjectLocation
+  )(using LoggingDetails): Future[Unit]
+
+  def getObjectMetadata(
+    objectLocation: S3ObjectLocation
+  )(using LoggingDetails): Future[InboundObjectMetadata]
+
+  def withObjectContent[T](
+    objectLocation: S3ObjectLocation
+  )(
+    function: ObjectContent => Future[T]
+  )(using
+    LoggingDetails
+  ): Future[T]

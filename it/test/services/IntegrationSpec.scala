@@ -16,66 +16,63 @@
 
 package services
 
-import java.nio.charset.StandardCharsets.UTF_8
-
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.{PutObjectResult, S3Object}
 import com.amazonaws.util.StringInputStream
 import modules.MockAWSClientModule
 import org.apache.commons.io.IOUtils
-import org.mockito.scalatest.MockitoSugar
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpecLike
+import org.mockito.Mockito.when
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.play.guice.GuiceOneServerPerSuite
 import play.api.Application
 import play.api.inject.guice.{GuiceApplicationBuilder, GuiceableModuleConversions}
 
-class IntegrationSpec
-    extends AnyWordSpecLike
-    with should.Matchers
-    with MockitoSugar
-    with GuiceOneServerPerSuite
-    with GuiceableModuleConversions
-    with BeforeAndAfterEach
-    with BeforeAndAfterAll {
+import java.nio.charset.StandardCharsets.UTF_8
 
-  override lazy val app: Application = new GuiceApplicationBuilder()
-    .disable(classOf[connectors.aws.AWSClientModule])
-    .overrides(new MockAWSClientModule())
-    .build()
+class IntegrationSpec
+  extends AnyWordSpec
+     with should.Matchers
+     with MockitoSugar
+     with GuiceOneServerPerSuite
+     with GuiceableModuleConversions
+     with BeforeAndAfterEach
+     with BeforeAndAfterAll:
+
+  override lazy val app: Application =
+    GuiceApplicationBuilder()
+      .disable(classOf[connectors.aws.AWSClientModule])
+      .overrides(MockAWSClientModule())
+      .build()
 
   lazy val s3 = app.injector.instanceOf[AmazonS3]
 
-  "IntegrationSpec" can {
-    "Put and Get to an S3 bucket" in {
-      new S3TestMock {
-        val putActualResult: PutObjectResult = s3.putObject("myBucket", "myKey", "myContent")
+  "IntegrationSpec" can:
+    "Put and Get to an S3 bucket" in new S3TestMock:
+      val putActualResult: PutObjectResult = s3.putObject("myBucket", "myKey", "myContent")
 
-        putActualResult.getVersionId shouldBe "0.666"
+      putActualResult.getVersionId shouldBe "0.666"
 
-        val getActualResult: S3Object = s3.getObject("myBucket", "myKey")
+      val getActualResult: S3Object = s3.getObject("myBucket", "myKey")
 
-        getActualResult.contentAsString shouldBe "myContent"
-      }
-    }
-  }
+      contentAsString(getActualResult) shouldBe "myContent"
 
-  trait S3TestMock {
-    val putResult: PutObjectResult = new PutObjectResult()
+  trait S3TestMock:
+    val putResult: PutObjectResult = PutObjectResult()
     putResult.setVersionId("0.666")
 
-    when(s3.putObject("myBucket", "myKey", "myContent")).thenReturn(putResult)
+    when(s3.putObject("myBucket", "myKey", "myContent"))
+      .thenReturn(putResult)
 
-    val getResult: S3Object = new S3Object()
+    val getResult: S3Object = S3Object()
     getResult.setBucketName("myBucket")
     getResult.setKey("myKey")
-    getResult.setObjectContent(new StringInputStream("myContent"))
+    getResult.setObjectContent(StringInputStream("myContent"))
 
-    when(s3.getObject("myBucket", "myKey")).thenReturn(getResult)
-  }
+    when(s3.getObject("myBucket", "myKey"))
+      .thenReturn(getResult)
 
-  implicit class S3ObjectOps(s3object: S3Object) {
-    def contentAsString: String = IOUtils.toString(s3object.getObjectContent, UTF_8)
-  }
-}
+  def contentAsString(s3object: S3Object): String =
+    IOUtils.toString(s3object.getObjectContent, UTF_8)

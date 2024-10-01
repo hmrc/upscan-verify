@@ -16,76 +16,86 @@
 
 package connectors.aws
 
-import javax.inject.Inject
 import model.{FileUploadEvent, Message, S3ObjectLocation}
 import play.api.Logging
 import play.api.libs.functional.syntax._
-import play.api.libs.json.Reads._
-import util.logging.LoggingDetails
-import util.logging.WithLoggingDetails.withLoggingDetails
 import play.api.libs.json._
+import play.api.libs.json.Reads._
+import _root_.util.logging.LoggingDetails
+import _root_.util.logging.WithLoggingDetails.withLoggingDetails
 import services._
 
+import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-class S3EventParser @Inject()(implicit ec: ExecutionContext) extends MessageParser with Logging {
+class S3EventParser @Inject() ()(using ExecutionContext) extends MessageParser with Logging:
 
-  case class S3EventNotification(records: Seq[S3EventNotificationRecord])
+  case class S3EventNotification(
+    records: Seq[S3EventNotificationRecord]
+  )
 
   case class S3EventNotificationRecord(
-    eventVersion: String,
-    eventSource: String,
-    awsRegion: String,
-    eventTime: String,
-    eventName: String,
+    eventVersion     : String,
+    eventSource      : String,
+    awsRegion        : String,
+    eventTime        : String,
+    eventName        : String,
     requestParameters: RequestParameters,
-    s3: S3Details)
+    s3               : S3Details
+  )
 
   case class RequestParameters(
     sourceIPAddress: String
   )
 
-  case class S3Details(bucketName: String, objectKey: String, versionId: Option[String])
+  case class S3Details(
+    bucketName: String,
+    objectKey : String,
+    versionId : Option[String]
+  )
 
-  implicit val s3reads: Reads[S3Details] =
-    ((JsPath \ "bucket" \ "name").read[String] and
-      (JsPath \ "object" \ "key").read[String] and
-      (JsPath \ "object" \ "versionId").read[String].map(Some(_).filterNot(_.equals("null"))))(S3Details.apply _)
+  given Reads[S3Details] =
+    ( (__ \ "bucket" \ "name"     ).read[String]
+    ~ (__ \ "object" \ "key"      ).read[String]
+    ~ (__ \ "object" \ "versionId").read[String].map(Some(_).filterNot(_.equals("null")))
+    )(S3Details.apply _)
 
-  implicit val requestParametersReads: Reads[RequestParameters] = Json.reads[RequestParameters]
+  given Reads[RequestParameters] =
+    Json.reads[RequestParameters]
 
-  implicit val reads: Reads[S3EventNotificationRecord] = Json.reads[S3EventNotificationRecord]
+  given Reads[S3EventNotificationRecord] =
+    Json.reads[S3EventNotificationRecord]
 
-  implicit val messageReads: Reads[S3EventNotification] =
-    (JsPath \ "Records").read[Seq[S3EventNotificationRecord]].map(S3EventNotification)
+  given Reads[S3EventNotification] =
+    (__ \ "Records").read[Seq[S3EventNotificationRecord]].map(S3EventNotification.apply)
 
   override def parse(message: Message): Future[FileUploadEvent] =
-    for {
+    for
       json               <- Future.fromTry(Try(Json.parse(message.body)))
       deserializedJson   <- asFuture(json.validate[S3EventNotification])
       interpretedMessage <- interpretS3EventMessage(deserializedJson)
-    } yield interpretedMessage
+    yield interpretedMessage
 
   private def asFuture[T](input: JsResult[T]): Future[T] =
     input.fold(
-      errors => Future.failed(new Exception(s"Cannot parse the message: [${errors.toString()}].")),
-      result => Future.successful(result))
+      errors => Future.failed(Exception(s"Cannot parse the message: [${errors.toString()}].")),
+      result => Future.successful(result)
+    )
 
   private val ObjectCreatedEventPattern = "ObjectCreated\\:.*".r
 
   private def interpretS3EventMessage(result: S3EventNotification): Future[FileUploadEvent] =
-    result.records match {
+    result.records match
       case Seq(S3EventNotificationRecord(_, "aws:s3", _, _, ObjectCreatedEventPattern(), requestParameters, s3Details)) =>
         val event = FileUploadEvent(
           S3ObjectLocation(s3Details.bucketName, s3Details.objectKey, s3Details.versionId),
           requestParameters.sourceIPAddress)
 
-        withLoggingDetails(LoggingDetails.fromMessageContext(MessageContext(event.location.objectKey))) {
+        withLoggingDetails(LoggingDetails.fromMessageContext(MessageContext(event.location.objectKey))):
           logger.info(s"Created FileUploadEvent for Key=[${event.location.objectKey}].")
-        }
+
         Future.successful(event)
 
-      case _ => Future.failed(new Exception(s"Unexpected records in event: [${result.records.toString}]."))
-    }
-}
+      case _ =>
+        Future.failed(Exception(s"Unexpected records in event: [${result.records.toString}]."))

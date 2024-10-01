@@ -16,58 +16,65 @@
 
 package uk.gov.hmrc.clamav
 
-import java.io.{DataOutputStream, InputStream}
-import java.net.{InetSocketAddress, Socket}
-
 import play.api.Logging
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 
+import java.io.{DataOutputStream, InputStream}
+import java.net.{InetSocketAddress, Socket}
 import scala.concurrent.{ExecutionContext, Future}
 
-private[clamav] class ClamAvSocket(socket: Socket, val in : InputStream, val out : DataOutputStream) extends Connection with Logging {
+private[clamav] class ClamAvSocket(
+  socket           : Socket,
+  override val in  : InputStream,
+  override val out : DataOutputStream
+) extends Connection
+     with Logging:
 
-  private def terminate()(implicit ec: ExecutionContext): Future[Unit] =
-    Future {
-      socket.close()
-      out.close()
-    } recover {
-      case e: Throwable =>
-        logger.error("Error closing socket to clamd", e)
-    }
+  private def terminate()(using ExecutionContext): Future[Unit] =
+    Future
+      .apply:
+        socket.close()
+        out.close()
+      .recover:
+        case e: Throwable =>
+          logger.error("Error closing socket to clamd", e)
 
-}
-
-private[clamav] trait Connection {
-  def in: InputStream
+private[clamav] trait Connection:
+  def in : InputStream
   def out: DataOutputStream
-}
 
-private[clamav] object ClamAvSocket {
+private[clamav] object ClamAvSocket:
 
-  private def openSocket(config : ClamAvConfig)(implicit ec : ExecutionContext): Future[ClamAvSocket] = Future {
-    val sock = new Socket
-    sock.setSoTimeout(config.timeout)
-    sock.setKeepAlive(true)
+  private def openSocket(
+    config: ClamAvConfig
+  )(using
+    ExecutionContext
+  ): Future[ClamAvSocket] =
+    Future:
+      val sock = Socket()
+      sock.setSoTimeout(config.timeout)
+      sock.setKeepAlive(true)
 
-    val address: InetSocketAddress = new InetSocketAddress(config.host, config.port)
-    sock.connect(address)
+      val address: InetSocketAddress = InetSocketAddress(config.host, config.port)
+      sock.connect(address)
 
-    val out: DataOutputStream = new DataOutputStream(sock.getOutputStream)
+      ClamAvSocket(
+        sock,
+        in  = sock.getInputStream,
+        out = DataOutputStream(sock.getOutputStream)
+      )
 
-    val in: InputStream = sock.getInputStream
-
-    new ClamAvSocket(sock, in, out)
-  }
-
-  def withSocket[T](config: ClamAvConfig)(function: Connection => Future[T])(
-    implicit ec: ExecutionContext): Future[T] = {
-    for {
+  def withSocket[T](
+    config: ClamAvConfig
+  )(
+    function: Connection => Future[T]
+  )(using
+    ExecutionContext
+  ): Future[T] =
+    for
       socket <- openSocket(config)
-      result <- {
-        val functionResult = function(socket)
-        functionResult.onComplete(_ => socket.terminate())
-        functionResult
-      }
-    } yield result
-  }
-}
+      result <- { val functionResult = function(socket)
+                  functionResult.onComplete(_ => socket.terminate())
+                  functionResult
+                }
+    yield result

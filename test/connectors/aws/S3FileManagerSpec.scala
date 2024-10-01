@@ -211,10 +211,9 @@ class S3FileManagerSpec
       result shouldBe ((fileContent, fileContent.length))
 
       And("stream has been fully read and closed")
-      eventually {
+      eventually:
         fileInputStream.read() shouldBe -1
         s3ObjectClosed shouldBe true
-      }
 
       And("proper version of the file has been downloaded")
       val argumentCaptor = ArgumentCaptor.forClass(classOf[GetObjectRequest])

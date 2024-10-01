@@ -43,9 +43,8 @@ class FileCheckingResultHandler @Inject()(
     result           : Either[FileRejected, FileValidationSuccess],
     messageReceivedAt: Instant
   )(using ld: LoggingDetails): Future[Unit] =
-    withLoggingDetails(ld) {
+    withLoggingDetails(ld):
       logger.info(s"Handling check result for Key=[${objectDetails.location.objectKey}] Result=[$result]")
-    }
     result match
       case Right(FileValidationSuccess(checksum, mimeType, virusScanTimings, fileTypeTimings)) =>
         handleValid(objectDetails, checksum, mimeType)(messageReceivedAt, virusScanTimings, fileTypeTimings)

@@ -43,7 +43,7 @@ case class FileUploadEvent(
 case class Timings(
   start: Instant,
   end  : Instant
-) {
+):
   def asMetadata(checkpoint: String): Map[String, String] =
     Map(
       s"x-amz-meta-upscan-verify-$checkpoint-started" -> start.toString,
@@ -52,9 +52,8 @@ case class Timings(
 
   lazy val difference: Long =
     end.toEpochMilli - start.toEpochMilli
-}
 
-object Timings {
+object Timings:
 
   type Timer = () => Timings
 
@@ -62,7 +61,6 @@ object Timings {
     val startTime = clock.instant()
     () =>
       Timings(startTime, clock.instant())
-}
 
 case class FileValidationSuccess(
   checksum        : String,
@@ -109,7 +107,6 @@ case class ErrorMessage(
   message      : String
 )
 
-object ErrorMessage {
+object ErrorMessage:
   given Writes[ErrorMessage] =
     Json.writes[ErrorMessage]
-}

@@ -20,7 +20,7 @@ Here is the list of service's configuration properties:
 - *aws.secretAccessKey* - AWS secret key, not needed when using credentials of hosting EC2 instance
 - *aws.sessionToken* - AWS session token, needed only when service is running locally and uses MFA authentication. Proper value
 of the token is set automatically when using aws-profile script
-- *aws.sqs.queue.inbound - address of SQS queue that contains notifications regarding uploads of files to inbound bucket 
+- *aws.sqs.queue.inbound* - address of SQS queue that contains notifications regarding uploads of files to inbound bucket
 - *aws.s3.region* - AWS region on which outbound AWS bucket is located (default value is *eu-west-2*)
 - *aws.s3.bucket.outbound* - name of the outbound AWS S3 bucket, this bucket will be used to store clean files
 - *aws.sqs.retry.interval* - retry period between failed attempts to poll messages from inbound SQS queue
@@ -119,4 +119,3 @@ Upscan service has end-to-end acceptance tests which can be found in https://git
 # License
 
 This code is open source software licensed under the [Apache 2.0 License]("http://www.apache.org/licenses/LICENSE-2.0.html")
-

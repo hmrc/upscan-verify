@@ -5,7 +5,7 @@ import sbt.*
 import uk.gov.hmrc.DefaultBuildSettings
 
 ThisBuild / majorVersion := 1
-ThisBuild / scalaVersion := "3.3.0"
+ThisBuild / scalaVersion := "3.3.3"
 
 lazy val microservice = Project("upscan-verify", file("."))
   .enablePlugins(play.sbt.PlayScala, SbtDistributablesPlugin)

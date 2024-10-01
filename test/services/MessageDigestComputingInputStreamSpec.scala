@@ -35,10 +35,9 @@ class MessageDigestComputingInputStreamSpec
 
       var b      = is.read
       val buffer = mutable.Buffer[Byte]()
-      while (b != -1) {
+      while b != -1 do
         buffer.append(b.toByte)
         b = is.read
-      }
 
       buffer.toArray shouldBe bytes
 
@@ -80,10 +79,9 @@ class MessageDigestComputingInputStreamSpec
 
       var b      = is.read
       val buffer = mutable.Buffer[Byte]()
-      while (b != -1) {
+      while b != -1 do
         buffer.append(b.toByte)
         b = is.read
-      }
 
       is.getChecksum() shouldBe DigestUtils.sha256Hex(bytes)
 

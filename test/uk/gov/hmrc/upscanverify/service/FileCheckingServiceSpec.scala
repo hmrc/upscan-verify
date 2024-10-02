@@ -16,6 +16,8 @@
 
 package uk.gov.hmrc.upscanverify.service
 
+import org.mockito.ArgumentCaptor
+import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{verifyNoInteractions, when}
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.ScalaFutures
@@ -24,7 +26,7 @@ import uk.gov.hmrc.upscanverify.model._
 import uk.gov.hmrc.upscanverify.test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
 
-import java.io.{ByteArrayInputStream, InputStream}
+import java.io.ByteArrayInputStream
 import java.time.Instant
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -42,36 +44,17 @@ class FileCheckingServiceSpec
 
     val content = ObjectContent(ByteArrayInputStream("TEST".getBytes), "TEST".length)
 
-    val fileManager = new FileManager:
-      override def delete(objectLocation: S3ObjectLocation)(using LoggingDetails): Future[Unit] =
-        ???
-
-      override def getObjectMetadata(objectLocation: S3ObjectLocation)(using LoggingDetails): Future[InboundObjectMetadata] =
-        ???
-
-      override def withObjectContent[T](
-        objectLocation: S3ObjectLocation
-      )(function: ObjectContent => Future[T]
-      )(using LoggingDetails): Future[T] =
+    val fileManager    = mock[FileManager]
+    val functionCaptor = ArgumentCaptor.forClass(classOf[ObjectContent => Future[Nothing]]) // using argument capture since it can match the function param
+    when(fileManager.withObjectContent(any[S3ObjectLocation])(functionCaptor.capture())(using any[LoggingDetails]))
+      .thenAnswer { i =>
+        val objectLocation = i.getArgument[S3ObjectLocation](0)
+        val function       = i.getArgument[ObjectContent => Future[Nothing]](1) // same as functionCaptor.getValue
         if objectLocation.objectKey.contains("exception") then
           Future.failed(RuntimeException("Expected exception"))
         else
           function(content)
-
-      override def copyObject(
-        sourceLocation: S3ObjectLocation,
-        targetLocation: S3ObjectLocation,
-        metadata      : OutboundObjectMetadata
-      )(using LoggingDetails): Future[Unit] =
-        ???
-
-      override def writeObject(
-        sourceLocation: S3ObjectLocation,
-        targetLocation: S3ObjectLocation,
-        content       : InputStream,
-        metadata      : OutboundObjectMetadata
-      )(using LoggingDetails): Future[Unit] =
-        ???
+      }
 
     val location = S3ObjectLocation("bucket", "file", None)
     val metadata = InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clock.instant(), 0)
@@ -117,7 +100,8 @@ class FileCheckingServiceSpec
       when(virusScanningService.scan(location, content, metadata))
         .thenReturn(Future.successful(VirusScanResult.NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant()))))
 
-      when(fileTypeCheckingService.scan(location, content, metadata)).thenReturn(Future.successful(Left(FileTypeError.NotAllowedMimeType(MimeType("application/xml"), Some("valid-test-service"), Timings(clock.instant(), clock.instant())))))
+      when(fileTypeCheckingService.scan(location, content, metadata))
+        .thenReturn(Future.successful(Left(FileTypeError.NotAllowedMimeType(MimeType("application/xml"), Some("valid-test-service"), Timings(clock.instant(), clock.instant())))))
 
       fileCheckingService.check(location, metadata).futureValue shouldBe
         VerifyResult.FileRejected(

@@ -132,7 +132,8 @@ class FileCheckingResultHandlerSpec
 
       when(fileManager.copyObject(eqTo(file), any[S3ObjectLocation], any[OutboundObjectMetadata])(using any[LoggingDetails]))
         .thenReturn(Future.unit)
-      when(fileManager.delete(file)).thenReturn(Future.unit)
+      when(fileManager.delete(file))
+        .thenReturn(Future.unit)
 
       When("when processing scanning result")
       handler
@@ -210,7 +211,8 @@ class FileCheckingResultHandlerSpec
 
       when(fileManager.copyObject(eqTo(file), any[S3ObjectLocation], eqTo(outboundObjectMetadata))(using any[LoggingDetails]))
         .thenReturn(Future.unit)
-      when(fileManager.delete(file)).thenReturn(Future.failed(RuntimeException("Expected failure")))
+      when(fileManager.delete(file))
+        .thenReturn(Future.failed(RuntimeException("Expected failure")))
 
       When("when processing scanning result")
       val result =
@@ -326,7 +328,8 @@ class FileCheckingResultHandlerSpec
         .thenReturn(Future.unit)
       when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(using any[LoggingDetails])).
         thenReturn(Future.unit)
-      when(fileManager.delete(file)).thenReturn(Future.failed(RuntimeException("Expected failure")))
+      when(fileManager.delete(file))
+        .thenReturn(Future.failed(RuntimeException("Expected failure")))
 
       When("when processing scanning result")
       val result =
@@ -358,7 +361,8 @@ class FileCheckingResultHandlerSpec
         .thenReturn(Future.unit)
       when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(using any[LoggingDetails]))
         .thenReturn(Future.unit)
-      when(fileManager.delete(file)).thenReturn(Future.unit)
+      when(fileManager.delete(file))
+        .thenReturn(Future.unit)
 
       When("checking incorrectly typed file")
       val serviceName: Option[String] = Some("valid-test-service")
@@ -413,7 +417,8 @@ class FileCheckingResultHandlerSpec
         .thenReturn(Future.unit)
       when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(using any[LoggingDetails]))
         .thenReturn(Future.unit)
-      when(fileManager.delete(file)).thenReturn(Future.unit)
+      when(fileManager.delete(file))
+        .thenReturn(Future.unit)
 
       When("checking incorrectly typed file")
       val serviceName: Option[String] = Some("valid-test-service")
@@ -467,7 +472,8 @@ class FileCheckingResultHandlerSpec
         .thenReturn(Future.unit)
 
       And("a file manager that fails to delete correctly")
-      when(fileManager.delete(file)).thenReturn(Future.failed(RuntimeException("Expected failure")))
+      when(fileManager.delete(file))
+        .thenReturn(Future.failed(RuntimeException("Expected failure")))
 
       When("when processing checking result")
       when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]])(using any[LoggingDetails]))

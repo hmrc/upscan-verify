@@ -62,19 +62,44 @@ object Timings:
     () =>
       Timings(startTime, clock.instant())
 
-enum FileTypeError:
+enum VirusScanResult:
+  case FileInfected(
+    details         : String,
+    checksum        : String,
+    virusScanTimings: Timings
+  ) extends VirusScanResult
+
+  case NoVirusFound(
+    checksum        : String,
+    virusScanTimings: Timings
+  ) extends VirusScanResult
+
+case class FileAllowed(
+  mimeType       : MimeType,
+  fileTypeTimings: Timings
+)
+
+enum FileTypeError(
+  val consumingService: Option[String],
+  val fileTypeTimings : Timings
+):
   case NotAllowedMimeType(
-    typeFound       : MimeType,
-    consumingService: Option[String],
-    fileTypeTimings : Timings
-  ) extends FileTypeError
+    typeFound                    : MimeType,
+    override val consumingService: Option[String],
+    override val fileTypeTimings : Timings
+  ) extends FileTypeError(consumingService, fileTypeTimings)
 
   case NotAllowedFileExtension(
-    typeFound       : MimeType,
-    fileExtension   : String,
-    consumingService: Option[String],
-    fileTypeTimings : Timings
-  ) extends FileTypeError
+    typeFound                    : MimeType,
+    fileExtension                : String,
+    override val consumingService: Option[String],
+    override val fileTypeTimings : Timings
+  ) extends FileTypeError(consumingService, fileTypeTimings)
+
+  case Corrupt(
+    override val consumingService: Option[String],
+    override val fileTypeTimings : Timings
+  ) extends FileTypeError(consumingService, fileTypeTimings)
 
 enum VerifyResult:
   case FileRejected(
@@ -88,19 +113,6 @@ enum VerifyResult:
     virusScanTimings: Timings,
     fileTypeTimings : Timings
   ) extends VerifyResult
-
-
-enum VirusScanResult:
-  case FileInfected(
-    details         : String,
-    checksum        : String,
-    virusScanTimings: Timings
-  ) extends VirusScanResult
-
-  case NoVirusFound(
-    checksum        : String,
-    virusScanTimings: Timings
-  ) extends VirusScanResult
 
 
 enum FileCheckingError(val value: String):

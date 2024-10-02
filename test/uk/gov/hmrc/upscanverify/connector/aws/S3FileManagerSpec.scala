@@ -146,7 +146,8 @@ class S3FileManagerSpec
       fileMetadata.setUserMetadata(userMetadata)
       fileMetadata.setLastModified(awsLastModified)
 
-      when(s3client.getObjectMetadata(any[GetObjectMetadataRequest])).thenReturn(fileMetadata)
+      when(s3client.getObjectMetadata(any[GetObjectMetadataRequest]))
+        .thenReturn(fileMetadata)
 
       When("fetching objects metadata")
       val metadata =
@@ -196,7 +197,8 @@ class S3FileManagerSpec
       s3Object.setObjectMetadata(fileMetadata)
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      when(s3client.getObject(any[GetObjectRequest])).thenReturn(s3Object)
+      when(s3client.getObject(any[GetObjectRequest]))
+        .thenReturn(s3Object)
 
       Given("a valid file location")
       val fileManager = S3FileManager(s3client)
@@ -240,7 +242,8 @@ class S3FileManagerSpec
       s3Object.setObjectMetadata(fileMetadata)
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      when(s3client.getObject(any[GetObjectRequest])).thenReturn(s3Object)
+      when(s3client.getObject(any[GetObjectRequest]))
+        .thenReturn(s3Object)
 
       Given("a valid file location")
       val fileManager = S3FileManager(s3client)

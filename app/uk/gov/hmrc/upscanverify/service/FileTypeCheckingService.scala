@@ -29,12 +29,8 @@ import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetai
 import java.time.Clock
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-import scala.concurrent.Future
-
-case class FileAllowed(
-  mimeType: MimeType,
-  fileTypeTimings: Timings
-)
+import scala.util.Try
+import scala.concurrent.{ExecutionContext, Future}
 
 class FileTypeCheckingService @Inject()(
   mimeTypeDetector    : MimeTypeDetector,
@@ -42,6 +38,7 @@ class FileTypeCheckingService @Inject()(
   serviceConfiguration: ServiceConfiguration,
   metrics             : Metrics
 )(using
+  ExecutionContext,
   Clock
 ) extends Logging:
 
@@ -50,28 +47,38 @@ class FileTypeCheckingService @Inject()(
     objectContent : ObjectContent,
     objectMetadata: InboundObjectMetadata
   )(using
-    LoggingDetails
+    ld: LoggingDetails
   ): Future[Either[FileTypeError, FileAllowed]] =
+    Future:
+      given endTimer: Timer = timer()
 
-    given endTimer: Timer = timer()
+      val consumingService = objectMetadata.consumingService
+      val filename         = objectMetadata.originalFilename
 
-    val consumingService = objectMetadata.consumingService
-    val maybeFilename    = objectMetadata.originalFilename
-    val detectedMimeType = mimeTypeDetector.detect(objectContent.inputStream, maybeFilename)
+      val attempt          = Try(mimeTypeDetector.detect(objectContent.inputStream, filename))
+      addCheckingTimeMetrics()
 
-    addCheckingTimeMetrics
-    logZeroLengthFiles(detectedMimeType, location, consumingService)
+      for
+        detectedMimeType <- attempt.toEither match
+                              case Right(mimeType) =>
+                                Right(mimeType)
+                              case Left(e: java.io.IOException) if e.getMessage == "Stream is already being read" =>
+                                withLoggingDetails(ld):
+                                  logger.warn(
+                                    s"File with Key=[${location.objectKey}] could not be scanned. consuming service [$consumingService] "
+                                  )
+                                metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
+                                Left(FileTypeError.Corrupt(consumingService, endTimer()))
+                              case Left(other) =>
+                                throw other
+        _                =  logZeroLengthFiles(detectedMimeType, location, consumingService)
+        mimeType         =  detectedMimeType.value
+        _                <- validateMimeType(mimeType, consumingService, location)
+        _                <- validateFileExtension(mimeType, consumingService, location, filename)
+      yield
+        metrics.defaultRegistry.counter("validTypeFileUpload").inc()
+        FileAllowed(mimeType, endTimer())
 
-    val mimeType = detectedMimeType.value
-
-    val result = for
-      _ <- validateMimeType(mimeType, consumingService, location)
-      _ <- validateFileExtension(mimeType, consumingService, location, maybeFilename)
-    yield
-      metrics.defaultRegistry.counter("validTypeFileUpload").inc()
-      FileAllowed(mimeType, endTimer())
-
-    Future.successful(result)
 
   private def logZeroLengthFiles(
     detectedMimeType: DetectedMimeType,
@@ -81,7 +88,7 @@ class FileTypeCheckingService @Inject()(
     ld              : LoggingDetails
   ): Unit =
     detectedMimeType match
-      case _ :DetectedMimeType.EmptyLength =>
+      case _: DetectedMimeType.EmptyLength =>
         withLoggingDetails(ld):
           logger.info(
             s"File with key=[${location.objectKey}] was uploaded with 0 bytes for consuming service [$consumingService]"
@@ -134,5 +141,5 @@ class FileTypeCheckingService @Inject()(
             FileTypeError.NotAllowedFileExtension(mimeType, extension, consumingService, timer())
       .getOrElse(Right(()))
 
-  private def addCheckingTimeMetrics(using timer: Timer): Unit =
+  private def addCheckingTimeMetrics()(using timer: Timer): Unit =
     metrics.defaultRegistry.timer("fileTypeCheckingTime").update(timer().difference, TimeUnit.MILLISECONDS)

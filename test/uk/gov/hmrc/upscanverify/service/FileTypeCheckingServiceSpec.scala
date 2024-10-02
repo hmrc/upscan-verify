@@ -30,8 +30,6 @@ import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
-import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
 
 class FileTypeCheckingServiceSpec
   extends UnitSpec
@@ -72,7 +70,7 @@ class FileTypeCheckingServiceSpec
 
       When("the file is checked")
       when(mockFilenameValidator.validate(mimeType, filename)).thenReturn(Right(()))
-      val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
+      val result = checkingService.scan(location, content, metadata).futureValue
 
       Then("a valid result should be returned")
       result shouldBe Right(
@@ -111,7 +109,7 @@ class FileTypeCheckingServiceSpec
       val checkingService = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using clock)
 
       When("the file is checked")
-      val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
+      val result = checkingService.scan(location, content, metadata).futureValue
 
       Then("an incorrect file type result should be returned")
       result shouldBe Left(
@@ -150,7 +148,7 @@ class FileTypeCheckingServiceSpec
 
       When("the file is checked")
       when(mockFilenameValidator.validate(mimeType, filename)).thenReturn(Left("foo"))
-      val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
+      val result = checkingService.scan(location, content, metadata).futureValue
 
       Then("an incorrect file type result should be returned")
       result shouldBe Left(
@@ -266,7 +264,7 @@ class FileTypeCheckingServiceSpec
       val checkingService       = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using clock)
 
       When("the file is checked")
-      val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
+      val result = checkingService.scan(location, content, metadata).futureValue
 
       Then("an incorrect file type result should be returned")
       result shouldBe Left(

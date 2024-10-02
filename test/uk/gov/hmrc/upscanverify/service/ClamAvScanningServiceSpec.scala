@@ -26,14 +26,13 @@ import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
-import uk.gov.hmrc.upscanverify.model.{FileInfected, S3ObjectLocation, Timings}
+import uk.gov.hmrc.upscanverify.model.{VirusScanResult, S3ObjectLocation, Timings}
 import uk.gov.hmrc.upscanverify.test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
 
 import java.io.{ByteArrayInputStream, FilterInputStream, InputStream}
 import java.time.{Instant, LocalDateTime, ZoneOffset}
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class ClamAvScanningServiceSpec
@@ -83,7 +82,7 @@ class ClamAvScanningServiceSpec
       val result = scanningService.scan(fileLocation, fileContent, fileMetadata).futureValue
 
       Then("a scanning clean result should be returned")
-      result shouldBe Right(NoVirusFound("CHECKSUM", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z"))))
+      result shouldBe VirusScanResult.NoVirusFound("CHECKSUM", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z")))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 1
@@ -112,10 +111,10 @@ class ClamAvScanningServiceSpec
       val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified, content.length)
 
       When("scanning service is called")
-      val result = Await.result(scanningService.scan(fileLocation, fileContent, fileMetadata), 2.seconds)
+      val result = scanningService.scan(fileLocation, fileContent, fileMetadata).futureValue
 
       Then("a scanning infected result should be returned")
-      result shouldBe Left(FileInfected("File dirty", "CHECKSUM", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z"))))
+      result shouldBe VirusScanResult.FileInfected("File dirty", "CHECKSUM", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z")))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 0

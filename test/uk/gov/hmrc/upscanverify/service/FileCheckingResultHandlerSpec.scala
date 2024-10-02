@@ -21,7 +21,7 @@ import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.{any, eq => eqTo}
 import org.mockito.Mockito.{when, verify, verifyNoMoreInteractions, verifyNoInteractions}
 import org.scalatest.GivenWhenThen
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.upscanverify.config.ServiceConfiguration
 import uk.gov.hmrc.upscanverify.model._
@@ -40,7 +40,8 @@ class FileCheckingResultHandlerSpec
      with Eventually
      with GivenWhenThen
      with WithIncrementingClock
-     with ScalaFutures:
+     with ScalaFutures
+     with IntegrationPatience:
 
   val fileSize: Long = 97
 
@@ -137,7 +138,7 @@ class FileCheckingResultHandlerSpec
       handler
         .handleCheckingResult(
           inboundObjectDetails,
-          Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)),
+          VerifyResult.FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings),
           receivedAt
         )
         .futureValue
@@ -172,7 +173,7 @@ class FileCheckingResultHandlerSpec
       val result =
         handler.handleCheckingResult(
           inboundObjectDetails,
-          Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)),
+          VerifyResult.FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings),
           receivedAt
         )
 
@@ -215,7 +216,7 @@ class FileCheckingResultHandlerSpec
       val result =
         handler.handleCheckingResult(
           inboundObjectDetails,
-          Right(FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings)),
+          VerifyResult.FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings),
           receivedAt
         )
 
@@ -250,7 +251,7 @@ class FileCheckingResultHandlerSpec
         handler
           .handleCheckingResult(
             InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-            Left(FileRejected(Left(FileInfected(errorMessage.message, checksum, virusScanTimings)))),
+            VerifyResult.FileRejected(VirusScanResult.FileInfected(errorMessage.message, checksum, virusScanTimings)),
             receivedAt
           )
           .futureValue
@@ -298,7 +299,7 @@ class FileCheckingResultHandlerSpec
         handler
           .handleCheckingResult(
             InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-            Left(FileRejected(Left(FileInfected("There is a virus", checksum, virusScanTimings)))),
+            VerifyResult.FileRejected(VirusScanResult.FileInfected("There is a virus", checksum, virusScanTimings)),
             receivedAt
           )
 
@@ -332,7 +333,7 @@ class FileCheckingResultHandlerSpec
         handler
           .handleCheckingResult(
             InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-            Left(FileRejected(Left(FileInfected("There is a virus", checksum, virusScanTimings)))),
+            VerifyResult.FileRejected(VirusScanResult.FileInfected("There is a virus", checksum, virusScanTimings)),
             receivedAt
           )
 
@@ -365,10 +366,10 @@ class FileCheckingResultHandlerSpec
       handler
         .handleCheckingResult(
           InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-          Left(FileRejected(
-            Right(NoVirusFound(checksum, virusScanTimings)),
+          VerifyResult.FileRejected(
+            VirusScanResult.NoVirusFound(checksum, virusScanTimings),
             Some(FileTypeError.NotAllowedMimeType(mimeType, serviceName, fileTypeTimings))
-          )),
+          ),
           receivedAt
         )
         .futureValue
@@ -420,10 +421,10 @@ class FileCheckingResultHandlerSpec
       handler
         .handleCheckingResult(
           InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-          Left(FileRejected(
-            Right(NoVirusFound(checksum, virusScanTimings)),
+          VerifyResult.FileRejected(
+            VirusScanResult.NoVirusFound(checksum, virusScanTimings),
             Some(FileTypeError.NotAllowedFileExtension(mimeType, "foo", serviceName, fileTypeTimings))
-          )),
+          ),
           receivedAt
         )
         .futureValue
@@ -475,10 +476,10 @@ class FileCheckingResultHandlerSpec
         handler
           .handleCheckingResult(
             InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-            Left(FileRejected(
-              Right(NoVirusFound("1234567890", virusScanTimings)),
+            VerifyResult.FileRejected(
+              VirusScanResult.NoVirusFound("1234567890", virusScanTimings),
               Some(FileTypeError.NotAllowedMimeType(mimeType, Some("valid-test-service"), fileTypeTimings))
-            )),
+            ),
             receivedAt
           )
 

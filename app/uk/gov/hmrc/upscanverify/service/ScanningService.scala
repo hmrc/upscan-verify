@@ -30,11 +30,6 @@ import javax.inject.Inject
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
-case class NoVirusFound(
-  checksum        : String,
-  virusScanTimings: Timings
-)
-
 trait ScanningService:
   def scan(
     location      : S3ObjectLocation,
@@ -42,7 +37,7 @@ trait ScanningService:
     objectMetadata: InboundObjectMetadata
   )(using
     LoggingDetails
-  ): Future[Either[FileInfected, NoVirusFound]]
+  ): Future[VirusScanResult]
 
 class ClamAvScanningService @Inject()(
   clamClientFactory                       : ClamAntiVirusFactory,
@@ -60,7 +55,7 @@ class ClamAvScanningService @Inject()(
     metadata   : InboundObjectMetadata
   )(using
     ld         : LoggingDetails
-  ): Future[Either[FileInfected, NoVirusFound]] =
+  ): Future[VirusScanResult] =
 
     val startTime       = clock.instant()
     val antivirusClient = clamClientFactory.getClient()
@@ -73,12 +68,12 @@ class ClamAvScanningService @Inject()(
                       .map:
                         case ScanningResult.Clean =>
                           metrics.defaultRegistry.counter("cleanFileUpload").inc()
-                          Right(NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
+                          VirusScanResult.NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant()))
                         case ScanningResult.Infected(message) =>
                           withLoggingDetails(ld):
                             logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
                           metrics.defaultRegistry.counter("quarantineFileUpload").inc()
-                          Left(FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant())))
+                          VirusScanResult.FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant()))
     yield
       addScanningTimeMetrics(startTime, clock.instant())
       scanResult

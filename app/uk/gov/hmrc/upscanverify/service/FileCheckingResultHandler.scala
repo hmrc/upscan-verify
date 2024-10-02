@@ -40,13 +40,13 @@ class FileCheckingResultHandler @Inject()(
 
   def handleCheckingResult(
     objectDetails    : InboundObjectDetails,
-    result           : Either[FileRejected, FileValidationSuccess],
+    result           : VerifyResult,
     messageReceivedAt: Instant
   )(using ld: LoggingDetails): Future[Unit] =
     withLoggingDetails(ld):
       logger.info(s"Handling check result for Key=[${objectDetails.location.objectKey}] Result=[$result]")
     result match
-      case Right(FileValidationSuccess(checksum, mimeType, virusScanTimings, fileTypeTimings)) =>
+      case VerifyResult.FileValidationSuccess(checksum, mimeType, virusScanTimings, fileTypeTimings) =>
         handleValid(
           objectDetails,
           checksum,
@@ -54,7 +54,7 @@ class FileCheckingResultHandler @Inject()(
           metadata = metadata(objectDetails, "x-amz-meta-upscan-verify-outbound-queued", messageReceivedAt, virusScanTimings, Some(fileTypeTimings))
         )
 
-      case Left(FileRejected(Left(FileInfected(errorMessage, checksum, virusScanTimings)), None)) =>
+      case VerifyResult.FileRejected(VirusScanResult.FileInfected(errorMessage, checksum, virusScanTimings), None) =>
         handleError(
           objectDetails,
           checksum,
@@ -63,7 +63,7 @@ class FileCheckingResultHandler @Inject()(
           metadata            = metadata(objectDetails, "x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings, fileTypeTimings = None)
         )
 
-      case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(FileTypeError.NotAllowedMimeType(mime, consumingService, fileTypeTimings)))) =>
+      case VerifyResult.FileRejected(VirusScanResult.NoVirusFound(checksum, virusScanTimings), Some(FileTypeError.NotAllowedMimeType(mime, consumingService, fileTypeTimings))) =>
         val errorMessage =
           s"MIME type [${mime.value}] is not allowed for service: [${consumingService.getOrElse("No service name provided")}]"
         handleError(
@@ -74,7 +74,7 @@ class FileCheckingResultHandler @Inject()(
           metadata            = metadata(objectDetails, "x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings, Some(fileTypeTimings))
         )
 
-      case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(FileTypeError.NotAllowedFileExtension(mime, extension, consumingService, fileTypeTimings)))) =>
+      case VerifyResult.FileRejected(VirusScanResult.NoVirusFound(checksum, virusScanTimings), Some(FileTypeError.NotAllowedFileExtension(mime, extension, consumingService, fileTypeTimings))) =>
         val errorMessage =
           s"File extension [$extension] is not allowed for mime-type [${mime.value}], service: [${consumingService.getOrElse("No service name provided")}]"
         handleError(

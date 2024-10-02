@@ -17,7 +17,7 @@
 package uk.gov.hmrc.upscanverify.model
 
 import play.api.libs.json._
-import uk.gov.hmrc.upscanverify.service.{MimeType, NoVirusFound}
+import uk.gov.hmrc.upscanverify.service.MimeType
 
 import java.time.{Clock, Instant}
 
@@ -62,19 +62,6 @@ object Timings:
     () =>
       Timings(startTime, clock.instant())
 
-case class FileValidationSuccess(
-  checksum        : String,
-  mimeType        : MimeType,
-  virusScanTimings: Timings,
-  fileTypeTimings : Timings
-)
-
-case class FileInfected(
-  details         : String,
-  checksum        : String,
-  virusScanTimings: Timings
-)
-
 enum FileTypeError:
   case NotAllowedMimeType(
     typeFound       : MimeType,
@@ -89,10 +76,32 @@ enum FileTypeError:
     fileTypeTimings : Timings
   ) extends FileTypeError
 
-case class FileRejected(
-  virusScanResult  : Either[FileInfected, NoVirusFound],
-  fileTypeResultOpt: Option[FileTypeError]             = None
-)
+enum VerifyResult:
+  case FileRejected(
+    virusScanResult  : VirusScanResult,
+    fileTypeResultOpt: Option[FileTypeError] = None
+  ) extends VerifyResult
+
+  case FileValidationSuccess(
+    checksum        : String,
+    mimeType        : MimeType,
+    virusScanTimings: Timings,
+    fileTypeTimings : Timings
+  ) extends VerifyResult
+
+
+enum VirusScanResult:
+  case FileInfected(
+    details         : String,
+    checksum        : String,
+    virusScanTimings: Timings
+  ) extends VirusScanResult
+
+  case NoVirusFound(
+    checksum        : String,
+    virusScanTimings: Timings
+  ) extends VirusScanResult
+
 
 enum FileCheckingError(val value: String):
   case Quarantine extends FileCheckingError("QUARANTINE")

@@ -82,18 +82,18 @@ class FileCheckingServiceSpec
       val fileCheckingService     = FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant())))))
+        .thenReturn(Future.successful(VirusScanResult.NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant()))))
 
       when(fileTypeCheckingService.scan(location, content, metadata))
         .thenReturn(Future.successful(Right(FileAllowed(MimeType("application/xml"), Timings(clock.instant(), clock.instant())))))
 
       fileCheckingService.check(location, metadata).futureValue shouldBe
-        Right(FileValidationSuccess(
+        VerifyResult.FileValidationSuccess(
           "CHECKSUM",
           MimeType("application/xml"),
           Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1)),
           Timings(clockStart.plusSeconds(2), clockStart.plusSeconds(3))
-        ))
+        )
 
     "do not check file type if virus found and return virus details" in:
       val virusScanningService    = mock[ScanningService]
@@ -102,10 +102,10 @@ class FileCheckingServiceSpec
       val checksum: String        = "CHECKSUM"
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Left(FileInfected("Virus", checksum, Timings(clock.instant(), clock.instant())))))
+        .thenReturn(Future.successful(VirusScanResult.FileInfected("Virus", checksum, Timings(clock.instant(), clock.instant()))))
 
       fileCheckingService.check(location, metadata).futureValue shouldBe
-        Left(FileRejected(Left(FileInfected("Virus", checksum, Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))))))
+        VerifyResult.FileRejected(VirusScanResult.FileInfected("Virus", checksum, Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))))
 
       verifyNoInteractions(fileTypeCheckingService)
 
@@ -115,17 +115,16 @@ class FileCheckingServiceSpec
       val fileCheckingService     = FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
 
       when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Right(NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant())))))
+        .thenReturn(Future.successful(VirusScanResult.NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant()))))
 
       when(fileTypeCheckingService.scan(location, content, metadata)).thenReturn(Future.successful(Left(FileTypeError.NotAllowedMimeType(MimeType("application/xml"), Some("valid-test-service"), Timings(clock.instant(), clock.instant())))))
 
-      fileCheckingService.check(location, metadata).futureValue shouldBe Left(
-        FileRejected(
-          Right(NoVirusFound("CHECKSUM", Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1)))),
+      fileCheckingService.check(location, metadata).futureValue shouldBe
+        VerifyResult.FileRejected(
+          VirusScanResult.NoVirusFound("CHECKSUM", Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))),
           Some(FileTypeError.NotAllowedMimeType(
             MimeType("application/xml"),
             Some("valid-test-service"),
             Timings(clockStart.plusSeconds(2), clockStart.plusSeconds(3))
           )
         ))
-      )

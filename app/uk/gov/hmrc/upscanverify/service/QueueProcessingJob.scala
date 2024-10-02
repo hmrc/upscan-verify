@@ -16,44 +16,52 @@
 
 package uk.gov.hmrc.upscanverify.service
 
+import com.amazonaws.services.sqs.model.Message
 import com.codahale.metrics.MetricRegistry
 import play.api.Logging
-import uk.gov.hmrc.upscanverify.model.Message
 import uk.gov.hmrc.upscanverify.util.logging.LoggingUtils
 
+import java.time.{Clock, Instant}
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters._
 
 class QueueProcessingJob @Inject()(
-  consumer        : QueueConsumer,
   messageProcessor: MessageProcessor,
-  metricRegistry  : MetricRegistry
+  metricRegistry  : MetricRegistry,
+  clock           : Clock
 )(using
   ExecutionContext
 ) extends PollingJob
      with Logging:
 
-  def run(): Future[Unit] =
-    val outcomes =
-      for
-        messages        <- consumer.poll()
-        messageOutcomes <- Future.traverse(messages)(processMessage)
-      yield messageOutcomes
+  private def toUpscanMessage(sqsMessage: Message): uk.gov.hmrc.upscanverify.model.Message =
+    val receivedAt = clock.instant()
 
-    outcomes.map(_ => ())
+    if logger.isDebugEnabled then
+      logger.debug(
+        s"Received message with id: [${sqsMessage.getMessageId}] and receiptHandle: [${sqsMessage.getReceiptHandle}], message details:\n "
+          + sqsMessage.toString
+      )
 
-  private def processMessage(message: Message): Future[Unit] =
+    val queueTimestamp = sqsMessage.getAttributes.asScala.get("SentTimestamp").map(s => Instant.ofEpochMilli(s.toLong))
+
+    if queueTimestamp.isEmpty then
+      logger.warn(s"SentTimestamp is missing from the message attribute. Message id = ${sqsMessage.getMessageId}")
+
+    uk.gov.hmrc.upscanverify.model.Message(
+      sqsMessage.getMessageId,
+      sqsMessage.getBody,
+      sqsMessage.getReceiptHandle,
+      receivedAt,
+      queueTimestamp
+    )
+
+  override def processMessage(sqsMessage: Message): Future[Unit] =
+    val message = toUpscanMessage(sqsMessage)
     messageProcessor.processMessage(message)
-      .flatMap: context =>
-        LoggingUtils
-          .withMdc(context):
-            for
-              _ <- consumer.confirm(message)
-              _ =  metricRegistry.meter("verifyThroughput").mark()
-            yield ()
-          .recover:
-            case exception =>
-              logger.error(s"Failed to process message '${message.id}' for Key=[${context.fileReference}], cause ${exception.getMessage}", exception)
+      .map: context =>
+        metricRegistry.meter("verifyThroughput").mark()
       .recover:
         case exception =>
           logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)

@@ -49,3 +49,6 @@ class TikaMimeTypeDetector extends MimeTypeDetector:
     tikaInputStream.close()
 
     detectedMimeType
+
+
+//java.io.IOException: Stream is already being read

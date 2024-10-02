@@ -236,10 +236,10 @@ class FileCheckingResultHandlerSpec
       val inboundObjectDetails   = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
       val outboundObjectMetadata = OutboundObjectMetadata.invalid(inboundObjectDetails, virusFoundExpectedCheckpoints)
 
-      val details:  String = "There is a virus"
+      val errorMessage = ErrorMessage(FileCheckingError.Quarantine, "There is a virus")
       val checksum: String = "CHECKSUM"
 
-      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(using any[LoggingDetails]))
+      when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]])(using any[LoggingDetails]))
         .thenReturn(Future.unit)
       when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(using any[LoggingDetails]))
         .thenReturn(Future.unit)
@@ -250,13 +250,13 @@ class FileCheckingResultHandlerSpec
         handler
           .handleCheckingResult(
             InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-            Left(FileRejected(Left(FileInfected(details, checksum, virusScanTimings)))),
+            Left(FileRejected(Left(FileInfected(errorMessage.message, checksum, virusScanTimings)))),
             receivedAt
           )
           .futureValue
 
       Then("notification is created")
-      verify(rejectionNotifier).notifyFileInfected(file, checksum, fileSize, uploadedAt, details, None)
+      verify(rejectionNotifier).notifyRejection(file, checksum, fileSize, uploadedAt, errorMessage, None)
 
       And("file metadata and error details are stored in the quarantine bucket")
       val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
@@ -290,7 +290,7 @@ class FileCheckingResultHandlerSpec
       val checksum: String = "CHECKSUM"
 
       Given("notification service fails")
-      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(using any[LoggingDetails]))
+      when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]])(using any[LoggingDetails]))
         .thenReturn(Future.failed(Exception("Notification failed")))
 
       When("scanning infected file")
@@ -321,7 +321,7 @@ class FileCheckingResultHandlerSpec
       val inboundObjectMetadata = InboundObjectMetadata(Map("someKey" -> "someValue"), uploadedAt, fileSize)
       val checksum: String = "CHECKSUM"
 
-      when(rejectionNotifier.notifyFileInfected(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(using any[LoggingDetails]))
+      when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]])(using any[LoggingDetails]))
         .thenReturn(Future.unit)
       when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(using any[LoggingDetails])).
         thenReturn(Future.unit)
@@ -353,7 +353,7 @@ class FileCheckingResultHandlerSpec
       val inboundObjectDetails   = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
       val outboundObjectMetadata = OutboundObjectMetadata.invalid(inboundObjectDetails, fileTypeRejectedExpectedCheckpoints)
 
-      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(using any[LoggingDetails]))
+      when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]])(using any[LoggingDetails]))
         .thenReturn(Future.unit)
       when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(using any[LoggingDetails]))
         .thenReturn(Future.unit)
@@ -374,7 +374,7 @@ class FileCheckingResultHandlerSpec
         .futureValue
 
       Then("notification is created")
-      verify(rejectionNotifier).notifyInvalidFileType(eqTo(file), eqTo(checksum), eqTo(fileSize), eqTo(uploadedAt), any[String], eqTo(serviceName))(using eqTo(ld))
+      verify(rejectionNotifier).notifyRejection(eqTo(file), eqTo(checksum), eqTo(fileSize), eqTo(uploadedAt), any[ErrorMessage], eqTo(serviceName))(using eqTo(ld))
 
       And("file metadata and error details are stored in the quarantine bucket")
 
@@ -408,7 +408,7 @@ class FileCheckingResultHandlerSpec
       val inboundObjectDetails   = InboundObjectDetails(inboundObjectMetadata, clientIp, file)
       val outboundObjectMetadata = OutboundObjectMetadata.invalid(inboundObjectDetails, fileTypeRejectedExpectedCheckpoints)
 
-      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(using any[LoggingDetails]))
+      when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]])(using any[LoggingDetails]))
         .thenReturn(Future.unit)
       when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])(using any[LoggingDetails]))
         .thenReturn(Future.unit)
@@ -429,7 +429,7 @@ class FileCheckingResultHandlerSpec
         .futureValue
 
       Then("notification is created")
-      verify(rejectionNotifier).notifyInvalidFileType(eqTo(file), eqTo(checksum), eqTo(fileSize), eqTo(uploadedAt), any[String], eqTo(serviceName))(using eqTo(ld))
+      verify(rejectionNotifier).notifyRejection(eqTo(file), eqTo(checksum), eqTo(fileSize), eqTo(uploadedAt), any[ErrorMessage], eqTo(serviceName))(using eqTo(ld))
 
       And("file metadata and error details are stored in the quarantine bucket")
 
@@ -469,7 +469,7 @@ class FileCheckingResultHandlerSpec
       when(fileManager.delete(file)).thenReturn(Future.failed(RuntimeException("Expected failure")))
 
       When("when processing checking result")
-      when(rejectionNotifier.notifyInvalidFileType(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[String], any[Option[String]])(using any[LoggingDetails]))
+      when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]])(using any[LoggingDetails]))
         .thenReturn(Future.unit)
       val result =
         handler

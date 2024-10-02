@@ -47,20 +47,43 @@ class FileCheckingResultHandler @Inject()(
       logger.info(s"Handling check result for Key=[${objectDetails.location.objectKey}] Result=[$result]")
     result match
       case Right(FileValidationSuccess(checksum, mimeType, virusScanTimings, fileTypeTimings)) =>
-        handleValid(objectDetails, checksum, mimeType)(messageReceivedAt, virusScanTimings, fileTypeTimings)
+        handleValid(
+          objectDetails,
+          checksum,
+          mimeType,
+          metadata = metadata(objectDetails, "x-amz-meta-upscan-verify-outbound-queued", messageReceivedAt, virusScanTimings, Some(fileTypeTimings))
+        )
 
       case Left(FileRejected(Left(FileInfected(errorMessage, checksum, virusScanTimings)), None)) =>
-        handleInfected(objectDetails, errorMessage)(checksum, messageReceivedAt, virusScanTimings)
+        handleError(
+          objectDetails,
+          checksum,
+          ErrorMessage(FileCheckingError.Quarantine, errorMessage),
+          serviceName         = None,
+          metadata            = metadata(objectDetails, "x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings, fileTypeTimings = None)
+        )
 
       case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(FileTypeError.NotAllowedMimeType(mime, consumingService, fileTypeTimings)))) =>
         val errorMessage =
           s"MIME type [${mime.value}] is not allowed for service: [${consumingService.getOrElse("No service name provided")}]"
-        handleFileTypeError(objectDetails, errorMessage, consumingService)(checksum, messageReceivedAt, virusScanTimings, fileTypeTimings)
+        handleError(
+          objectDetails,
+          checksum,
+          ErrorMessage(FileCheckingError.Rejected, errorMessage),
+          consumingService,
+          metadata            = metadata(objectDetails, "x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings, Some(fileTypeTimings))
+        )
 
       case Left(FileRejected(Right(NoVirusFound(checksum, virusScanTimings)), Some(FileTypeError.NotAllowedFileExtension(mime, extension, consumingService, fileTypeTimings)))) =>
         val errorMessage =
           s"File extension [$extension] is not allowed for mime-type [${mime.value}], service: [${consumingService.getOrElse("No service name provided")}]"
-        handleFileTypeError(objectDetails, errorMessage, consumingService)(checksum, messageReceivedAt, virusScanTimings, fileTypeTimings)
+        handleError(
+          objectDetails,
+          checksum,
+          ErrorMessage(FileCheckingError.Rejected, errorMessage),
+          consumingService,
+          metadata            = metadata(objectDetails, "x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings, Some(fileTypeTimings))
+        )
 
       case _ =>
         Future.successful:
@@ -68,123 +91,76 @@ class FileCheckingResultHandler @Inject()(
             logger.error(s"Unexpected match result for Key=[${objectDetails.location.objectKey}] Result=[$result]")
 
   private def handleValid(
-    details: InboundObjectDetails,
+    details : InboundObjectDetails,
     checksum: String,
-    mimeType: MimeType
-  )(
-    messageReceivedAt: Instant,
-    virusScanTimings: Timings,
-    fileTypeTimings: Timings
+    mimeType: MimeType,
+    metadata: Map[String,String]
   )(using
     ExecutionContext,
     LoggingDetails
   ): Future[Unit] =
-
-    def metadata(key: String): Option[(String, String)] =
-      details.metadata.items.get(key).map(s"x-amz-meta-${key}" -> _)
-
-    val targetLocation =
-      S3ObjectLocation(configuration.outboundBucket, UUID.randomUUID().toString, objectVersion = None)
-
     for
-      _ <- fileManager
-            .copyObject(
-              details.location,
-              targetLocation,
-              OutboundObjectMetadata.valid(
-                details,
-                checksum,
-                mimeType,
-                timingsMetadata("x-amz-meta-upscan-verify-outbound-queued", messageReceivedAt, virusScanTimings, Some(fileTypeTimings))
-                  ++ metadata("upscan-initiate-received")
-                  ++ metadata("upscan-initiate-response")
-              )
-            )
-      _ <- fileManager.delete(details.location)
-    yield ()
-
-  private def handleInfected(
-    details          : InboundObjectDetails,
-    errorMessage     : String
-  )(
-    checksum         : String,
-    messageReceivedAt: Instant,
-    virusScanTimings : Timings
-  )(using
-    ExecutionContext,
-    LoggingDetails
-  ): Future[Unit] =
-
-    def metadata(key: String): Option[(String, String)] =
-      details.metadata.items.get(key).map(s"x-amz-meta-${key}" -> _)
-
-    val fileCheckingError = ErrorMessage(FileCheckingError.Quarantine, errorMessage)
-    val objectContent     = ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
-    val targetLocation    =
-      S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None)
-
-    for
-      _ <- rejectionNotifier.notifyFileInfected(details.location, checksum, details.metadata.fileSize, details.metadata.uploadedTimestamp, errorMessage, None)
-      _ <- fileManager.writeObject(
-             details.location,
-             targetLocation,
-             objectContent,
-             OutboundObjectMetadata.invalid(
-              details,
-              timingsMetadata("x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings)
-                ++ metadata("upscan-initiate-received")
-                ++ metadata("upscan-initiate-response")
-             )
+      _ <- fileManager.copyObject(
+             sourceLocation = details.location,
+             targetLocation = S3ObjectLocation(configuration.outboundBucket, UUID.randomUUID().toString, objectVersion = None),
+             metadata       = OutboundObjectMetadata.valid(
+                                details,
+                                checksum,
+                                mimeType,
+                                metadata
+                              )
            )
       _ <- fileManager.delete(details.location)
     yield ()
 
-  private def handleFileTypeError(
+  private def handleError(
+    details            : InboundObjectDetails,
+    checksum           : String,
+    errorMessage       : ErrorMessage,
+    serviceName        : Option[String],
+    metadata           : Map[String,String]
+  )(using
+    ExecutionContext,
+    LoggingDetails
+  ): Future[Unit] =
+    for
+      _ <- rejectionNotifier.notifyRejection(
+             fileProperties      = details.location,
+             checksum            = checksum,
+             fileSize            = details.metadata.fileSize,
+             fileUploadDatetime  = details.metadata.uploadedTimestamp,
+             errorMessage        = errorMessage,
+             serviceName         = serviceName
+           )
+      _ <- fileManager.writeObject(
+             sourceLocation = details.location,
+             targetLocation = S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None),
+             content        = ByteArrayInputStream(Json.toJson(errorMessage).toString.getBytes),
+             metadata       = OutboundObjectMetadata.invalid(details, metadata)
+           )
+      _ <- fileManager.delete(details.location)
+    yield ()
+
+  def metadata(
     details          : InboundObjectDetails,
-    errorMessage     : String,
-    serviceName      : Option[String]
-  )(
-    checksum         : String,
+    queueMetadataKey : String,
     messageReceivedAt: Instant,
     virusScanTimings : Timings,
-    fileTypeTimings  : Timings
-  )(using
-    ExecutionContext,
-    LoggingDetails
-  ): Future[Unit] =
-    def metadata(key: String): Option[(String, String)] =
-      details.metadata.items.get(key).map(s"x-amz-meta-${key}" -> _)
-
-    val fileCheckingError = ErrorMessage(FileCheckingError.Rejected, errorMessage)
-    val objectContent     = ByteArrayInputStream(Json.toJson(fileCheckingError).toString.getBytes)
-    val targetLocation    =
-      S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None)
-
-    for
-      _ <- rejectionNotifier.notifyInvalidFileType(details.location, checksum, details.metadata.fileSize, details.metadata.uploadedTimestamp, errorMessage, serviceName)
-      _ <- fileManager.writeObject(
-             details.location,
-             targetLocation,
-             objectContent,
-             OutboundObjectMetadata.invalid(
-               details,
-               timingsMetadata("x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings, Some(fileTypeTimings))
-                 ++ metadata("upscan-initiate-received")
-                 ++ metadata("upscan-initiate-response")
-             )
-           )
-      _ <- fileManager.delete(details.location)
-    yield ()
+    fileTypeTimings  : Option[Timings]
+  ): Map[String, String] =
+    timingsMetadata(queueMetadataKey, messageReceivedAt, virusScanTimings, fileTypeTimings)
+      ++ details.metadata.items.get("upscan-initiate-received").map("x-amz-meta-upscan-initiate-received" -> _)
+      ++ details.metadata.items.get("upscan-initiate-response").map("x-amz-meta-upscan-initiate-response" -> _)
 
   private def timingsMetadata(
-    queueMetadataKey  : String,
-    messageReceivedAt : Instant,
-    virusScanTimings  : Timings,
-    fileTypeTimingsOpt: Option[Timings] = None
-  ): Map[String,String] =
+    queueMetadataKey : String,
+    messageReceivedAt: Instant,
+    virusScanTimings : Timings,
+    fileTypeTimings  : Option[Timings]
+  ): Map[String, String] =
     virusScanTimings.asMetadata("virusscan")
-      ++ fileTypeTimingsOpt.fold(Map.empty)(_.asMetadata("filetype"))
+      ++ fileTypeTimings.fold(Map.empty)(_.asMetadata("filetype"))
       ++ Map(
-           "x-amz-meta-upscan-verify-received" -> messageReceivedAt.toString(),
-           queueMetadataKey                    -> clock.instant().toString()
+           "x-amz-meta-upscan-verify-received" -> messageReceivedAt.toString,
+           queueMetadataKey                    -> clock.instant().toString
          )

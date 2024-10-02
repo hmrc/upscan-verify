@@ -26,3 +26,4 @@ trait MimeTypeDetector:
 enum DetectedMimeType(val value: MimeType):
   case Detected   (override val value: MimeType) extends DetectedMimeType(value)
   case EmptyLength(override val value: MimeType) extends DetectedMimeType(value)
+  case Failed     (message: String)              extends DetectedMimeType(MimeType("TODO"))

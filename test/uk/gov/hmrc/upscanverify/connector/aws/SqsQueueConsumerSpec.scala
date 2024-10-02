@@ -63,10 +63,12 @@ class SqsQueueConsumerSpec
     "call an SQS endpoint to receive messages" in:
       Given("an SQS queue consumer and a queue containing messages")
       val messageResult: ReceiveMessageResult = mock[ReceiveMessageResult]
-      when(messageResult.getMessages).thenReturn(sqsMessages(2))
+      when(messageResult.getMessages)
+        .thenReturn(sqsMessages(2))
 
       val sqsClient: AmazonSQS = mock[AmazonSQS]
-      when(sqsClient.receiveMessage(any[ReceiveMessageRequest])).thenReturn(messageResult)
+      when(sqsClient.receiveMessage(any[ReceiveMessageRequest]))
+        .thenReturn(messageResult)
       val consumer = SqsQueueConsumer(sqsClient, configuration, clock)
 
       When("the consumer poll method is called")
@@ -84,10 +86,12 @@ class SqsQueueConsumerSpec
     "call an SQS endpoint to receive messages for empty queue" in:
       Given("an SQS queue consumer and a queue containing NO messages")
       val messageResult: ReceiveMessageResult = mock[ReceiveMessageResult]
-      when(messageResult.getMessages).thenReturn(sqsMessages(0))
+      when(messageResult.getMessages)
+        .thenReturn(sqsMessages(0))
 
       val sqsClient: AmazonSQS = mock[AmazonSQS]
-      when(sqsClient.receiveMessage(any[ReceiveMessageRequest])).thenReturn(messageResult)
+      when(sqsClient.receiveMessage(any[ReceiveMessageRequest]))
+        .thenReturn(messageResult)
       val consumer = SqsQueueConsumer(sqsClient, configuration, clock)
 
       When("the consumer poll method is called")
@@ -118,10 +122,12 @@ class SqsQueueConsumerSpec
     "call an SQS endpoint to delete a message" in:
       Given("a message containing a receipt handle")
       val messageResult: ReceiveMessageResult = mock[ReceiveMessageResult]
-      when(messageResult.getMessages).thenReturn(sqsMessages(1))
+      when(messageResult.getMessages)
+        .thenReturn(sqsMessages(1))
 
       val sqsClient: AmazonSQS = mock[AmazonSQS]
-      when(sqsClient.receiveMessage(any[ReceiveMessageRequest])).thenReturn(messageResult)
+      when(sqsClient.receiveMessage(any[ReceiveMessageRequest]))
+        .thenReturn(messageResult)
       val consumer = SqsQueueConsumer(sqsClient, configuration, clock)
 
       val message: Message = consumer.poll().futureValue.head
@@ -138,10 +144,12 @@ class SqsQueueConsumerSpec
     "handle failing SQS delete calls" in:
       Given("a message containing a receipt handle")
       val messageResult: ReceiveMessageResult = mock[ReceiveMessageResult]
-      when(messageResult.getMessages).thenReturn(sqsMessages(1))
+      when(messageResult.getMessages)
+        .thenReturn(sqsMessages(1))
 
       val sqsClient: AmazonSQS = mock[AmazonSQS]
-      when(sqsClient.receiveMessage(any[ReceiveMessageRequest])).thenReturn(messageResult)
+      when(sqsClient.receiveMessage(any[ReceiveMessageRequest]))
+        .thenReturn(messageResult)
       val consumer = SqsQueueConsumer(sqsClient, configuration, clock)
 
       And("an SQS endpoint which is throwing an error")

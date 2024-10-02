@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.upscanverify.service
 
+import cats.data.EitherT
 import play.api.Logger
 import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.upscanverify.model._
@@ -39,35 +40,22 @@ class FileCheckingService @Inject()(
     objectMetadata: InboundObjectMetadata
   )(using
     ld: LoggingDetails
-  ): Future[Either[FileRejected, FileValidationSuccess]] =
+  ): Future[VerifyResult] =
 
     withLoggingDetails(ld):
       logger.debug(s"Checking upload Key=[${location.objectKey}]")
 
-    virusScan(location, objectMetadata).flatMap:
-      case Left(fi: FileInfected)   =>
-        Future.successful(Left(FileRejected(Left(fi))))
-      case Right(nvf: NoVirusFound) =>
-        fileType(location, objectMetadata).map:
-          case Left(ift) =>
-            Left(FileRejected(Right(nvf), Some(ift)))
-          case Right(FileAllowed(mime, timings)) =>
-            Right(FileValidationSuccess(nvf.checksum, mime, nvf.virusScanTimings, timings))
-
-  private def virusScan(
-    location      : S3ObjectLocation,
-    objectMetadata: InboundObjectMetadata
-  )(using
-    LoggingDetails
-  ): Future[Either[FileInfected, NoVirusFound]] =
-    fileManager.withObjectContent(location): (objectContent: ObjectContent) =>
-      virusScanningService.scan(location, objectContent, objectMetadata)
-
-  private def fileType(
-    location: S3ObjectLocation,
-    objectMetadata: InboundObjectMetadata
-  )(using
-    LoggingDetails
-  ): Future[Either[FileTypeError, FileAllowed]] =
-    fileManager.withObjectContent(location): (objectContent: ObjectContent) =>
-      fileTypeCheckingService.scan(location, objectContent, objectMetadata)
+    (for
+       noVirusFound <- EitherT
+                         .apply:
+                           fileManager.withObjectContent(location): objectContent =>
+                             virusScanningService.scan(location, objectContent, objectMetadata)
+                         .leftMap(VerifyResult.FileRejected.VirusScanFailure.apply)
+       fileAllowed <- EitherT
+                        .apply:
+                          fileManager.withObjectContent(location): objectContent =>
+                            fileTypeCheckingService.scan(location, objectContent, objectMetadata)
+                        .leftMap(fileTypeError => VerifyResult.FileRejected.FileTypeFailure(noVirusFound, fileTypeError))
+     yield
+       VerifyResult.FileValidationSuccess(noVirusFound, fileAllowed)
+    ).value

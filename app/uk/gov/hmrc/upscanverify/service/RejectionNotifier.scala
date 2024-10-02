@@ -18,7 +18,7 @@ package uk.gov.hmrc.upscanverify.service
 
 import play.api.Logging
 import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.upscanverify.model.S3ObjectLocation
+import uk.gov.hmrc.upscanverify.model.{ErrorMessage, FileCheckingError, S3ObjectLocation}
 import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
 
 import java.time.Instant
@@ -31,37 +31,11 @@ trait RejectionNotifier:
     checksum           : String,
     fileSize           : Long,
     fileUploadDatetime : Instant,
-    details            : String,
-    serviceName        : Option[String],
-    customMessagePrefix: String
+    errorMessage       : ErrorMessage,
+    serviceName        : Option[String]
   )(using
     LoggingDetails
   ): Future[Unit]
-
-  def notifyFileInfected(
-    fileProperties    : S3ObjectLocation,
-    checksum          : String,
-    fileSize          : Long,
-    fileUploadDatetime: Instant,
-    details           : String,
-    serviceName       : Option[String]
-  )(using
-    LoggingDetails
-  ): Future[Unit] =
-    notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "Virus detected in file.")
-
-  def notifyInvalidFileType(
-    fileProperties    : S3ObjectLocation,
-    checksum          : String,
-    fileSize          : Long,
-    fileUploadDatetime: Instant,
-    details           : String,
-    serviceName       : Option[String]
-  )(using
-    LoggingDetails
-  ): Future[Unit] =
-    notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "File type is not allowed for this service.")
-
 
 object LoggingRejectionNotifier
   extends RejectionNotifier
@@ -72,12 +46,15 @@ object LoggingRejectionNotifier
     checksum           : String,
     fileSize           : Long,
     fileUploadDatetime : Instant,
-    details            : String,
-    serviceName        : Option[String],
-    customMessagePrefix: String
+    errorMessage       : ErrorMessage,
+    serviceName        : Option[String]
   )(using
     ld: LoggingDetails
   ): Future[Unit] =
+    val customMessagePrefix =
+      errorMessage.failureReason match
+        case FileCheckingError.Quarantine => "Virus detected in file."
+        case FileCheckingError.Rejected   => "File type is not allowed for this service."
 
     withLoggingDetails(ld):
       logger.warn(
@@ -87,7 +64,7 @@ object LoggingRejectionNotifier
            |File size: [$fileSize B]
            |File upload datetime: [$fileUploadDatetime]
            |Bucket: [${fileProperties.bucket}]
-           |Details: [$details].
+           |Details: [${errorMessage.message}].
          """.stripMargin
       )
     Future.unit

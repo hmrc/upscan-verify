@@ -79,7 +79,7 @@ class S3EventParser @Inject() ()(using ExecutionContext) extends MessageParser w
 
   private def asFuture[T](input: JsResult[T]): Future[T] =
     input.fold(
-      errors => Future.failed(Exception(s"Cannot parse the message: [${errors.toString()}].")),
+      errors => Future.failed(Exception(s"Cannot parse the message: [$errors].")),
       result => Future.successful(result)
     )
 
@@ -98,4 +98,4 @@ class S3EventParser @Inject() ()(using ExecutionContext) extends MessageParser w
         Future.successful(event)
 
       case _ =>
-        Future.failed(Exception(s"Unexpected records in event: [${result.records.toString}]."))
+        Future.failed(Exception(s"Unexpected records in event: [${result.records}]."))

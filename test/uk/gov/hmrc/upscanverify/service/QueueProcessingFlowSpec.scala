@@ -52,8 +52,10 @@ class QueueProcessingFlowSpec
     val invalidMessage = Message("ID2", "INVALID-BODY", "RECEIPT-2", Instant.now(), None)
     val validMessage2  = Message("ID3", "VALID-BODY"  , "RECEIPT-3", Instant.now(), None)
 
-    when(queueConsumer.poll()).thenReturn(Future.successful(List(validMessage1, invalidMessage, validMessage2)))
-    when(queueConsumer.confirm(any[Message])).thenReturn(Future.unit)
+    when(queueConsumer.poll())
+      .thenReturn(Future.successful(List(validMessage1, invalidMessage, validMessage2)))
+    when(queueConsumer.confirm(any[Message]))
+      .thenReturn(Future.unit)
 
     And("processing of two messages succeeds")
     val context = MessageContext("TEST")

@@ -29,12 +29,7 @@ import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetai
 import java.time.Clock
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-import scala.concurrent.Future
-
-case class FileAllowed(
-  mimeType: MimeType,
-  fileTypeTimings: Timings
-)
+import scala.concurrent.{ExecutionContext, Future}
 
 class FileTypeCheckingService @Inject()(
   mimeTypeDetector    : MimeTypeDetector,
@@ -42,6 +37,7 @@ class FileTypeCheckingService @Inject()(
   serviceConfiguration: ServiceConfiguration,
   metrics             : Metrics
 )(using
+  ExecutionContext,
   Clock
 ) extends Logging:
 
@@ -50,26 +46,24 @@ class FileTypeCheckingService @Inject()(
     objectContent : ObjectContent,
     objectMetadata: InboundObjectMetadata
   )(using
-    LoggingDetails
-  ): Future[Either[FileTypeError, FileAllowed]] =
+    ld: LoggingDetails
+  ): Future[FileTypeCheckResult] =
+    Future:
+      given endTimer: Timer = timer()
 
-    given endTimer: Timer = timer()
+      val consumingService = objectMetadata.consumingService
+      val filename         = objectMetadata.originalFilename
 
-    val consumingService = objectMetadata.consumingService
-    val maybeFilename    = objectMetadata.originalFilename
-    val mimeType         = mimeTypeDetector.detect(objectContent.inputStream, maybeFilename)
+      val mimeType         = mimeTypeDetector.detect(objectContent.inputStream, filename)
+      addCheckingTimeMetrics()
+      logZeroLengthFiles(objectMetadata, location, consumingService)
 
-    addCheckingTimeMetrics()
-    logZeroLengthFiles(objectMetadata, location, consumingService)
-
-    val result = for
-      _ <- validateMimeType(mimeType, consumingService, location)
-      _ <- validateFileExtension(mimeType, consumingService, location, maybeFilename)
-    yield
-      metrics.defaultRegistry.counter("validTypeFileUpload").inc()
-      FileAllowed(mimeType, endTimer())
-
-    Future.successful(result)
+      for
+        _ <- validateMimeType(mimeType, consumingService, location)
+        _ <- validateFileExtension(mimeType, consumingService, location, filename)
+      yield
+        metrics.defaultRegistry.counter("validTypeFileUpload").inc()
+        FileAllowed(mimeType, endTimer())
 
   private def logZeroLengthFiles(
     objectMetadata  : InboundObjectMetadata,

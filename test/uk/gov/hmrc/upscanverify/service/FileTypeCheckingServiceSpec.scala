@@ -30,8 +30,8 @@ import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
-import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class FileTypeCheckingServiceSpec
   extends UnitSpec
@@ -68,11 +68,12 @@ class FileTypeCheckingServiceSpec
 
       val metrics               = metricsStub()
       val mockFilenameValidator = mock[FileNameValidator]
-      val checkingService       = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using clock)
+      val checkingService       = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using summon[ExecutionContext], clock)
 
       When("the file is checked")
-      when(mockFilenameValidator.validate(mimeType, filename)).thenReturn(Right(()))
-      val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
+      when(mockFilenameValidator.validate(mimeType, filename))
+        .thenReturn(Right(()))
+      val result = checkingService.scan(location, content, metadata).futureValue
 
       Then("a valid result should be returned")
       result shouldBe Right(
@@ -83,9 +84,9 @@ class FileTypeCheckingServiceSpec
       )
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 1
-      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount        shouldBe 0
-      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
+      metrics.defaultRegistry.counter("validTypeFileUpload").getCount        shouldBe 1
+      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount      shouldBe 0
+      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size shouldBe 1
 
     "return invalid result when mime type not valid for service" in:
       Given("an uploaded file with a valid MIME type for the service")
@@ -108,10 +109,10 @@ class FileTypeCheckingServiceSpec
         .thenReturn(Some(allowedMimeTypes))
 
       val metrics = metricsStub()
-      val checkingService = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using clock)
+      val checkingService = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using summon[ExecutionContext], clock)
 
       When("the file is checked")
-      val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
+      val result = checkingService.scan(location, content, metadata).futureValue
 
       Then("an incorrect file type result should be returned")
       result shouldBe Left(
@@ -123,9 +124,9 @@ class FileTypeCheckingServiceSpec
       )
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 0
-      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount        shouldBe 1
-      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
+      metrics.defaultRegistry.counter("validTypeFileUpload").getCount        shouldBe 0
+      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount      shouldBe 1
+      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size shouldBe 1
 
     "return invalid result when file extension for detected mimetype is not allowed" in:
       Given("an uploaded file with a valid MIME type for the service")
@@ -142,15 +143,17 @@ class FileTypeCheckingServiceSpec
           mimeType
 
       val configuration = mock[ServiceConfiguration]
-      when(configuration.allowedMimeTypes(serviceName)).thenReturn(Some(allowedMimeTypes))
+      when(configuration.allowedMimeTypes(serviceName))
+        .thenReturn(Some(allowedMimeTypes))
 
       val metrics = metricsStub()
       val mockFilenameValidator = mock[FileNameValidator]
-      val checkingService = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using clock)
+      val checkingService = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using summon[ExecutionContext], clock)
 
       When("the file is checked")
-      when(mockFilenameValidator.validate(mimeType, filename)).thenReturn(Left("foo"))
-      val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
+      when(mockFilenameValidator.validate(mimeType, filename))
+        .thenReturn(Left("foo"))
+      val result = checkingService.scan(location, content, metadata).futureValue
 
       Then("an incorrect file type result should be returned")
       result shouldBe Left(
@@ -163,9 +166,9 @@ class FileTypeCheckingServiceSpec
       )
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 0
-      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount        shouldBe 1
-      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
+      metrics.defaultRegistry.counter("validTypeFileUpload").getCount        shouldBe 0
+      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount      shouldBe 1
+      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size shouldBe 1
 
     "return valid result when file meets default allowed mime types" in:
       Given("an uploaded file with a valid MIME type for the service")
@@ -173,7 +176,7 @@ class FileTypeCheckingServiceSpec
       val defaultAllowedMimeTypes = List("application/pdf")
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
-      val content = ObjectContent(null, 1200)
+      val content  = ObjectContent(null, 1200)
       val filename = "some-file"
       val metadata = InboundObjectMetadata(Map("consuming-service" -> serviceName, "original-filename" -> filename), Instant.now(), 0)
 
@@ -183,12 +186,14 @@ class FileTypeCheckingServiceSpec
           fileMimeType
 
       val configuration = mock[ServiceConfiguration]
-      when(configuration.allowedMimeTypes(serviceName)).thenReturn(None)
-      when(configuration.defaultAllowedMimeTypes).thenReturn(defaultAllowedMimeTypes)
+      when(configuration.allowedMimeTypes(serviceName))
+        .thenReturn(None)
+      when(configuration.defaultAllowedMimeTypes)
+        .thenReturn(defaultAllowedMimeTypes)
 
       val metrics = metricsStub()
       val mockFilenameValidator = mock[FileNameValidator]
-      val checkingService = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using clock)
+      val checkingService = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using summon[ExecutionContext], clock)
 
       When("the file is checked")
       when(mockFilenameValidator.validate(fileMimeType, filename))
@@ -202,9 +207,9 @@ class FileTypeCheckingServiceSpec
           Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:32Z"))))
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 1
-      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount        shouldBe 0
-      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
+      metrics.defaultRegistry.counter("validTypeFileUpload").getCount        shouldBe 1
+      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount      shouldBe 0
+      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size shouldBe 1
 
     "return valid result when file meets default allowed mime types and no filename is provided" in:
       Given("an uploaded file with a valid MIME type for the service")
@@ -212,7 +217,7 @@ class FileTypeCheckingServiceSpec
       val defaultAllowedMimeTypes = List("application/pdf")
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
-      val content = ObjectContent(null, 1200)
+      val content  = ObjectContent(null, 1200)
       val metadata = InboundObjectMetadata(Map("consuming-service" -> serviceName), Instant.now(), 0)
 
       val fileMimeType = MimeType("application/pdf")
@@ -228,7 +233,7 @@ class FileTypeCheckingServiceSpec
 
       val metrics               = metricsStub()
       val mockFilenameValidator = mock[FileNameValidator]
-      val checkingService       = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using clock)
+      val checkingService       = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using summon[ExecutionContext], clock)
 
       When("the file is checked")
       val result = checkingService.scan(location, content, metadata).futureValue
@@ -242,9 +247,9 @@ class FileTypeCheckingServiceSpec
       )
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 1
-      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount        shouldBe 0
-      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
+      metrics.defaultRegistry.counter("validTypeFileUpload").getCount        shouldBe 1
+      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount      shouldBe 0
+      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size shouldBe 1
 
     "return invalid result when MIME type cannot be determined due to a 0 byte upload" in:
       Given("an uploaded file with a invalid MIME type for the service (application/octet-stream)")
@@ -259,14 +264,15 @@ class FileTypeCheckingServiceSpec
       val detector     = TikaMimeTypeDetector()
 
       val configuration = mock[ServiceConfiguration]
-      when(configuration.allowedMimeTypes(serviceName)).thenReturn(Some(allowedMimeTypes))
+      when(configuration.allowedMimeTypes(serviceName))
+        .thenReturn(Some(allowedMimeTypes))
 
       val metrics               = metricsStub()
       val mockFilenameValidator = mock[FileNameValidator]
-      val checkingService       = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using clock)
+      val checkingService       = FileTypeCheckingService(detector, mockFilenameValidator, configuration, metrics)(using summon[ExecutionContext], clock)
 
       When("the file is checked")
-      val result = Await.result(checkingService.scan(location, content, metadata), 2.seconds)
+      val result = checkingService.scan(location, content, metadata).futureValue
 
       Then("an incorrect file type result should be returned")
       result shouldBe Left(
@@ -278,6 +284,6 @@ class FileTypeCheckingServiceSpec
       )
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.counter("validTypeFileUpload").getCount          shouldBe 0
-      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount        shouldBe 1
-      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size() shouldBe 1
+      metrics.defaultRegistry.counter("validTypeFileUpload").getCount        shouldBe 0
+      metrics.defaultRegistry.counter("invalidTypeFileUpload").getCount      shouldBe 1
+      metrics.defaultRegistry.timer("fileTypeCheckingTime").getSnapshot.size shouldBe 1

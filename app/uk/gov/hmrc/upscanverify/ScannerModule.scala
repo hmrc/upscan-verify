@@ -20,7 +20,7 @@ import play.api.inject.{Binding, Module}
 import play.api.{Configuration, Environment}
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 import uk.gov.hmrc.upscanverify.config.{PlayBasedServiceConfiguration, PlayClamAvConfig, ServiceConfiguration}
-import uk.gov.hmrc.upscanverify.connector.aws.{S3EventParser, S3FileManager, SqsQueueConsumer}
+import uk.gov.hmrc.upscanverify.connector.aws.{S3EventParser, S3FileManager}
 import uk.gov.hmrc.upscanverify.service._
 import uk.gov.hmrc.upscanverify.service.tika.TikaMimeTypeDetector
 
@@ -32,7 +32,6 @@ class ScannerModule extends Module:
       bind[ServiceConfiguration].to[PlayBasedServiceConfiguration].eagerly(),
       bind[ClamAvConfig        ].to[PlayClamAvConfig].eagerly(),
       bind[MessageParser       ].to[S3EventParser],
-      bind[QueueConsumer       ].to[SqsQueueConsumer],
       bind[PollingJob          ].to[QueueProcessingJob],
       bind[MessageProcessor    ].to[ScanUploadedFilesFlow],
       bind[ContinuousPoller    ].toSelf.eagerly(),

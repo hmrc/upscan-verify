@@ -20,7 +20,7 @@ import play.api.Logging
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
 import uk.gov.hmrc.clamav.model.ScanningResult
 import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
+import com.codahale.metrics.MetricRegistry
 import uk.gov.hmrc.upscanverify.model._
 import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
 
@@ -42,7 +42,7 @@ trait ScanningService:
 class ClamAvScanningService @Inject()(
   clamClientFactory                       : ClamAntiVirusFactory,
   messageDigestComputingInputStreamFactory: ChecksumComputingInputStreamFactory,
-  metrics                                 : Metrics,
+  metricRegistry                          : MetricRegistry,
   clock                                   : Clock
 )(using
   ExecutionContext
@@ -67,18 +67,18 @@ class ClamAvScanningService @Inject()(
                       .sendAndCheck(location.objectKey, inputStream, fileContent.length.toInt)
                       .map:
                         case ScanningResult.Clean =>
-                          metrics.defaultRegistry.counter("cleanFileUpload").inc()
+                          metricRegistry.counter("cleanFileUpload").inc()
                           Right(VirusScanResult.NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
                         case ScanningResult.Infected(message) =>
                           withLoggingDetails(ld):
                             logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
-                          metrics.defaultRegistry.counter("quarantineFileUpload").inc()
+                          metricRegistry.counter("quarantineFileUpload").inc()
                           Left(VirusScanResult.FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant())))
     yield
       addScanningTimeMetrics(startTime, clock.instant())
       scanResult
 
   private def addScanningTimeMetrics(startTime: Instant, endTime: Instant): Unit =
-    metrics.defaultRegistry
+    metricRegistry
       .timer("scanningTime")
       .update(endTime.toEpochMilli - startTime.toEpochMilli, TimeUnit.MILLISECONDS)

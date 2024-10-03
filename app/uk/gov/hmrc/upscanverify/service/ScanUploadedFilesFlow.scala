@@ -17,7 +17,7 @@
 package uk.gov.hmrc.upscanverify.service
 
 import cats.implicits._
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
+import com.codahale.metrics.MetricRegistry
 import uk.gov.hmrc.upscanverify.model.Message
 import uk.gov.hmrc.upscanverify.util.MonadicUtils._
 import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
@@ -41,7 +41,7 @@ class ScanUploadedFilesFlow @Inject()(
   fileManager          : FileManager,
   fileCheckingService  : FileCheckingService,
   scanningResultHandler: FileCheckingResultHandler,
-  metrics              : Metrics,
+  metricRegistry       : MetricRegistry,
   clock                : Clock
 )(using
   ExecutionContext
@@ -69,16 +69,16 @@ class ScanUploadedFilesFlow @Inject()(
 
   private def addUploadToStartProcessMetrics(uploadedTimestamp: Instant, startTime: Instant): Unit =
     val interval = startTime.toEpochMilli - uploadedTimestamp.toEpochMilli
-    metrics.defaultRegistry.timer("uploadToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
+    metricRegistry.timer("uploadToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
 
   private def addQueueSentToStartProcessMetrics(queueTimestamp: Instant, startTime: Instant): Unit =
     val interval = startTime.toEpochMilli - queueTimestamp.toEpochMilli
-    metrics.defaultRegistry.timer("queueSentToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
+    metricRegistry.timer("queueSentToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
 
   private def addUploadToEndScanMetrics(uploadedTimestamp: Instant, endTime: Instant): Unit =
     val interval = endTime.toEpochMilli - uploadedTimestamp.toEpochMilli
-    metrics.defaultRegistry.timer("uploadToScanComplete").update(interval, TimeUnit.MILLISECONDS)
+    metricRegistry.timer("uploadToScanComplete").update(interval, TimeUnit.MILLISECONDS)
 
   private def addInternalProcessMetrics(startTime: Instant, endTime: Instant): Unit =
     val interval = endTime.toEpochMilli - startTime.toEpochMilli
-    metrics.defaultRegistry.timer("upscanVerifyProcessing").update(interval, TimeUnit.MILLISECONDS)
+    metricRegistry.timer("upscanVerifyProcessing").update(interval, TimeUnit.MILLISECONDS)

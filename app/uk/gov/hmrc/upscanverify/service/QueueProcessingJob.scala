@@ -17,8 +17,8 @@
 package uk.gov.hmrc.upscanverify.service
 
 import cats.implicits._
+import com.codahale.metrics.MetricRegistry
 import play.api.Logging
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import uk.gov.hmrc.upscanverify.model.Message
 import uk.gov.hmrc.upscanverify.util.MonadicUtils
 import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
@@ -30,14 +30,11 @@ import scala.concurrent.{ExecutionContext, Future}
 class QueueProcessingJob @Inject()(
   consumer        : QueueConsumer,
   messageProcessor: MessageProcessor,
-  metrics         : Metrics
+  metricRegistry  : MetricRegistry
 )(using
   ExecutionContext
 ) extends PollingJob
      with Logging:
-
-  private val queueThroughput =
-    metrics.defaultRegistry.meter("verifyThroughput")
 
   def run(): Future[Unit] =
     val outcomes =
@@ -54,7 +51,7 @@ class QueueProcessingJob @Inject()(
       for
         context <- messageProcessor.processMessage(message)
         _       <- MonadicUtils.withContext(consumer.confirm(message), context)
-        _       =  queueThroughput.mark()
+        _       =  metricRegistry.meter("verifyThroughput").mark()
       yield ()
 
     outcome.value.map:

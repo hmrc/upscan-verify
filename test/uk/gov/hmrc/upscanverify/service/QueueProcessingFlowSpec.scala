@@ -21,7 +21,6 @@ import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when}
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import uk.gov.hmrc.upscanverify.model.Message
 import uk.gov.hmrc.upscanverify.test.UnitSpec
 import uk.gov.hmrc.upscanverify.util.MonadicUtils
@@ -40,12 +39,8 @@ class QueueProcessingFlowSpec
     val queueConsumer    = mock[QueueConsumer]
     val messageProcessor = mock[MessageProcessor]
 
-    val metricsStub = new Metrics:
-      override val defaultRegistry: MetricRegistry =
-        MetricRegistry()
-
     val queueProcessingFlow =
-      QueueProcessingJob(queueConsumer, messageProcessor, metricsStub)
+      QueueProcessingJob(queueConsumer, messageProcessor, MetricRegistry())
 
     Given("there are three message in a message queue")
     val validMessage1  = Message("ID1", "VALID-BODY"  , "RECEIPT-1", Instant.now(), None)

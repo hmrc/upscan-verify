@@ -24,7 +24,6 @@ import org.mockito.ArgumentMatchers.{any, eq => eqTo}
 import org.mockito.Mockito.{verify, verifyNoInteractions, verifyNoMoreInteractions, when}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import uk.gov.hmrc.upscanverify.model._
 import uk.gov.hmrc.upscanverify.test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
@@ -50,10 +49,6 @@ class ScanUploadedFilesFlowSpec
         case "VALID-BODY" => Future.successful(FileUploadEvent(S3ObjectLocation("bucket", message.id, None), "127.0.0.1"))
         case _            => Future.failed(Exception("Invalid body"))
 
-  def metricsStub() = new Metrics:
-    override val defaultRegistry: MetricRegistry =
-      MetricRegistry()
-
   "ScanUploadedFilesFlow" should:
     "scan and post-process valid message" in:
       Given("there is a valid message in the queue")
@@ -69,14 +64,14 @@ class ScanUploadedFilesFlowSpec
       val fileManager           = mock[FileManager]
       val scanningResultHandler = mock[FileCheckingResultHandler]
       val fileCheckingService   = mock[FileCheckingService]
-      val metrics: Metrics      = metricsStub()
+      val metricRegistry        = MetricRegistry()
       val flow =
         ScanUploadedFilesFlow(
           parser,
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          metrics,
+          metricRegistry,
           clock
         )
 
@@ -105,10 +100,10 @@ class ScanUploadedFilesFlowSpec
         )(using any[LoggingDetails])
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.timer("uploadToScanComplete"      ).getSnapshot.size() shouldBe 1
-      metrics.defaultRegistry.timer("uploadToStartProcessing"   ).getSnapshot.size() shouldBe 1
-      metrics.defaultRegistry.timer("upscanVerifyProcessing"    ).getSnapshot.size() shouldBe 1
-      metrics.defaultRegistry.timer("queueSentToStartProcessing").getSnapshot.size() shouldBe 1
+      metricRegistry.timer("uploadToScanComplete"      ).getSnapshot.size() shouldBe 1
+      metricRegistry.timer("uploadToStartProcessing"   ).getSnapshot.size() shouldBe 1
+      metricRegistry.timer("upscanVerifyProcessing"    ).getSnapshot.size() shouldBe 1
+      metricRegistry.timer("queueSentToStartProcessing").getSnapshot.size() shouldBe 1
 
     "skip processing if file metadata is unavailable" in:
       val fileManager           = mock[FileManager]
@@ -118,14 +113,14 @@ class ScanUploadedFilesFlowSpec
       val location            = S3ObjectLocation("bucket", "ID2", None)
       val message             = Message("ID2", "VALID-BODY", "RECEIPT-2", clock.instant(), None)
       val fileCheckingService = mock[FileCheckingService]
-      val metrics: Metrics    = metricsStub()
+      val metricRegistry      = MetricRegistry()
       val flow =
         ScanUploadedFilesFlow(
           parser,
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          metrics,
+          metricRegistry,
           clock
         )
 
@@ -144,9 +139,9 @@ class ScanUploadedFilesFlowSpec
       verifyNoMoreInteractions(fileCheckingService)
 
       And("the metrics should not be updated")
-      metrics.defaultRegistry.timer("uploadToScanComplete"   ).getSnapshot.size() shouldBe 0
-      metrics.defaultRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 0
-      metrics.defaultRegistry.timer("upscanVerifyProcessing" ).getSnapshot.size() shouldBe 0
+      metricRegistry.timer("uploadToScanComplete"   ).getSnapshot.size() shouldBe 0
+      metricRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 0
+      metricRegistry.timer("upscanVerifyProcessing" ).getSnapshot.size() shouldBe 0
 
     "skip processing when parsing failed" in:
       val fileManager           = mock[FileManager]
@@ -155,14 +150,14 @@ class ScanUploadedFilesFlowSpec
       Given("there is a valid message")
       val message             = Message("ID2", "INVALID-BODY", "RECEIPT-2", clock.instant(), None)
       val fileCheckingService = mock[FileCheckingService]
-      val metrics: Metrics    = metricsStub()
+      val metricRegistry      = MetricRegistry()
       val flow =
         ScanUploadedFilesFlow(
           parser,
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          metrics,
+          metricRegistry,
           clock
         )
 
@@ -176,9 +171,9 @@ class ScanUploadedFilesFlowSpec
       verifyNoInteractions(fileCheckingService)
 
       And("the metrics should not be updated")
-      metrics.defaultRegistry.timer("uploadToScanComplete"   ).getSnapshot.size() shouldBe 0
-      metrics.defaultRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 0
-      metrics.defaultRegistry.timer("upscanVerifyProcessing" ).getSnapshot.size() shouldBe 0
+      metricRegistry.timer("uploadToScanComplete"   ).getSnapshot.size() shouldBe 0
+      metricRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 0
+      metricRegistry.timer("upscanVerifyProcessing" ).getSnapshot.size() shouldBe 0
 
     "return error if scanning failed" in:
       Given("there is a valid message in the queue")
@@ -190,14 +185,14 @@ class ScanUploadedFilesFlowSpec
       val fileManager           = mock[FileManager]
       val scanningResultHandler = mock[FileCheckingResultHandler]
       val fileCheckingService   = mock[FileCheckingService]
-      val metrics: Metrics      = metricsStub()
+      val metricRegistry        = MetricRegistry()
       val flow =
         ScanUploadedFilesFlow(
           parser,
           fileManager,
           fileCheckingService,
           scanningResultHandler,
-          metrics,
+          metricRegistry,
           clock
         )
 
@@ -217,6 +212,6 @@ class ScanUploadedFilesFlowSpec
       verifyNoInteractions(scanningResultHandler)
 
       And("the metrics should not be updated")
-      metrics.defaultRegistry.timer("uploadToScanComplete"   ).getSnapshot.size() shouldBe 0
-      metrics.defaultRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 0
-      metrics.defaultRegistry.timer("upscanVerifyProcessing" ).getSnapshot.size() shouldBe 0
+      metricRegistry.timer("uploadToScanComplete"   ).getSnapshot.size() shouldBe 0
+      metricRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 0
+      metricRegistry.timer("upscanVerifyProcessing" ).getSnapshot.size() shouldBe 0

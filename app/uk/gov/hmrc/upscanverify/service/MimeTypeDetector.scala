@@ -24,6 +24,6 @@ trait MimeTypeDetector:
   def detect(inputStream: InputStream, fileName: Option[String]): DetectedMimeType
 
 enum DetectedMimeType:
-  case Detected   (val value: MimeType) extends DetectedMimeType
-  case EmptyLength(val value: MimeType) extends DetectedMimeType
-  case Failed     (message: String)     extends DetectedMimeType
+  case Detected   (value: MimeType) extends DetectedMimeType
+  case EmptyLength(value: MimeType) extends DetectedMimeType
+  case Failed     (message: String) extends DetectedMimeType

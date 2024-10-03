@@ -68,12 +68,12 @@ class ClamAvScanningService @Inject()(
                       .map:
                         case ScanningResult.Clean =>
                           metrics.defaultRegistry.counter("cleanFileUpload").inc()
-                          VirusScanResult.NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant()))
+                          Right(VirusScanResult.NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
                         case ScanningResult.Infected(message) =>
                           withLoggingDetails(ld):
                             logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
                           metrics.defaultRegistry.counter("quarantineFileUpload").inc()
-                          VirusScanResult.FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant()))
+                          Left(VirusScanResult.FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant())))
     yield
       addScanningTimeMetrics(startTime, clock.instant())
       scanResult

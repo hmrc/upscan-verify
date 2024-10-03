@@ -19,7 +19,7 @@ package uk.gov.hmrc.upscanverify.service
 import com.amazonaws.AmazonServiceException
 import com.codahale.metrics.MetricRegistry
 import org.scalatest.GivenWhenThen
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.mockito.ArgumentMatchers.{any, eq => eqTo}
 import org.mockito.Mockito.{verify, verifyNoInteractions, verifyNoMoreInteractions, when}
 import uk.gov.hmrc.http.HeaderCarrier
@@ -37,7 +37,8 @@ class ScanUploadedFilesFlowSpec
   extends UnitSpec
      with GivenWhenThen
      with WithIncrementingClock
-     with ScalaFutures:
+     with ScalaFutures
+     with IntegrationPatience:
 
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
@@ -59,10 +60,8 @@ class ScanUploadedFilesFlowSpec
       val message          = Message("ID", "VALID-BODY", "RECEIPT-1", clock.instant(), Some(clock.instant().minusSeconds(1)))
       val location         = S3ObjectLocation("bucket", "ID", None)
       val processingResult = VerifyResult.FileValidationSuccess(
-                               "CHECKSUM",
-                               MimeType("application/xml"),
-                               Timings(clock.instant(), clock.instant()),
-                               Timings(clock.instant(), clock.instant())
+                               VirusScanResult.NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant())),
+                               FileAllowed(MimeType("application/xml"), Timings(clock.instant(), clock.instant()))
                              )
       val inboundObjectMetadata =
         InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clockStart.minusSeconds(1), 0)
@@ -85,7 +84,7 @@ class ScanUploadedFilesFlowSpec
         .thenReturn(Future.successful(inboundObjectMetadata))
 
       when(fileCheckingService.check(any[S3ObjectLocation], any[InboundObjectMetadata])(using any[LoggingDetails]))
-        .thenReturn(Future.successful(processingResult))
+        .thenReturn(Future.successful(Right(processingResult)))
 
       when(scanningResultHandler.handleCheckingResult(
         any[InboundObjectDetails], any[VerifyResult], any[Instant])(using any[LoggingDetails]))
@@ -101,7 +100,7 @@ class ScanUploadedFilesFlowSpec
       verify(scanningResultHandler)
         .handleCheckingResult(
           eqTo(InboundObjectDetails(inboundObjectMetadata, "127.0.0.1", location)),
-          eqTo(processingResult),
+          eqTo(Right(processingResult)),
           any[Instant]
         )(using any[LoggingDetails])
 

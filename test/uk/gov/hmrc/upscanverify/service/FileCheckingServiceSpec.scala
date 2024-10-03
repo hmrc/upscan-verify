@@ -21,6 +21,7 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{verifyNoInteractions, when}
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatestplus.mockito.MockitoSugar.mock
 import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.upscanverify.model._
 import uk.gov.hmrc.upscanverify.test.{UnitSpec, WithIncrementingClock}
@@ -40,6 +41,44 @@ class FileCheckingServiceSpec
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
   "File checking service" should:
+    "succeed when virus and file type scanning succeeded" in new Setup:
+      val noVirusFound = VirusScanResult.NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant()))
+      val fileAllowed  = FileAllowed(MimeType("application/xml"), Timings(clock.instant(), clock.instant()))
+
+      when(virusScanningService.scan(location, content, metadata))
+        .thenReturn(Future.successful(Right(noVirusFound)))
+
+      when(fileTypeCheckingService.scan(location, content, metadata))
+        .thenReturn(Future.successful(Right(fileAllowed)))
+
+      fileCheckingService.check(location, metadata).futureValue shouldBe
+        Right(VerifyResult.FileValidationSuccess(noVirusFound, fileAllowed))
+
+    "do not check file type if virus found and return virus details" in new Setup:
+      val fileInfected = VirusScanResult.FileInfected("Virus", "CHECKSUM", Timings(clock.instant(), clock.instant()))
+
+      when(virusScanningService.scan(location, content, metadata))
+        .thenReturn(Future.successful(Left(fileInfected)))
+
+      fileCheckingService.check(location, metadata).futureValue shouldBe
+        Left(VerifyResult.FileRejected.VirusScanFailure(fileInfected))
+
+      verifyNoInteractions(fileTypeCheckingService)
+
+    "return failed file type scanning if virus not found but invalid file type" in new Setup:
+      val noVirusFound       = VirusScanResult.NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant()))
+      val notAllowedMimeType = FileTypeError.NotAllowedMimeType(MimeType("application/xml"), Some("valid-test-service"), Timings(clock.instant(), clock.instant()))
+
+      when(virusScanningService.scan(location, content, metadata))
+        .thenReturn(Future.successful(Right(noVirusFound)))
+
+      when(fileTypeCheckingService.scan(location, content, metadata))
+        .thenReturn(Future.successful(Left(notAllowedMimeType)))
+
+      fileCheckingService.check(location, metadata).futureValue shouldBe
+        Left(VerifyResult.FileRejected.FileTypeFailure(noVirusFound, notAllowedMimeType))
+
+  trait Setup:
     given LoggingDetails = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
     val content = ObjectContent(ByteArrayInputStream("TEST".getBytes), "TEST".length)
@@ -59,56 +98,6 @@ class FileCheckingServiceSpec
     val location = S3ObjectLocation("bucket", "file", None)
     val metadata = InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clock.instant(), 0)
 
-    "succeed when virus and file type scanning succeeded" in:
-      val virusScanningService    = mock[ScanningService]
-      val fileTypeCheckingService = mock[FileTypeCheckingService]
-      val fileCheckingService     = FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
-
-      when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(VirusScanResult.NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant()))))
-
-      when(fileTypeCheckingService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Right(FileAllowed(MimeType("application/xml"), Timings(clock.instant(), clock.instant())))))
-
-      fileCheckingService.check(location, metadata).futureValue shouldBe
-        VerifyResult.FileValidationSuccess(
-          "CHECKSUM",
-          MimeType("application/xml"),
-          Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1)),
-          Timings(clockStart.plusSeconds(2), clockStart.plusSeconds(3))
-        )
-
-    "do not check file type if virus found and return virus details" in:
-      val virusScanningService    = mock[ScanningService]
-      val fileTypeCheckingService = mock[FileTypeCheckingService]
-      val fileCheckingService     = FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
-      val checksum: String        = "CHECKSUM"
-
-      when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(VirusScanResult.FileInfected("Virus", checksum, Timings(clock.instant(), clock.instant()))))
-
-      fileCheckingService.check(location, metadata).futureValue shouldBe
-        VerifyResult.FileRejected(VirusScanResult.FileInfected("Virus", checksum, Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))))
-
-      verifyNoInteractions(fileTypeCheckingService)
-
-    "return failed file type scanning if virus not found but invalid file type" in:
-      val virusScanningService    = mock[ScanningService]
-      val fileTypeCheckingService = mock[FileTypeCheckingService]
-      val fileCheckingService     = FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)
-
-      when(virusScanningService.scan(location, content, metadata))
-        .thenReturn(Future.successful(VirusScanResult.NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant()))))
-
-      when(fileTypeCheckingService.scan(location, content, metadata))
-        .thenReturn(Future.successful(Left(FileTypeError.NotAllowedMimeType(MimeType("application/xml"), Some("valid-test-service"), Timings(clock.instant(), clock.instant())))))
-
-      fileCheckingService.check(location, metadata).futureValue shouldBe
-        VerifyResult.FileRejected(
-          VirusScanResult.NoVirusFound("CHECKSUM", Timings(clockStart.plusSeconds(0), clockStart.plusSeconds(1))),
-          Some(FileTypeError.NotAllowedMimeType(
-            MimeType("application/xml"),
-            Some("valid-test-service"),
-            Timings(clockStart.plusSeconds(2), clockStart.plusSeconds(3))
-          )
-        ))
+    val virusScanningService    = mock[ScanningService]
+    val fileTypeCheckingService = mock[FileTypeCheckingService]
+    val fileCheckingService     = FileCheckingService(fileManager, virusScanningService, fileTypeCheckingService)

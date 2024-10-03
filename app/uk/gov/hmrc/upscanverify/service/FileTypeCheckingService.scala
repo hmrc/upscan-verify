@@ -47,7 +47,7 @@ class FileTypeCheckingService @Inject()(
     objectMetadata: InboundObjectMetadata
   )(using
     ld: LoggingDetails
-  ): Future[Either[FileTypeError, FileAllowed]] =
+  ): Future[FileTypeCheckResult] =
     Future:
       given endTimer: Timer = timer()
 

@@ -139,7 +139,10 @@ class FileCheckingResultHandlerSpec
       handler
         .handleCheckingResult(
           inboundObjectDetails,
-          VerifyResult.FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings),
+          Right(VerifyResult.FileValidationSuccess(
+            VirusScanResult.NoVirusFound(expectedChecksum, virusScanTimings),
+            FileAllowed(expectedMimeType, fileTypeTimings)
+          )),
           receivedAt
         )
         .futureValue
@@ -174,7 +177,10 @@ class FileCheckingResultHandlerSpec
       val result =
         handler.handleCheckingResult(
           inboundObjectDetails,
-          VerifyResult.FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings),
+          Right(VerifyResult.FileValidationSuccess(
+            VirusScanResult.NoVirusFound(expectedChecksum, virusScanTimings),
+            FileAllowed(expectedMimeType, fileTypeTimings)
+          )),
           receivedAt
         )
 
@@ -218,7 +224,10 @@ class FileCheckingResultHandlerSpec
       val result =
         handler.handleCheckingResult(
           inboundObjectDetails,
-          VerifyResult.FileValidationSuccess(expectedChecksum, expectedMimeType, virusScanTimings, fileTypeTimings),
+          Right(VerifyResult.FileValidationSuccess(
+            VirusScanResult.NoVirusFound(expectedChecksum, virusScanTimings),
+            FileAllowed(expectedMimeType, fileTypeTimings)
+          )),
           receivedAt
         )
 
@@ -253,7 +262,9 @@ class FileCheckingResultHandlerSpec
         handler
           .handleCheckingResult(
             InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-            VerifyResult.FileRejected(VirusScanResult.FileInfected(errorMessage.message, checksum, virusScanTimings)),
+            Left(VerifyResult.FileRejected.VirusScanFailure(
+              VirusScanResult.FileInfected(errorMessage.message, checksum, virusScanTimings)
+            )),
             receivedAt
           )
           .futureValue
@@ -263,7 +274,7 @@ class FileCheckingResultHandlerSpec
 
       And("file metadata and error details are stored in the quarantine bucket")
       val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
-      val contentCaptor = ArgumentCaptor.forClass(classOf[InputStream])
+      val contentCaptor  = ArgumentCaptor.forClass(classOf[InputStream])
       verify(fileManager)
         .writeObject(
           eqTo(file),
@@ -301,7 +312,9 @@ class FileCheckingResultHandlerSpec
         handler
           .handleCheckingResult(
             InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-            VerifyResult.FileRejected(VirusScanResult.FileInfected("There is a virus", checksum, virusScanTimings)),
+            Left(VerifyResult.FileRejected.VirusScanFailure(
+              VirusScanResult.FileInfected("There is a virus", checksum, virusScanTimings)
+            )),
             receivedAt
           )
 
@@ -336,7 +349,9 @@ class FileCheckingResultHandlerSpec
         handler
           .handleCheckingResult(
             InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-            VerifyResult.FileRejected(VirusScanResult.FileInfected("There is a virus", checksum, virusScanTimings)),
+            Left(VerifyResult.FileRejected.VirusScanFailure(
+              VirusScanResult.FileInfected("There is a virus", checksum, virusScanTimings)
+            )),
             receivedAt
           )
 
@@ -370,10 +385,10 @@ class FileCheckingResultHandlerSpec
       handler
         .handleCheckingResult(
           InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-          VerifyResult.FileRejected(
+          Left(VerifyResult.FileRejected.FileTypeFailure(
             VirusScanResult.NoVirusFound(checksum, virusScanTimings),
-            Some(FileTypeError.NotAllowedMimeType(mimeType, serviceName, fileTypeTimings))
-          ),
+            FileTypeError.NotAllowedMimeType(mimeType, serviceName, fileTypeTimings)
+          )),
           receivedAt
         )
         .futureValue
@@ -390,7 +405,8 @@ class FileCheckingResultHandlerSpec
           eqTo(file),
           locationCaptor.capture(),
           streamCaptor.capture(),
-          eqTo(outboundObjectMetadata))(using any[LoggingDetails])
+          eqTo(outboundObjectMetadata)
+        )(using any[LoggingDetails])
       IOUtils.toString(streamCaptor.getValue, UTF_8) shouldBe
         """{"failureReason":"REJECTED","message":"MIME type [application/pdf] is not allowed for service: [valid-test-service]"}"""
       locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
@@ -426,10 +442,10 @@ class FileCheckingResultHandlerSpec
       handler
         .handleCheckingResult(
           InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-          VerifyResult.FileRejected(
+          Left(VerifyResult.FileRejected.FileTypeFailure(
             VirusScanResult.NoVirusFound(checksum, virusScanTimings),
-            Some(FileTypeError.NotAllowedFileExtension(mimeType, "foo", serviceName, fileTypeTimings))
-          ),
+            FileTypeError.NotAllowedFileExtension(mimeType, "foo", serviceName, fileTypeTimings)
+          )),
           receivedAt
         )
         .futureValue
@@ -446,7 +462,8 @@ class FileCheckingResultHandlerSpec
           eqTo(file),
           locationCaptor.capture(),
           streamCaptor.capture(),
-          eqTo(outboundObjectMetadata))(using any[LoggingDetails])
+          eqTo(outboundObjectMetadata)
+        )(using any[LoggingDetails])
       IOUtils.toString(streamCaptor.getValue, UTF_8) shouldBe
         """{"failureReason":"REJECTED","message":"File extension [foo] is not allowed for mime-type [text/plain], service: [valid-test-service]"}"""
       locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
@@ -482,10 +499,10 @@ class FileCheckingResultHandlerSpec
         handler
           .handleCheckingResult(
             InboundObjectDetails(inboundObjectMetadata, clientIp, file),
-            VerifyResult.FileRejected(
+            Left(VerifyResult.FileRejected.FileTypeFailure(
               VirusScanResult.NoVirusFound("1234567890", virusScanTimings),
-              Some(FileTypeError.NotAllowedMimeType(mimeType, Some("valid-test-service"), fileTypeTimings))
-            ),
+              FileTypeError.NotAllowedMimeType(mimeType, Some("valid-test-service"), fileTypeTimings)
+            )),
             receivedAt
           )
 

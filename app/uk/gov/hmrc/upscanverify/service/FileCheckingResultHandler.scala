@@ -46,24 +46,24 @@ class FileCheckingResultHandler @Inject()(
     withLoggingDetails(ld):
       logger.info(s"Handling check result for Key=[${objectDetails.location.objectKey}] Result=[$result]")
     result match
-      case VerifyResult.FileValidationSuccess(checksum, mimeType, virusScanTimings, fileTypeTimings) =>
+      case Right(VerifyResult.FileValidationSuccess(noVirusFound, fileAllowed)) =>
         handleValid(
           objectDetails,
-          checksum,
-          mimeType,
-          metadata = metadata(objectDetails, "x-amz-meta-upscan-verify-outbound-queued", messageReceivedAt, virusScanTimings, Some(fileTypeTimings))
+          noVirusFound.checksum,
+          fileAllowed.mimeType,
+          metadata = metadata(objectDetails, "x-amz-meta-upscan-verify-outbound-queued", messageReceivedAt, noVirusFound.virusScanTimings, Some(fileAllowed.fileTypeTimings))
         )
 
-      case VerifyResult.FileRejected(VirusScanResult.FileInfected(errorMessage, checksum, virusScanTimings), _) =>
+      case Left(VerifyResult.FileRejected.VirusScanFailure(virusFound)) =>
         handleError(
           objectDetails,
-          checksum,
-          ErrorMessage(FileCheckingError.Quarantine, errorMessage),
+          virusFound.checksum,
+          ErrorMessage(FileCheckingError.Quarantine, virusFound.details),
           serviceName         = None,
-          metadata            = metadata(objectDetails, "x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings, fileTypeTimings = None)
+          metadata            = metadata(objectDetails, "x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusFound.virusScanTimings, fileTypeTimings = None)
         )
 
-      case VerifyResult.FileRejected(VirusScanResult.NoVirusFound(checksum, virusScanTimings), Some(fileTypeError)) =>
+      case Left(VerifyResult.FileRejected.FileTypeFailure(noVirusFound, fileTypeError)) =>
         val errorMessage =
           fileTypeError match
             case FileTypeError.NotAllowedMimeType(mime, consumingService, fileTypeTimings) =>
@@ -75,16 +75,11 @@ class FileCheckingResultHandler @Inject()(
 
         handleError(
           objectDetails,
-          checksum,
+          noVirusFound.checksum,
           ErrorMessage(FileCheckingError.Rejected, errorMessage),
           serviceName         = fileTypeError.consumingService,
-          metadata            = metadata(objectDetails, "x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusScanTimings, Some(fileTypeError.fileTypeTimings))
+          metadata            = metadata(objectDetails, "x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, noVirusFound.virusScanTimings, Some(fileTypeError.fileTypeTimings))
         )
-
-      case _ => // FileRejected(NoVirus, None) shouldn't happen (TODO prove it in the model)
-        Future.successful:
-          withLoggingDetails(ld):
-            logger.error(s"Unexpected match result for Key=[${objectDetails.location.objectKey}] Result=[$result]")
 
   private def handleValid(
     details : InboundObjectDetails,

@@ -82,7 +82,7 @@ class ClamAvScanningServiceSpec
       val result = scanningService.scan(fileLocation, fileContent, fileMetadata).futureValue
 
       Then("a scanning clean result should be returned")
-      result shouldBe VirusScanResult.NoVirusFound("CHECKSUM", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z")))
+      result shouldBe Right(VirusScanResult.NoVirusFound("CHECKSUM", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z"))))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 1
@@ -114,7 +114,7 @@ class ClamAvScanningServiceSpec
       val result = scanningService.scan(fileLocation, fileContent, fileMetadata).futureValue
 
       Then("a scanning infected result should be returned")
-      result shouldBe VirusScanResult.FileInfected("File dirty", "CHECKSUM", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z")))
+      result shouldBe Left(VirusScanResult.FileInfected("File dirty", "CHECKSUM", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z"))))
 
       And("the metrics should be successfully updated")
       metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 0

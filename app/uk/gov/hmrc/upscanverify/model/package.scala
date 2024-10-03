@@ -62,17 +62,19 @@ object Timings:
     () =>
       Timings(startTime, clock.instant())
 
-enum VirusScanResult:
-  case FileInfected(
+object VirusScanResult:
+  case class FileInfected(
     details         : String,
     checksum        : String,
     virusScanTimings: Timings
-  ) extends VirusScanResult
+  )
 
-  case NoVirusFound(
+  case class NoVirusFound(
     checksum        : String,
     virusScanTimings: Timings
-  ) extends VirusScanResult
+  )
+
+type VirusScanResult = Either[VirusScanResult.FileInfected, VirusScanResult.NoVirusFound]
 
 case class FileAllowed(
   mimeType       : MimeType,
@@ -101,18 +103,25 @@ enum FileTypeError(
     override val fileTypeTimings : Timings
   ) extends FileTypeError(consumingService, fileTypeTimings)
 
-enum VerifyResult:
-  case FileRejected(
-    virusScanResult  : VirusScanResult,
-    fileTypeResultOpt: Option[FileTypeError] = None
-  ) extends VerifyResult
+type FileTypeCheckResult = Either[FileTypeError, FileAllowed]
 
-  case FileValidationSuccess(
-    checksum        : String,
-    mimeType        : MimeType,
-    virusScanTimings: Timings,
-    fileTypeTimings : Timings
-  ) extends VerifyResult
+object VerifyResult:
+  enum FileRejected:
+    case VirusScanFailure(
+      virusScanResult: VirusScanResult.FileInfected
+    ) extends FileRejected
+
+    case FileTypeFailure(
+      virusScanResult: VirusScanResult.NoVirusFound,
+      fileTypeResult : FileTypeError
+    ) extends FileRejected
+
+  case class FileValidationSuccess(
+    virusScanResult: VirusScanResult.NoVirusFound,
+    fileTypeResult : FileAllowed
+  )
+
+type VerifyResult = Either[VerifyResult.FileRejected, VerifyResult.FileValidationSuccess]
 
 
 enum FileCheckingError(val value: String):

@@ -17,9 +17,9 @@
 package uk.gov.hmrc.upscanverify.service
 
 import cats.syntax.either._
+import com.codahale.metrics.MetricRegistry
 import play.api.Logging
 import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import uk.gov.hmrc.upscanverify.config.ServiceConfiguration
 import uk.gov.hmrc.upscanverify.model._
 import uk.gov.hmrc.upscanverify.model.Timings.{Timer, timer}
@@ -35,7 +35,7 @@ class FileTypeCheckingService @Inject()(
   mimeTypeDetector    : MimeTypeDetector,
   fileNameValidator   : FileNameValidator,
   serviceConfiguration: ServiceConfiguration,
-  metrics             : Metrics
+  metricRegistry      : MetricRegistry
 )(using
   ExecutionContext,
   Clock
@@ -63,7 +63,7 @@ class FileTypeCheckingService @Inject()(
         _        <- validateMimeType(mimeType, consumingService, location)
         _        <- validateFileExtension(mimeType, consumingService, location, filename)
       yield
-        metrics.defaultRegistry.counter("validTypeFileUpload").inc()
+        metricRegistry.counter("validTypeFileUpload").inc()
         FileAllowed(mimeType, endTimer())
 
 
@@ -100,7 +100,7 @@ class FileTypeCheckingService @Inject()(
           logger.warn(
             s"File with Key=[${location.objectKey}] could not be scanned. consuming service [$consumingService]: $message"
           )
-        metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
+        metricRegistry.counter("invalidTypeFileUpload").inc()
         Left(FileTypeError.Corrupt(consumingService, timer()))
 
   private def validateMimeType(
@@ -123,7 +123,7 @@ class FileTypeCheckingService @Inject()(
         logger.warn(
           s"File with Key=[${location.objectKey}] is not allowed by [$consumingService] - service does not allow MIME type: [${mimeType.value}]"
         )
-      metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
+      metricRegistry.counter("invalidTypeFileUpload").inc()
       Left(FileTypeError.NotAllowedMimeType(mimeType, consumingService, timer()))
 
   private def validateFileExtension(
@@ -144,9 +144,9 @@ class FileTypeCheckingService @Inject()(
               logger.warn(
                 s"File with extension=[$extension] is not allowed for MIME type=[$mimeType]. consumingService=[$consumingService], key=[${location.objectKey}]"
               )
-            metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
+            metricRegistry.counter("invalidTypeFileUpload").inc()
             FileTypeError.NotAllowedFileExtension(mimeType, extension, consumingService, timer())
       .getOrElse(Right(()))
 
   private def addCheckingTimeMetrics()(using timer: Timer): Unit =
-    metrics.defaultRegistry.timer("fileTypeCheckingTime").update(timer().difference, TimeUnit.MILLISECONDS)
+    metricRegistry.timer("fileTypeCheckingTime").update(timer().difference, TimeUnit.MILLISECONDS)

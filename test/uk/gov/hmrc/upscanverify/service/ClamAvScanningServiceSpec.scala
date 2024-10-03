@@ -25,7 +25,6 @@ import uk.gov.hmrc.clamav.model.ScanningResult
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import uk.gov.hmrc.upscanverify.model.{VirusScanResult, S3ObjectLocation, Timings}
 import uk.gov.hmrc.upscanverify.test.{UnitSpec, WithIncrementingClock}
 import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
@@ -47,11 +46,6 @@ class ClamAvScanningServiceSpec
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
   "ClamAvScanningService" should:
-
-    def metricsStub() = new Metrics:
-      override val defaultRegistry: MetricRegistry =
-        new MetricRegistry()
-
     val checksumInputStreamFactoryStub = new ChecksumComputingInputStreamFactory:
       override def create(source: InputStream): InputStream with ChecksumSource =
         new FilterInputStream(source) with ChecksumSource:
@@ -66,8 +60,8 @@ class ClamAvScanningServiceSpec
       when(factory.getClient())
         .thenReturn(client)
 
-      val metrics         = metricsStub()
-      val scanningService = ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics, clock)
+      val metricRegistry  = new MetricRegistry()
+      val scanningService = ClamAvScanningService(factory, checksumInputStreamFactoryStub, metricRegistry, clock)
 
       Given("a file location pointing to a clean file")
       val fileLocation = S3ObjectLocation("inboundBucket", "file", None)
@@ -85,9 +79,9 @@ class ClamAvScanningServiceSpec
       result shouldBe Right(VirusScanResult.NoVirusFound("CHECKSUM", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z"))))
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 1
-      metrics.defaultRegistry.counter("quarantineFileUpload").getCount shouldBe 0
-      metrics.defaultRegistry.timer("scanningTime").getSnapshot.size() shouldBe 1
+      metricRegistry.counter("cleanFileUpload").getCount      shouldBe 1
+      metricRegistry.counter("quarantineFileUpload").getCount shouldBe 0
+      metricRegistry.timer("scanningTime").getSnapshot.size() shouldBe 1
 
     "return infected if file can be retrieved and scan result infected" in:
       val client = mock[ClamAntiVirus]
@@ -98,8 +92,8 @@ class ClamAvScanningServiceSpec
       when(factory.getClient())
         .thenReturn(client)
 
-      val metrics         = metricsStub()
-      val scanningService = ClamAvScanningService(factory, checksumInputStreamFactoryStub, metrics, clock)
+      val metricRegistry  = new MetricRegistry()
+      val scanningService = ClamAvScanningService(factory, checksumInputStreamFactoryStub, metricRegistry, clock)
 
       Given("a file location pointing to a clean file")
       val fileLocation = S3ObjectLocation("inboundBucket", "file", None)
@@ -117,6 +111,6 @@ class ClamAvScanningServiceSpec
       result shouldBe Left(VirusScanResult.FileInfected("File dirty", "CHECKSUM", Timings(Instant.parse("2018-12-04T17:48:30Z"), Instant.parse("2018-12-04T17:48:31Z"))))
 
       And("the metrics should be successfully updated")
-      metrics.defaultRegistry.counter("cleanFileUpload").getCount      shouldBe 0
-      metrics.defaultRegistry.counter("quarantineFileUpload").getCount shouldBe 1
-      metrics.defaultRegistry.timer("scanningTime").getSnapshot.size() shouldBe 1
+      metricRegistry.counter("cleanFileUpload").getCount      shouldBe 0
+      metricRegistry.counter("quarantineFileUpload").getCount shouldBe 1
+      metricRegistry.timer("scanningTime").getSnapshot.size() shouldBe 1

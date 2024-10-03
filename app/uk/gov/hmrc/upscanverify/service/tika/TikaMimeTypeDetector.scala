@@ -34,18 +34,22 @@ class TikaMimeTypeDetector extends MimeTypeDetector:
 
     val tikaInputStream = TikaInputStream.get(inputStream)
 
-    val metadata = Metadata()
-    fileName.foreach(name => metadata.add(TikaCoreProperties.RESOURCE_NAME_KEY, name))
+    try
+      val metadata = Metadata()
+      fileName.foreach(name => metadata.add(TikaCoreProperties.RESOURCE_NAME_KEY, name))
 
-    val detectionResult = detector.detect(tikaInputStream, metadata)
-    val mimeType        = MimeType(s"${detectionResult.getType}/${detectionResult.getSubtype}")
+      val detectionResult = detector.detect(tikaInputStream, metadata)
+      // what does the following line print when it fails?
+      val mimeType        = MimeType(s"${detectionResult.getType}/${detectionResult.getSubtype}")
 
-    val detectedMimeType =
       if tikaInputStream.getLength > 0 then
         DetectedMimeType.Detected(mimeType)
       else
         DetectedMimeType.EmptyLength(mimeType)
 
-    tikaInputStream.close()
+    catch
+      case e: java.io.IOException if e.getMessage == "Stream is already being read" =>
+        DetectedMimeType.Failed(e.getMessage)
 
-    detectedMimeType
+    finally
+      tikaInputStream.close()

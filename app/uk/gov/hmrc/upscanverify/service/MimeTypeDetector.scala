@@ -23,6 +23,7 @@ case class MimeType(value: String) extends AnyVal
 trait MimeTypeDetector:
   def detect(inputStream: InputStream, fileName: Option[String]): DetectedMimeType
 
-enum DetectedMimeType(val value: MimeType):
-  case Detected   (override val value: MimeType) extends DetectedMimeType(value)
-  case EmptyLength(override val value: MimeType) extends DetectedMimeType(value)
+enum DetectedMimeType:
+  case Detected   (val value: MimeType) extends DetectedMimeType
+  case EmptyLength(val value: MimeType) extends DetectedMimeType
+  case Failed     (message: String)     extends DetectedMimeType

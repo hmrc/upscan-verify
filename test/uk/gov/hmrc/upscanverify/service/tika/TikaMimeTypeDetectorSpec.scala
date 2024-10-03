@@ -71,3 +71,8 @@ class TikaMimeTypeDetectorSpec
       tikaMimeTypeDetector
         .detect(ByteArrayInputStream("""<html><head></head></html>"""".getBytes), Some("test.html")) shouldBe
           DetectedMimeType.Detected(MimeType("text/html"))
+
+    "return Failed for unscannable resources" in:
+      tikaMimeTypeDetector
+        .detect(this.getClass.getResourceAsStream("/fbd7e500-d5ab-4a45-ae95-4e23209eedb1"), Some("IMG_0514.png")) shouldBe
+          DetectedMimeType.Failed("Stream is already being read")

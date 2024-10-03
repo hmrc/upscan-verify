@@ -306,7 +306,7 @@ class FileTypeCheckingServiceSpec
       And("it can't be scanned")
       when(detector.detect(any[InputStream], any[Option[String]]))
         // we can't use `thenThrow` since function is not declared to throw the checked exception
-        .thenAnswer { _ => throw java.io.IOException("Stream is already being read") }
+        .thenReturn(DetectedMimeType.Failed("Stream is already being read"))
 
       When("the file is checked")
       val result = checkingService.scan(location, content, metadata).futureValue

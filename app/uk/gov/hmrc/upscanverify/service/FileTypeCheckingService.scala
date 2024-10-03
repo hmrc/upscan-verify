@@ -29,7 +29,6 @@ import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetai
 import java.time.Clock
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-import scala.util.Try
 import scala.concurrent.{ExecutionContext, Future}
 
 class FileTypeCheckingService @Inject()(
@@ -55,26 +54,14 @@ class FileTypeCheckingService @Inject()(
       val consumingService = objectMetadata.consumingService
       val filename         = objectMetadata.originalFilename
 
-      val attempt          = Try(mimeTypeDetector.detect(objectContent.inputStream, filename))
+      val detectedMimeType = mimeTypeDetector.detect(objectContent.inputStream, filename)
       addCheckingTimeMetrics()
+      logZeroLengthFiles(detectedMimeType, location, consumingService)
 
       for
-        detectedMimeType <- attempt.toEither match
-                              case Right(mimeType) =>
-                                Right(mimeType)
-                              case Left(e: java.io.IOException) if e.getMessage == "Stream is already being read" =>
-                                withLoggingDetails(ld):
-                                  logger.warn(
-                                    s"File with Key=[${location.objectKey}] could not be scanned. consuming service [$consumingService] "
-                                  )
-                                metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
-                                Left(FileTypeError.Corrupt(consumingService, endTimer()))
-                              case Left(other) =>
-                                throw other
-        _                =  logZeroLengthFiles(detectedMimeType, location, consumingService)
-        mimeType         =  detectedMimeType.value
-        _                <- validateMimeType(mimeType, consumingService, location)
-        _                <- validateFileExtension(mimeType, consumingService, location, filename)
+        mimeType <- valiateNotCorrupt(detectedMimeType, consumingService, location)
+        _        <- validateMimeType(mimeType, consumingService, location)
+        _        <- validateFileExtension(mimeType, consumingService, location, filename)
       yield
         metrics.defaultRegistry.counter("validTypeFileUpload").inc()
         FileAllowed(mimeType, endTimer())
@@ -95,6 +82,26 @@ class FileTypeCheckingService @Inject()(
           )
       case _ =>
         ()
+
+  private def valiateNotCorrupt(
+    detectedMimeType: DetectedMimeType,
+    consumingService: Option[String],
+    location        : S3ObjectLocation
+  )(using
+    ld   : LoggingDetails,
+    timer: Timer
+  ): Either[FileTypeError, MimeType] =
+    detectedMimeType match
+      case DetectedMimeType.Detected(mimeType)    => Right(mimeType)
+      case DetectedMimeType.EmptyLength(mimeType) => Right(mimeType)
+      case DetectedMimeType.Failed(message)       =>
+        // TODO do we need these warns? The RejectionNotifier will also log them
+        withLoggingDetails(ld):
+          logger.warn(
+            s"File with Key=[${location.objectKey}] could not be scanned. consuming service [$consumingService]: $message"
+          )
+        metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
+        Left(FileTypeError.Corrupt(consumingService, timer()))
 
   private def validateMimeType(
     mimeType        : MimeType,

@@ -44,8 +44,6 @@ class FileCheckingService @Inject()(
     withLoggingDetails(ld):
       logger.debug(s"Checking upload Key=[${location.objectKey}]")
 
-    logger.info(s"BDOG-32559 FileCheckingService length: ${objectMetadata.fileSize}")
-
     virusScan(location, objectMetadata).flatMap:
       case Left(fi: FileInfected)   =>
         Future.successful(Left(FileRejected(Left(fi))))

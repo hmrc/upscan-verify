@@ -60,7 +60,7 @@ class FileTypeCheckingServiceSpec
       val mimeType = MimeType("application/pdf")
       val detector = new MimeTypeDetector:
         override def detect(inputStream: InputStream, fileName: Option[String]) =
-          DetectedMimeType.Detected(mimeType)
+          mimeType
 
       val configuration = mock[ServiceConfiguration]
       when(configuration.allowedMimeTypes(serviceName))
@@ -101,7 +101,7 @@ class FileTypeCheckingServiceSpec
 
       val detector = new MimeTypeDetector:
         override def detect(inputStream: InputStream, fileName: Option[String]) =
-          DetectedMimeType.Detected(fileMimeType)
+          fileMimeType
 
       val configuration = mock[ServiceConfiguration]
       when(configuration.allowedMimeTypes(serviceName))
@@ -139,7 +139,7 @@ class FileTypeCheckingServiceSpec
       val mimeType = MimeType("application/pdf")
       val detector = new MimeTypeDetector:
         override def detect(inputStream: InputStream, fileName: Option[String]) =
-          DetectedMimeType.Detected(mimeType)
+          mimeType
 
       val configuration = mock[ServiceConfiguration]
       when(configuration.allowedMimeTypes(serviceName)).thenReturn(Some(allowedMimeTypes))
@@ -180,7 +180,7 @@ class FileTypeCheckingServiceSpec
       val fileMimeType = MimeType("application/pdf")
       val detector = new MimeTypeDetector:
         override def detect(inputStream: InputStream, fileName: Option[String]) =
-          DetectedMimeType.Detected(fileMimeType)
+          fileMimeType
 
       val configuration = mock[ServiceConfiguration]
       when(configuration.allowedMimeTypes(serviceName)).thenReturn(None)
@@ -218,7 +218,7 @@ class FileTypeCheckingServiceSpec
       val fileMimeType = MimeType("application/pdf")
       val detector = new MimeTypeDetector:
         override def detect(inputStream: InputStream, fileName: Option[String]) =
-          DetectedMimeType.Detected(fileMimeType)
+          fileMimeType
 
       val configuration = mock[ServiceConfiguration]
       when(configuration.allowedMimeTypes(serviceName))

@@ -18,7 +18,7 @@ package uk.gov.hmrc.upscanverify.service.tika
 
 import org.apache.tika.config.TikaConfig
 import org.apache.tika.metadata.{Metadata, TikaCoreProperties}
-import uk.gov.hmrc.upscanverify.service.{DetectedMimeType, MimeType, MimeTypeDetector}
+import uk.gov.hmrc.upscanverify.service.{MimeType, MimeTypeDetector}
 
 import java.io.InputStream
 import javax.inject.Singleton
@@ -26,29 +26,20 @@ import javax.inject.Singleton
 @Singleton
 class TikaMimeTypeDetector extends MimeTypeDetector:
 
-  private val logger   = play.api.Logger(getClass)
   private val config   = TikaConfig.getDefaultConfig
   private val detector = config.getDetector
 
-  def detect(inputStream: InputStream, fileName: Option[String]): DetectedMimeType =
+  def detect(inputStream: InputStream, fileName: Option[String]): MimeType =
     import org.apache.tika.io.TikaInputStream
 
     val tikaInputStream = TikaInputStream.get(inputStream)
 
-    val metadata = Metadata()
-    fileName.foreach(name => metadata.add(TikaCoreProperties.RESOURCE_NAME_KEY, name))
+    try
+      val metadata = Metadata()
+      fileName.foreach(name => metadata.add(TikaCoreProperties.RESOURCE_NAME_KEY, name))
 
-    val detectionResult = detector.detect(tikaInputStream, metadata)
-    val mimeType        = MimeType(s"${detectionResult.getType}/${detectionResult.getSubtype}")
+      val detectionResult = detector.detect(tikaInputStream, metadata)
+      MimeType(s"${detectionResult.getType}/${detectionResult.getSubtype}")
 
-    val length = tikaInputStream.getLength
-    logger.info(s"BDOG-32559 TikaMimeTypeDetector length: $length")
-    val detectedMimeType =
-      if length > 0 then
-        DetectedMimeType.Detected(mimeType)
-      else
-        DetectedMimeType.EmptyLength(mimeType)
-
-    tikaInputStream.close()
-
-    detectedMimeType
+    finally
+      tikaInputStream.close()

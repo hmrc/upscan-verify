@@ -57,12 +57,10 @@ class FileTypeCheckingService @Inject()(
 
     val consumingService = objectMetadata.consumingService
     val maybeFilename    = objectMetadata.originalFilename
-    val detectedMimeType = mimeTypeDetector.detect(objectContent.inputStream, maybeFilename)
+    val mimeType         = mimeTypeDetector.detect(objectContent.inputStream, maybeFilename)
 
-    addCheckingTimeMetrics
-    logZeroLengthFiles(detectedMimeType, location, consumingService)
-
-    val mimeType = detectedMimeType.value
+    addCheckingTimeMetrics()
+    logZeroLengthFiles(objectMetadata, location, consumingService)
 
     val result = for
       _ <- validateMimeType(mimeType, consumingService, location)
@@ -74,20 +72,17 @@ class FileTypeCheckingService @Inject()(
     Future.successful(result)
 
   private def logZeroLengthFiles(
-    detectedMimeType: DetectedMimeType,
+    objectMetadata  : InboundObjectMetadata,
     location        : S3ObjectLocation,
     consumingService: Option[String]
   )(using
     ld              : LoggingDetails
   ): Unit =
-    detectedMimeType match
-      case _ :DetectedMimeType.EmptyLength =>
-        withLoggingDetails(ld):
-          logger.info(
-            s"File with key=[${location.objectKey}] was uploaded with 0 bytes for consuming service [$consumingService]"
-          )
-      case _ =>
-        ()
+    if objectMetadata.fileSize == 0 then
+      withLoggingDetails(ld):
+        logger.info(
+          s"File with key=[${location.objectKey}] was uploaded with 0 bytes for consuming service [$consumingService]"
+        )
 
   private def validateMimeType(
     mimeType        : MimeType,
@@ -134,5 +129,5 @@ class FileTypeCheckingService @Inject()(
             FileTypeError.NotAllowedFileExtension(mimeType, extension, consumingService, timer())
       .getOrElse(Right(()))
 
-  private def addCheckingTimeMetrics(using timer: Timer): Unit =
+  private def addCheckingTimeMetrics()(using timer: Timer): Unit =
     metrics.defaultRegistry.timer("fileTypeCheckingTime").update(timer().difference, TimeUnit.MILLISECONDS)

@@ -20,12 +20,10 @@ import com.codahale.metrics.MetricRegistry
 import org.mockito.Mockito.when
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.ScalaFutures
-import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.upscanverify.config.ServiceConfiguration
 import uk.gov.hmrc.upscanverify.model._
 import uk.gov.hmrc.upscanverify.service.tika.{FileNameValidator, TikaMimeTypeDetector}
 import uk.gov.hmrc.upscanverify.test.{UnitSpec, WithIncrementingClock}
-import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
@@ -39,8 +37,6 @@ class FileTypeCheckingServiceSpec
      with ScalaFutures:
 
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
-
-  given HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   "FileTypeCheckingService" should:
     "return valid result for allowed mime type for the service" in:

@@ -18,9 +18,7 @@ package uk.gov.hmrc.upscanverify.service
 
 import cats.data.EitherT
 import play.api.Logger
-import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.upscanverify.model._
-import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
 
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
@@ -38,12 +36,9 @@ class FileCheckingService @Inject()(
   def check(
     location      : S3ObjectLocation,
     objectMetadata: InboundObjectMetadata
-  )(using
-    ld: LoggingDetails
   ): Future[VerifyResult] =
 
-    withLoggingDetails(ld):
-      logger.debug(s"Checking upload Key=[${location.objectKey}]")
+    logger.debug(s"Checking upload Key=[${location.objectKey}]")
 
     (for
        noVirusFound <- EitherT

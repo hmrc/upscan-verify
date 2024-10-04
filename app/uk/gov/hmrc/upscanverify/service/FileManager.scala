@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.upscanverify.service
 
-import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.upscanverify.model.S3ObjectLocation
 
 import java.io.InputStream
@@ -92,27 +91,25 @@ trait FileManager:
     sourceLocation: S3ObjectLocation,
     targetLocation: S3ObjectLocation,
     metadata      : OutboundObjectMetadata
-  )(using LoggingDetails): Future[Unit]
+  ): Future[Unit]
 
   def writeObject(
     sourceLocation: S3ObjectLocation,
     targetLocation: S3ObjectLocation,
     content       : InputStream,
     metadata      : OutboundObjectMetadata
-  )(using LoggingDetails): Future[Unit]
+  ): Future[Unit]
 
   def delete(
     objectLocation: S3ObjectLocation
-  )(using LoggingDetails): Future[Unit]
+  ): Future[Unit]
 
   def getObjectMetadata(
     objectLocation: S3ObjectLocation
-  )(using LoggingDetails): Future[InboundObjectMetadata]
+  ): Future[InboundObjectMetadata]
 
   def withObjectContent[T](
     objectLocation: S3ObjectLocation
   )(
     function: ObjectContent => Future[T]
-  )(using
-    LoggingDetails
   ): Future[T]

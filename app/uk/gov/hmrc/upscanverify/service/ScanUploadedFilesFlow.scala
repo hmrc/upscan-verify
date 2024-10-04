@@ -19,21 +19,15 @@ package uk.gov.hmrc.upscanverify.service
 import cats.implicits._
 import com.codahale.metrics.MetricRegistry
 import uk.gov.hmrc.upscanverify.model.Message
-import uk.gov.hmrc.upscanverify.util.MonadicUtils._
-import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
+import uk.gov.hmrc.upscanverify.util.logging.LoggingUtils
 
 import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 case class MessageContext(
   fileReference: String
-)
-
-case class ExceptionWithContext(
-  e      : Exception,
-  context: Option[MessageContext]
 )
 
 class ScanUploadedFilesFlow @Inject()(
@@ -47,17 +41,18 @@ class ScanUploadedFilesFlow @Inject()(
   ExecutionContext
 ) extends MessageProcessor:
 
-  def processMessage(message: Message): FutureEitherWithContext[MessageContext] =
-    for
-      parsedMessage        <- withoutContext(parser.parse(message))
-      context              =  MessageContext(parsedMessage.location.objectKey)
-      ld                   =  LoggingDetails.fromMessageContext(context)
-      metadata             <- withContext(fileManager.getObjectMetadata(parsedMessage.location)(using ld), context)
-      inboundObjectDetails =  InboundObjectDetails(metadata, parsedMessage.clientIp, parsedMessage.location)
-      scanningResult       <- withContext(fileCheckingService.check(parsedMessage.location, metadata)(using ld), context)
-      _                    <- withContext(scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult, message.receivedAt)(using ld), context)
-      _                    =  addMetrics(metadata.uploadedTimestamp, message)
-    yield context
+  def processMessage(message: Message): Future[MessageContext] =
+    parser.parse(message)
+      .flatMap: parsedMessage =>
+        val context =  MessageContext(parsedMessage.location.objectKey)
+        LoggingUtils.withMdc(context): // TODO the client of the MessageProcessor (QueueProcessingJob) also does this - we should just need to do it the once
+          for
+            metadata             <- fileManager.getObjectMetadata(parsedMessage.location)
+            inboundObjectDetails =  InboundObjectDetails(metadata, parsedMessage.clientIp, parsedMessage.location)
+            scanningResult       <- fileCheckingService.check(parsedMessage.location, metadata)
+            _                    <- scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult, message.receivedAt)
+            _                    =  addMetrics(metadata.uploadedTimestamp, message)
+          yield context
 
   private def addMetrics(uploadedTimestamp: Instant, message: Message): Unit =
     val endTime = clock.instant()

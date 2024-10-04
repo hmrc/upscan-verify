@@ -23,7 +23,6 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when}
 import uk.gov.hmrc.upscanverify.model.Message
 import uk.gov.hmrc.upscanverify.test.UnitSpec
-import uk.gov.hmrc.upscanverify.util.MonadicUtils
 
 import java.time.Instant
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -55,15 +54,14 @@ class QueueProcessingFlowSpec
     And("processing of two messages succeeds")
     val context = MessageContext("TEST")
     when(messageProcessor.processMessage(validMessage1))
-      .thenReturn(MonadicUtils.withContext(Future.successful(context), context))
+      .thenReturn(Future.successful(context))
 
     when(messageProcessor.processMessage(validMessage2))
-      .thenReturn(MonadicUtils.withContext(Future.successful(context), context))
-
-    when(messageProcessor.processMessage(invalidMessage))
-      .thenReturn(MonadicUtils.withContext[MessageContext](Future.failed(RuntimeException("Exception")), context))
+      .thenReturn(Future.successful(context))
 
     And("processing of one message fails")
+    when(messageProcessor.processMessage(invalidMessage))
+      .thenReturn(Future.failed(RuntimeException("Exception")))
 
     When("the orchestrator is called")
     queueProcessingFlow.run().futureValue

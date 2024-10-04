@@ -23,11 +23,8 @@ import org.scalatest.{Assertions, GivenWhenThen}
 import org.scalatest.concurrent.ScalaFutures
 import uk.gov.hmrc.clamav.model.ScanningResult
 import uk.gov.hmrc.clamav.{ClamAntiVirus, ClamAntiVirusFactory}
-import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.upscanverify.model.{VirusScanResult, S3ObjectLocation, Timings}
 import uk.gov.hmrc.upscanverify.test.{UnitSpec, WithIncrementingClock}
-import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
 
 import java.io.{ByteArrayInputStream, FilterInputStream, InputStream}
 import java.time.{Instant, LocalDateTime, ZoneOffset}
@@ -41,8 +38,6 @@ class ClamAvScanningServiceSpec
      with WithIncrementingClock
      with ScalaFutures:
 
-  given HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
-
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
   "ClamAvScanningService" should:
@@ -53,7 +48,7 @@ class ClamAvScanningServiceSpec
 
     "return success if file can be retrieved and scan result clean" in:
       val client = mock[ClamAntiVirus]
-      when(client.sendAndCheck(any[String], any[InputStream], any[Int])(using any[LoggingDetails], any[ExecutionContext]))
+      when(client.sendAndCheck(any[String], any[InputStream], any[Int]))
         .thenReturn(Future.successful(ScanningResult.Clean))
 
       val factory = mock[ClamAntiVirusFactory]
@@ -85,7 +80,7 @@ class ClamAvScanningServiceSpec
 
     "return infected if file can be retrieved and scan result infected" in:
       val client = mock[ClamAntiVirus]
-      when(client.sendAndCheck(any[String], any[InputStream], any[Int])(using any[LoggingDetails], any[ExecutionContext]))
+      when(client.sendAndCheck(any[String], any[InputStream], any[Int]))
         .thenReturn(Future.successful(ScanningResult.Infected("File dirty")))
 
       val factory = mock[ClamAntiVirusFactory]

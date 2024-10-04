@@ -19,10 +19,8 @@ package uk.gov.hmrc.upscanverify.service
 import play.api.Logging
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
 import uk.gov.hmrc.clamav.model.ScanningResult
-import uk.gov.hmrc.http.logging.LoggingDetails
 import com.codahale.metrics.MetricRegistry
 import uk.gov.hmrc.upscanverify.model._
-import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
 
 import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
@@ -35,8 +33,6 @@ trait ScanningService:
     location      : S3ObjectLocation,
     objectContent : ObjectContent,
     objectMetadata: InboundObjectMetadata
-  )(using
-    LoggingDetails
   ): Future[VirusScanResult]
 
 class ClamAvScanningService @Inject()(
@@ -53,8 +49,6 @@ class ClamAvScanningService @Inject()(
     location   : S3ObjectLocation,
     fileContent: ObjectContent,
     metadata   : InboundObjectMetadata
-  )(using
-    ld         : LoggingDetails
   ): Future[VirusScanResult] =
 
     val startTime       = clock.instant()
@@ -70,8 +64,7 @@ class ClamAvScanningService @Inject()(
                           metricRegistry.counter("cleanFileUpload").inc()
                           Right(VirusScanResult.NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
                         case ScanningResult.Infected(message) =>
-                          withLoggingDetails(ld):
-                            logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
+                          logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
                           metricRegistry.counter("quarantineFileUpload").inc()
                           Left(VirusScanResult.FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant())))
     yield

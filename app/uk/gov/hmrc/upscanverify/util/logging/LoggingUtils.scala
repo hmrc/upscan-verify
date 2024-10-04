@@ -16,14 +16,19 @@
 
 package uk.gov.hmrc.upscanverify.util.logging
 
-import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.upscanverify.service.MessageContext
+import org.slf4j.MDC
 
 /**
-  * Convenience methods to create a [[uk.gov.hmrc.http.logging.LoggingDetails]] instance, required by [[uk.gov.hmrc.play.http.logging.MdcLoggingExecutionContext]].
+  * Ensures the file reference is included in all subsequent logs
   */
-object LoggingDetails:
-  def fromMessageContext(messageContext: MessageContext): HeaderCarrier =
-    new HeaderCarrier():
-      override lazy val mdcData: Map[String, String] =
-        super.mdcData + ("file-reference" -> messageContext.fileReference)
+object LoggingUtils:
+  def withMdc[T](messageContext: MessageContext)(block: => T): T =
+    val previous = Option(MDC.getCopyOfContextMap)
+    MDC.put("file-reference", messageContext.fileReference)
+
+    try
+      block
+    finally
+      MDC.clear()
+      previous.foreach(MDC.setContextMap)

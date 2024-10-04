@@ -25,11 +25,9 @@ import org.mockito.ArgumentMatchers.{any, eq => eqTo}
 import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when, doThrow}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.{Assertions, GivenWhenThen}
-import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.upscanverify.model.S3ObjectLocation
 import uk.gov.hmrc.upscanverify.service._
 import uk.gov.hmrc.upscanverify.test.UnitSpec
-import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.nio.charset.StandardCharsets.UTF_8
@@ -48,8 +46,6 @@ class S3FileManagerSpec
 
   private val awsLastModified      = GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
   private val metadataLastModified = awsLastModified.toInstant
-
-  given HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   "S3FileManager" should:
     "allow to copy file from inbound bucket to outbound bucket" in:

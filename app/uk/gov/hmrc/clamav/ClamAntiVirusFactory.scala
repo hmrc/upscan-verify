@@ -20,8 +20,6 @@ import org.apache.commons.io.IOUtils
 import play.api.Logger
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 import uk.gov.hmrc.clamav.model.{ClamAvException, ScanningResult}
-import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
 
 import java.io.InputStream
 import java.nio.charset.StandardCharsets.UTF_8
@@ -52,9 +50,6 @@ private[clamav] class ClamAntiVirusImpl(
     objectKey  : String,
     inputStream: InputStream,
     length     : Int
-  )(using
-    ld: LoggingDetails,
-    ec: ExecutionContext
   ): Future[ScanningResult] =
     if length > 0 then
       ClamAvSocket.withSocket(clamAvConfig): connection =>
@@ -62,15 +57,15 @@ private[clamav] class ClamAntiVirusImpl(
         for
           _               <- sendHandshake(connection)
           handshakeTimeMs =  System.currentTimeMillis()
-          _               =  withLoggingDetails(ld)(logger.info(s"Send clamav handshake for Key=[$objectKey] took ${handshakeTimeMs - start}ms"))
+          _               =  logger.info(s"Send clamav handshake for Key=[$objectKey] took ${handshakeTimeMs - start}ms")
           _               <- sendRequest(connection)(inputStream, length)
           sendReqTimeMs   =  System.currentTimeMillis()
-          _               =  withLoggingDetails(ld)(logger.info(s"Send clamav request for Key=[$objectKey] took ${sendReqTimeMs - handshakeTimeMs}ms"))
+          _               =  logger.info(s"Send clamav request for Key=[$objectKey] took ${sendReqTimeMs - handshakeTimeMs}ms")
           response        <- readResponse(connection)
           readResTimeMs   =  System.currentTimeMillis()
-          _               =  withLoggingDetails(ld)(logger.info(s"Read clamav response for Key=[$objectKey] took ${readResTimeMs - sendReqTimeMs}ms"))
+          _               =  logger.info(s"Read clamav response for Key=[$objectKey] took ${readResTimeMs - sendReqTimeMs}ms")
           parsedResponse  <- parseResponse(response)
-          _               =  withLoggingDetails(ld)(logger.info(s"Parse clamav response for Key=[$objectKey] took ${System.currentTimeMillis() - readResTimeMs}ms"))
+          _               =  logger.info(s"Parse clamav response for Key=[$objectKey] took ${System.currentTimeMillis() - readResTimeMs}ms")
         yield parsedResponse
     else
       Future.successful(ScanningResult.Clean)

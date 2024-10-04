@@ -22,8 +22,7 @@ import play.api.libs.json._
 import play.api.libs.json.Reads._
 import uk.gov.hmrc.upscanverify.model.{FileUploadEvent, Message, S3ObjectLocation}
 import uk.gov.hmrc.upscanverify.service._
-import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
-import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
+import uk.gov.hmrc.upscanverify.util.logging.LoggingUtils
 
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
@@ -88,11 +87,14 @@ class S3EventParser @Inject() ()(using ExecutionContext) extends MessageParser w
   private def interpretS3EventMessage(result: S3EventNotification): Future[FileUploadEvent] =
     result.records match
       case Seq(S3EventNotificationRecord(_, "aws:s3", _, _, ObjectCreatedEventPattern(), requestParameters, s3Details)) =>
-        val event = FileUploadEvent(
-          S3ObjectLocation(s3Details.bucketName, s3Details.objectKey, s3Details.versionId),
-          requestParameters.sourceIPAddress)
+        val event =
+          FileUploadEvent(
+            S3ObjectLocation(s3Details.bucketName, s3Details.objectKey, s3Details.versionId),
+            requestParameters.sourceIPAddress
+          )
 
-        withLoggingDetails(LoggingDetails.fromMessageContext(MessageContext(event.location.objectKey))):
+        // TODO refactor so that the MessageContext is only created once
+        LoggingUtils.withMdc(MessageContext(event.location.objectKey)):
           logger.info(s"Created FileUploadEvent for Key=[${event.location.objectKey}].")
 
         Future.successful(event)

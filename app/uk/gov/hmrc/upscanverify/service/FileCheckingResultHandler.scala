@@ -18,10 +18,8 @@ package uk.gov.hmrc.upscanverify.service
 
 import play.api.Logging
 import play.api.libs.json.Json
-import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.upscanverify.config.ServiceConfiguration
 import uk.gov.hmrc.upscanverify.model._
-import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
 
 import java.io.ByteArrayInputStream
 import java.time.{Clock, Instant}
@@ -42,9 +40,7 @@ class FileCheckingResultHandler @Inject()(
     objectDetails    : InboundObjectDetails,
     result           : VerifyResult,
     messageReceivedAt: Instant
-  )(using ld: LoggingDetails): Future[Unit] =
-    withLoggingDetails(ld):
-      logger.info(s"Handling check result for Key=[${objectDetails.location.objectKey}] Result=[$result]")
+  ): Future[Unit] =
     result match
       case Right(VerifyResult.FileValidationSuccess(noVirusFound, fileAllowed)) =>
         handleValid(
@@ -85,8 +81,7 @@ class FileCheckingResultHandler @Inject()(
     mimeType: MimeType,
     metadata: Map[String,String]
   )(using
-    ExecutionContext,
-    LoggingDetails
+    ExecutionContext
   ): Future[Unit] =
     for
       _ <- fileManager.copyObject(
@@ -109,8 +104,7 @@ class FileCheckingResultHandler @Inject()(
     serviceName        : Option[String],
     metadata           : Map[String,String]
   )(using
-    ExecutionContext,
-    LoggingDetails
+    ExecutionContext
   ): Future[Unit] =
     for
       _ <- rejectionNotifier.notifyRejection(

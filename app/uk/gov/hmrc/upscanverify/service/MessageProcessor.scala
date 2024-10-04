@@ -17,7 +17,7 @@
 package uk.gov.hmrc.upscanverify.service
 
 import uk.gov.hmrc.upscanverify.model.Message
-import uk.gov.hmrc.upscanverify.util.MonadicUtils.FutureEitherWithContext
+import scala.concurrent.Future
 
 trait MessageProcessor:
-  def processMessage(message: Message): FutureEitherWithContext[MessageContext]
+  def processMessage(message: Message): Future[MessageContext]

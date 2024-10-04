@@ -22,10 +22,8 @@ import org.mockito.Mockito.{verifyNoInteractions, when}
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatestplus.mockito.MockitoSugar.mock
-import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.upscanverify.model._
 import uk.gov.hmrc.upscanverify.test.{UnitSpec, WithIncrementingClock}
-import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
 
 import java.io.ByteArrayInputStream
 import java.time.Instant
@@ -79,13 +77,11 @@ class FileCheckingServiceSpec
         Left(VerifyResult.FileRejected.FileTypeFailure(noVirusFound, notAllowedMimeType))
 
   trait Setup:
-    given LoggingDetails = LoggingDetails.fromMessageContext(MessageContext("TEST"))
-
     val content = ObjectContent(ByteArrayInputStream("TEST".getBytes), "TEST".length)
 
     val fileManager    = mock[FileManager]
     val functionCaptor = ArgumentCaptor.forClass(classOf[ObjectContent => Future[Nothing]]) // using argument capture since it can match the function param
-    when(fileManager.withObjectContent(any[S3ObjectLocation])(functionCaptor.capture())(using any[LoggingDetails]))
+    when(fileManager.withObjectContent(any[S3ObjectLocation])(functionCaptor.capture()))
       .thenAnswer { i =>
         val objectLocation = i.getArgument[S3ObjectLocation](0)
         val function       = i.getArgument[ObjectContent => Future[Nothing]](1) // same as functionCaptor.getValue

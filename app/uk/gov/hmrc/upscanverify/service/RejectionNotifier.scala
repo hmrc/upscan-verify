@@ -17,9 +17,7 @@
 package uk.gov.hmrc.upscanverify.service
 
 import play.api.Logging
-import uk.gov.hmrc.http.logging.LoggingDetails
 import uk.gov.hmrc.upscanverify.model.{ErrorMessage, FileCheckingError, S3ObjectLocation}
-import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
 
 import java.time.Instant
 import scala.concurrent.Future
@@ -33,8 +31,6 @@ trait RejectionNotifier:
     fileUploadDatetime : Instant,
     errorMessage       : ErrorMessage,
     serviceName        : Option[String]
-  )(using
-    LoggingDetails
   ): Future[Unit]
 
 object LoggingRejectionNotifier
@@ -48,23 +44,20 @@ object LoggingRejectionNotifier
     fileUploadDatetime : Instant,
     errorMessage       : ErrorMessage,
     serviceName        : Option[String]
-  )(using
-    ld: LoggingDetails
   ): Future[Unit] =
     val customMessagePrefix =
       errorMessage.failureReason match
         case FileCheckingError.Quarantine => "Virus detected in file."
         case FileCheckingError.Rejected   => "File type is not allowed for this service."
 
-    withLoggingDetails(ld):
-      logger.warn(
-        s"""$customMessagePrefix${serviceName.fold("")(service => s"\nService name: [$service]")}
-           |Key: [${fileProperties.objectKey}]${fileProperties.objectVersion.fold("")(version => s"\nVersion: [$version]")}
-           |Checksum: [$checksum]
-           |File size: [$fileSize B]
-           |File upload datetime: [$fileUploadDatetime]
-           |Bucket: [${fileProperties.bucket}]
-           |Details: [${errorMessage.message}].
-         """.stripMargin
-      )
+    logger.warn(
+      s"""$customMessagePrefix${serviceName.fold("")(service => s"\nService name: [$service]")}
+          |Key: [${fileProperties.objectKey}]${fileProperties.objectVersion.fold("")(version => s"\nVersion: [$version]")}
+          |Checksum: [$checksum]
+          |File size: [$fileSize B]
+          |File upload datetime: [$fileUploadDatetime]
+          |Bucket: [${fileProperties.bucket}]
+          |Details: [${errorMessage.message}].
+        """.stripMargin
+    )
     Future.unit

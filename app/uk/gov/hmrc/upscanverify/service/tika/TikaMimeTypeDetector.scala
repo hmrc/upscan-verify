@@ -26,6 +26,7 @@ import javax.inject.Singleton
 @Singleton
 class TikaMimeTypeDetector extends MimeTypeDetector:
 
+  private val logger   = play.api.Logger(getClass)
   private val config   = TikaConfig.getDefaultConfig
   private val detector = config.getDetector
 
@@ -40,8 +41,10 @@ class TikaMimeTypeDetector extends MimeTypeDetector:
     val detectionResult = detector.detect(tikaInputStream, metadata)
     val mimeType        = MimeType(s"${detectionResult.getType}/${detectionResult.getSubtype}")
 
+    val length = tikaInputStream.getLength
+    logger.info(s"BDOG-32559 TikaMimeTypeDetector length: $length")
     val detectedMimeType =
-      if tikaInputStream.getLength > 0 then
+      if length > 0 then
         DetectedMimeType.Detected(mimeType)
       else
         DetectedMimeType.EmptyLength(mimeType)

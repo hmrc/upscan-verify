@@ -19,7 +19,7 @@ package uk.gov.hmrc.upscanverify.service
 import com.amazonaws.services.sqs.model.Message
 import com.codahale.metrics.MetricRegistry
 import play.api.Logging
-import uk.gov.hmrc.upscanverify.model.FileUploadEvent
+import uk.gov.hmrc.upscanverify.connector.aws.PollingJob
 import uk.gov.hmrc.upscanverify.util.logging.LoggingUtils
 
 import java.time.{Clock, Instant}

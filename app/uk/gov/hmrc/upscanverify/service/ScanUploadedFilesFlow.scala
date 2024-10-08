@@ -18,8 +18,7 @@ package uk.gov.hmrc.upscanverify.service
 
 import cats.implicits._
 import com.codahale.metrics.MetricRegistry
-import uk.gov.hmrc.upscanverify.model.Message
-import uk.gov.hmrc.upscanverify.util.logging.LoggingUtils
+import uk.gov.hmrc.upscanverify.model.{FileUploadEvent, Message}
 
 import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
@@ -31,7 +30,6 @@ case class MessageContext(
 )
 
 class ScanUploadedFilesFlow @Inject()(
-  parser               : MessageParser,
   fileManager          : FileManager,
   fileCheckingService  : FileCheckingService,
   scanningResultHandler: FileCheckingResultHandler,
@@ -41,18 +39,14 @@ class ScanUploadedFilesFlow @Inject()(
   ExecutionContext
 ) extends MessageProcessor:
 
-  def processMessage(message: Message): Future[MessageContext] =
-    parser.parse(message)
-      .flatMap: parsedMessage =>
-        val context =  MessageContext(parsedMessage.location.objectKey)
-        LoggingUtils.withMdc(context): // TODO the client of the MessageProcessor (QueueProcessingJob) also does this - we should just need to do it the once
-          for
-            metadata             <- fileManager.getObjectMetadata(parsedMessage.location)
-            inboundObjectDetails =  InboundObjectDetails(metadata, parsedMessage.clientIp, parsedMessage.location)
-            scanningResult       <- fileCheckingService.check(parsedMessage.location, metadata)
-            _                    <- scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult, message.receivedAt)
-            _                    =  addMetrics(metadata.uploadedTimestamp, message)
-          yield context
+  def processMessage(fileUploadEvent: FileUploadEvent, message: Message): Future[Unit] =
+    for
+      metadata             <- fileManager.getObjectMetadata(fileUploadEvent.location)
+      inboundObjectDetails =  InboundObjectDetails(metadata, fileUploadEvent.clientIp, fileUploadEvent.location)
+      scanningResult       <- fileCheckingService.check(fileUploadEvent.location, metadata)
+      _                    <- scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult, message.receivedAt)
+      _                    =  addMetrics(metadata.uploadedTimestamp, message)
+    yield ()
 
   private def addMetrics(uploadedTimestamp: Instant, message: Message): Unit =
     val endTime = clock.instant()

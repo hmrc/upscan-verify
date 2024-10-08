@@ -22,7 +22,6 @@ import play.api.libs.json._
 import play.api.libs.json.Reads._
 import uk.gov.hmrc.upscanverify.model.{FileUploadEvent, Message, S3ObjectLocation}
 import uk.gov.hmrc.upscanverify.service._
-import uk.gov.hmrc.upscanverify.util.logging.LoggingUtils
 
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
@@ -92,10 +91,6 @@ class S3EventParser @Inject() ()(using ExecutionContext) extends MessageParser w
             S3ObjectLocation(s3Details.bucketName, s3Details.objectKey, s3Details.versionId),
             requestParameters.sourceIPAddress
           )
-
-        // TODO refactor so that the MessageContext is only created once
-        LoggingUtils.withMdc(MessageContext(event.location.objectKey)):
-          logger.info(s"Created FileUploadEvent for Key=[${event.location.objectKey}].")
 
         Future.successful(event)
 

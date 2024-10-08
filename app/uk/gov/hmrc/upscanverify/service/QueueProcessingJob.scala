@@ -19,6 +19,7 @@ package uk.gov.hmrc.upscanverify.service
 import com.amazonaws.services.sqs.model.Message
 import com.codahale.metrics.MetricRegistry
 import play.api.Logging
+import uk.gov.hmrc.upscanverify.model.FileUploadEvent
 import uk.gov.hmrc.upscanverify.util.logging.LoggingUtils
 
 import java.time.{Clock, Instant}
@@ -28,6 +29,7 @@ import scala.jdk.CollectionConverters._
 
 class QueueProcessingJob @Inject()(
   messageProcessor: MessageProcessor,
+  messageParser   : MessageParser,
   metricRegistry  : MetricRegistry,
   clock           : Clock
 )(using
@@ -39,10 +41,9 @@ class QueueProcessingJob @Inject()(
     val receivedAt = clock.instant()
 
     if logger.isDebugEnabled then
-      logger.debug(
+      logger.debug:
         s"Received message with id: [${sqsMessage.getMessageId}] and receiptHandle: [${sqsMessage.getReceiptHandle}], message details:\n "
           + sqsMessage.toString
-      )
 
     val queueTimestamp = sqsMessage.getAttributes.asScala.get("SentTimestamp").map(s => Instant.ofEpochMilli(s.toLong))
 
@@ -59,9 +60,14 @@ class QueueProcessingJob @Inject()(
 
   override def processMessage(sqsMessage: Message): Future[Unit] =
     val message = toUpscanMessage(sqsMessage)
-    messageProcessor.processMessage(message)
-      .map: context =>
-        metricRegistry.meter("verifyThroughput").mark()
-      .recover:
-        case exception =>
-          logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)
+    messageParser.parse(message)
+      .flatMap: parsedMessage =>
+        val context = MessageContext(parsedMessage.location.objectKey)
+        LoggingUtils.withMdc(context):
+          logger.info(s"Created FileUploadEvent for Key=[${parsedMessage.location.objectKey}].")
+          messageProcessor.processMessage(parsedMessage, message)
+            .map: _ =>
+              metricRegistry.meter("verifyThroughput").mark()
+            .recover:
+              case exception =>
+                logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)

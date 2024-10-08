@@ -15,7 +15,7 @@ lazy val microservice = Project("upscan-verify", file("."))
       playDefaultPort := 9578,
   )
   .settings(scalacOptions ++= Seq(
-    "-Wconf:src=routes/.*" //silence warnings in generated routes
+    "-Wconf:src=routes/.*:s" //silence warnings in generated routes
   , "-Wconf:msg=Flag.*repeatedly:s"
   ))
   .settings(resolvers += Resolver.jcenterRepo)

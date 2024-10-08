@@ -38,16 +38,11 @@ class ScanUploadedFilesFlowSpec
 
   override lazy val clockStart = Instant.parse("2018-12-04T17:48:30Z")
 
-  val parser: MessageParser = new MessageParser:
-    override def parse(message: Message) =
-      message.body match
-        case "VALID-BODY" => Future.successful(FileUploadEvent(S3ObjectLocation("bucket", message.id, None), "127.0.0.1"))
-        case _            => Future.failed(Exception("Invalid body"))
-
   "ScanUploadedFilesFlow" should:
     "scan and post-process valid message" in:
       Given("there is a valid message in the queue")
       val message          = Message("ID", "VALID-BODY", "RECEIPT-1", clock.instant(), Some(clock.instant().minusSeconds(1)))
+      val fileUploadEvent  = FileUploadEvent(S3ObjectLocation("bucket", message.id, None), "127.0.0.1")
       val location         = S3ObjectLocation("bucket", "ID", None)
       val processingResult = VerifyResult.FileValidationSuccess(
                                VirusScanResult.NoVirusFound("CHECKSUM", Timings(clock.instant(), clock.instant())),
@@ -62,7 +57,6 @@ class ScanUploadedFilesFlowSpec
       val metricRegistry        = MetricRegistry()
       val flow =
         ScanUploadedFilesFlow(
-          parser,
           fileManager,
           fileCheckingService,
           scanningResultHandler,
@@ -81,7 +75,7 @@ class ScanUploadedFilesFlowSpec
         .thenReturn(Future.unit)
 
       When("message is handled")
-      val result = flow.processMessage(message)
+      val result = flow.processMessage(fileUploadEvent, message)
 
       Then("processing result is success")
       result.futureValue
@@ -107,11 +101,11 @@ class ScanUploadedFilesFlowSpec
       Given("there is a valid message")
       val location            = S3ObjectLocation("bucket", "ID2", None)
       val message             = Message("ID2", "VALID-BODY", "RECEIPT-2", clock.instant(), None)
+      val fileUploadEvent     = FileUploadEvent(S3ObjectLocation("bucket", message.id, None), "127.0.0.1")
       val fileCheckingService = mock[FileCheckingService]
       val metricRegistry      = MetricRegistry()
       val flow =
         ScanUploadedFilesFlow(
-          parser,
           fileManager,
           fileCheckingService,
           scanningResultHandler,
@@ -125,7 +119,7 @@ class ScanUploadedFilesFlowSpec
         .thenReturn(Future.failed(AmazonServiceException("Expected exception")))
 
       When("message is processed")
-      val result = flow.processMessage(message)
+      val result = flow.processMessage(fileUploadEvent, message)
 
       Then("result should be a failure")
       result.failed.futureValue
@@ -138,42 +132,11 @@ class ScanUploadedFilesFlowSpec
       metricRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 0
       metricRegistry.timer("upscanVerifyProcessing" ).getSnapshot.size() shouldBe 0
 
-    "skip processing when parsing failed" in:
-      val fileManager           = mock[FileManager]
-      val scanningResultHandler = mock[FileCheckingResultHandler]
-
-      Given("there is a valid message")
-      val message             = Message("ID2", "INVALID-BODY", "RECEIPT-2", clock.instant(), None)
-      val fileCheckingService = mock[FileCheckingService]
-      val metricRegistry      = MetricRegistry()
-      val flow =
-        ScanUploadedFilesFlow(
-          parser,
-          fileManager,
-          fileCheckingService,
-          scanningResultHandler,
-          metricRegistry,
-          clock
-        )
-
-      When("message is processed")
-      val result = flow.processMessage(message)
-
-      Then("result should be a failure")
-      result.failed.futureValue
-
-      And("file checking service should not be invoked")
-      verifyNoInteractions(fileCheckingService)
-
-      And("the metrics should not be updated")
-      metricRegistry.timer("uploadToScanComplete"   ).getSnapshot.size() shouldBe 0
-      metricRegistry.timer("uploadToStartProcessing").getSnapshot.size() shouldBe 0
-      metricRegistry.timer("upscanVerifyProcessing" ).getSnapshot.size() shouldBe 0
-
     "return error if scanning failed" in:
       Given("there is a valid message in the queue")
-      val message  = Message("ID", "VALID-BODY", "RECEIPT-1", clock.instant(), None)
-      val location = S3ObjectLocation("bucket", "ID", None)
+      val message         = Message("ID", "VALID-BODY", "RECEIPT-1", clock.instant(), None)
+      val fileUploadEvent = FileUploadEvent(S3ObjectLocation("bucket", message.id, None), "127.0.0.1")
+      val location        = S3ObjectLocation("bucket", "ID", None)
       val inboundObjectMetadata =
         InboundObjectMetadata(Map("consuming-service" -> "ScanUploadedFilesFlowSpec"), clockStart.minusSeconds(1), 0)
 
@@ -183,7 +146,6 @@ class ScanUploadedFilesFlowSpec
       val metricRegistry        = MetricRegistry()
       val flow =
         ScanUploadedFilesFlow(
-          parser,
           fileManager,
           fileCheckingService,
           scanningResultHandler,
@@ -198,7 +160,7 @@ class ScanUploadedFilesFlowSpec
         .thenReturn(Future.failed(RuntimeException("Expected exception")))
 
       When("message is handled")
-      val result = flow.processMessage(message)
+      val result = flow.processMessage(fileUploadEvent, message)
 
       Then("processing result is success")
       result.failed.futureValue

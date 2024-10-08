@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.upscanverify.service
+package uk.gov.hmrc.upscanverify.connector.aws
 
 import com.amazonaws.services.sqs.AmazonSQS
 import com.amazonaws.services.sqs.model.{DeleteMessageRequest, Message, ReceiveMessageRequest}
@@ -22,7 +22,6 @@ import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Source
 import play.api.Logging
-import play.api.inject.ApplicationLifecycle
 import uk.gov.hmrc.upscanverify.config.ServiceConfiguration
 
 import javax.inject.Inject
@@ -37,17 +36,16 @@ trait PollingJob:
 
   def jobName: String = this.getClass.getName
 
-class ContinuousPoller @Inject()(
+class SqsConsumer @Inject()(
   sqsClient           : AmazonSQS,
   job                 : PollingJob, // QueueProcessingJob
   serviceConfiguration: ServiceConfiguration
 )(using
   actorSystem         : ActorSystem,
-  applicationLifecycle: ApplicationLifecycle,
   ec                  : ExecutionContext
 ) extends Logging:
 
-  logger.info(s"Creating ContinuousPoller for PollingJob: [${job.jobName}].")
+  logger.info(s"Starting SQS consumption for PollingJob: [${job.jobName}].")
 
   def runQueue(): Future[Done] =
     Source
@@ -62,7 +60,9 @@ class ContinuousPoller @Inject()(
       .mapAsync(parallelism = 1): message =>
         processMessage(message).flatMap:
           case MessageAction.Delete(message) => deleteMessage(message)
-          case MessageAction.Ignore(_)       => Future.unit
+          case MessageAction.Ignore(_)       => Future.unit // message will appear on queue after visibility timeout
+                                                // alternatively: returnMessage(message) (maybe after `serviceConfiguration.retryInterval`)
+                                                // set the VisibilityTimeout to 0 seconds through the ChangeMessageVisibility action. This immediately makes the message available for other consumers to process.
         .recover:
           case NonFatal(e)                   => logger.error(s"Failed to process messages", e)
       .run()

@@ -17,7 +17,7 @@
 package uk.gov.hmrc.upscanverify.connector.aws
 
 import com.amazonaws.services.sqs.AmazonSQS
-import com.amazonaws.services.sqs.model.{DeleteMessageRequest, Message, ReceiveMessageRequest}
+import com.amazonaws.services.sqs.model.{ChangeMessageVisibilityRequest, DeleteMessageRequest, Message, ReceiveMessageRequest}
 import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Source
@@ -60,9 +60,11 @@ class SqsConsumer @Inject()(
       .mapAsync(parallelism = 1): message =>
         processMessage(message).flatMap:
           case MessageAction.Delete(message) => deleteMessage(message)
-          case MessageAction.Ignore(_)       => Future.unit // message will appear on queue after visibility timeout
-                                                // alternatively: returnMessage(message) (maybe after `serviceConfiguration.retryInterval`)
-                                                // set the VisibilityTimeout to 0 seconds through the ChangeMessageVisibility action. This immediately makes the message available for other consumers to process.
+          case MessageAction.Ignore(_)       => // message will return to queue after retryInterval
+                                                // Note, we previously stopped processing *all* messages on this instance until the retryInterval
+                                                // We probably only need to do this for exceptions that are known to affect all messages
+                                                // This could be done by completing Future.unit after a timeout (e.g. complete a promise with `context.system.scheduler.scheduleOnce`)
+                                                returnMessage(message)
         .recover:
           case NonFatal(e)                   => logger.error(s"Failed to process messages", e)
       .run()
@@ -91,6 +93,16 @@ class SqsConsumer @Inject()(
       .map: _ =>
         logger.debug:
           s"Deleted message from Queue: [${serviceConfiguration.inboundQueueUrl}], for receiptHandle: [${message.getReceiptHandle}]."
+
+  private def returnMessage(message: Message): Future[Unit] =
+    Future
+      .apply:
+        sqsClient
+          .changeMessageVisibility:
+            ChangeMessageVisibilityRequest(serviceConfiguration.inboundQueueUrl, message.getReceiptHandle, serviceConfiguration.retryInterval.toSeconds.toInt)
+      .map: _ =>
+        logger.debug:
+          s"Returned message back to the queue (after ${serviceConfiguration.retryInterval}): [${serviceConfiguration.inboundQueueUrl}], for receiptHandle: [${message.getReceiptHandle}]."
 
   def processMessage(message: Message): Future[MessageAction] =
     logger.debug(s"Polling for job: [${job.jobName}].")

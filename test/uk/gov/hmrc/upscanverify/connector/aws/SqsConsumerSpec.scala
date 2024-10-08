@@ -17,7 +17,7 @@
 package uk.gov.hmrc.upscanverify.connector.aws
 
 import com.amazonaws.services.sqs.AmazonSQS
-import com.amazonaws.services.sqs.model.{DeleteMessageRequest, Message, ReceiveMessageRequest, ReceiveMessageResult}
+import com.amazonaws.services.sqs.model.{ChangeMessageVisibilityRequest, DeleteMessageRequest, Message, ReceiveMessageRequest, ReceiveMessageResult}
 import org.apache.pekko.actor.ActorSystem
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{atLeast => atLeastTimes, times, when, verify}
@@ -45,6 +45,8 @@ class SqsConsumerSpec
     .thenReturn(queueUrl)
   when(serviceConfiguration.inboundQueueVisibilityTimeout)
     .thenReturn(20.seconds)
+  when(serviceConfiguration.retryInterval)
+    .thenReturn(2.seconds)
 
   "SqsConsumer" should:
     "continuously poll the queue" in:
@@ -103,6 +105,8 @@ class SqsConsumerSpec
       verify(sqsClient).deleteMessage(DeleteMessageRequest(queueUrl, "3"))
       // but not
       verify(sqsClient, times(0)).deleteMessage(DeleteMessageRequest(queueUrl, "2"))
+      // instead
+      verify(sqsClient).changeMessageVisibility(ChangeMessageVisibilityRequest(queueUrl, "2", serviceConfiguration.retryInterval.toSeconds.toInt))
 
 
   override def beforeEach(): Unit =

@@ -16,8 +16,8 @@
 
 package uk.gov.hmrc.upscanverify.service
 
-import uk.gov.hmrc.upscanverify.model.Message
+import uk.gov.hmrc.upscanverify.model.{FileUploadEvent, Message}
 import scala.concurrent.Future
 
 trait MessageProcessor:
-  def processMessage(message: Message): Future[MessageContext]
+  def processMessage(fileUploadEvent: FileUploadEvent, message: Message): Future[Unit]

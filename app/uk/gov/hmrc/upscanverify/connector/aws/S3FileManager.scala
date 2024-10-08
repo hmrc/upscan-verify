@@ -50,9 +50,8 @@ class S3FileManager @Inject()(s3Client: AmazonS3)(using ExecutionContext) extend
 
     Future:
       s3Client.copyObject(request)
-      logger.debug(
+      logger.debug:
         s"Copied object with Key=[${sourceLocation.objectKey}] from [$sourceLocation] to [$targetLocation]."
-      )
 
   override def writeObject(
     sourceLocation: S3ObjectLocation,

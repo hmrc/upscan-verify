@@ -41,8 +41,10 @@ class ScanUploadedFilesFlow @Inject()(
 ) extends MessageProcessor:
 
   def processMessage(fileUploadEvent: FileUploadEvent, message: Message): Future[Unit] =
+    play.api.Logger(getClass).info(s"Test MDC 2")
     for
       metadata             <- fileManager.getObjectMetadata(fileUploadEvent.location)
+      _                    =  play.api.Logger(getClass).info(s"Test MDC 4")
       inboundObjectDetails =  InboundObjectDetails(metadata, fileUploadEvent.clientIp, fileUploadEvent.location)
       scanningResult       <- fileCheckingService.check(fileUploadEvent.location, metadata)
       _                    <- scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult, message.receivedAt)

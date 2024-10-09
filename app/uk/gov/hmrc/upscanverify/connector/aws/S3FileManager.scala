@@ -98,6 +98,7 @@ class S3FileManager @Inject()(s3Client: AmazonS3)(using ExecutionContext) extend
   override def getObjectMetadata(
     objectLocation: S3ObjectLocation
   ): Future[InboundObjectMetadata] =
+    logger.info(s"Test MDC 3")
 
     val getMetadataRequest = GetObjectMetadataRequest(objectLocation.bucket, objectLocation.objectKey)
     objectLocation.objectVersion.foreach(getMetadataRequest.setVersionId)

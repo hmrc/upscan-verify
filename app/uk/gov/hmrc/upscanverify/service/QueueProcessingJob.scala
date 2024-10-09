@@ -67,6 +67,7 @@ class QueueProcessingJob @Inject()(
           logger.info(s"Created FileUploadEvent for Key=[${parsedMessage.location.objectKey}].")
           messageProcessor.processMessage(parsedMessage, message)
             .map: _ =>
+              logger.info(s"Test MDC 5")
               metricRegistry.meter("verifyThroughput").mark()
             .recover:
               case exception =>

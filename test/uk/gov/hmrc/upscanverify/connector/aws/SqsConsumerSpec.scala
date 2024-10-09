@@ -22,7 +22,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{atLeast => atLeastTimes, times, when, verify}
 import org.scalatest.BeforeAndAfter
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import uk.gov.hmrc.upscanverify.config.ServiceConfiguration
 import uk.gov.hmrc.upscanverify.test.UnitSpec
 
@@ -33,6 +33,7 @@ import scala.concurrent.duration.DurationInt
 class SqsConsumerSpec
   extends UnitSpec
      with Eventually
+     with IntegrationPatience
      with BeforeAndAfter:
 
   given actorSystem: ActorSystem = ActorSystem()

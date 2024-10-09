@@ -62,9 +62,9 @@ class QueueProcessingJob @Inject()(
     val message = toUpscanMessage(sqsMessage)
     messageParser.parse(message)
       .flatMap: parsedMessage =>
-        val context = MessageContext(parsedMessage.location.objectKey)
-        LoggingUtils.withMdc(context):
-          logger.info(s"Created FileUploadEvent for Key=[${parsedMessage.location.objectKey}].")
+        val fileReference = parsedMessage.location.objectKey
+        LoggingUtils.withMdc(Map("file-reference" -> fileReference)):
+          logger.info(s"Created FileUploadEvent for Key=[$fileReference].")
           messageProcessor.processMessage(parsedMessage, message)
             .map: _ =>
               metricRegistry.meter("verifyThroughput").mark()

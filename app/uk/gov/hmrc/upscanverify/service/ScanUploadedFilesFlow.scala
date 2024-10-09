@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.upscanverify.service
 
-import cats.implicits._
 import com.codahale.metrics.MetricRegistry
 import uk.gov.hmrc.upscanverify.model.{FileUploadEvent, Message}
 
@@ -24,10 +23,6 @@ import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
-
-case class MessageContext(
-  fileReference: String
-)
 
 @Singleton
 class ScanUploadedFilesFlow @Inject()(

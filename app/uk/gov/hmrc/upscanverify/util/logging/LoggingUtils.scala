@@ -16,19 +16,18 @@
 
 package uk.gov.hmrc.upscanverify.util.logging
 
-import uk.gov.hmrc.upscanverify.service.MessageContext
 import org.slf4j.MDC
+
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Ensures the file reference is included in all subsequent logs
   */
 object LoggingUtils:
-  def withMdc[T](messageContext: MessageContext)(block: => T): T =
+  def withMdc[T](mdcData: Map[String, String])(block: => Future[T])(using ExecutionContext): Future[T] =
     val previous = Option(MDC.getCopyOfContextMap)
-    MDC.put("file-reference", messageContext.fileReference)
-
-    try
-      block
-    finally
+    val f = Future.unit.flatMap(_ => block) // flatMap to ensure exceptions initialising block are handled by onComplete
+    f.onComplete: _ =>
       MDC.clear()
       previous.foreach(MDC.setContextMap)
+    f

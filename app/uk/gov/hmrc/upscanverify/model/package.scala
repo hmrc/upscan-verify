@@ -17,7 +17,7 @@
 package uk.gov.hmrc.upscanverify.model
 
 import play.api.libs.json._
-import uk.gov.hmrc.upscanverify.service.{MimeType, NoVirusFound}
+import uk.gov.hmrc.upscanverify.service.MimeType
 
 import java.time.{Clock, Instant}
 
@@ -62,37 +62,62 @@ object Timings:
     () =>
       Timings(startTime, clock.instant())
 
-case class FileValidationSuccess(
-  checksum        : String,
-  mimeType        : MimeType,
-  virusScanTimings: Timings,
-  fileTypeTimings : Timings
+object VirusScanResult:
+  case class FileInfected(
+    details         : String,
+    checksum        : String,
+    virusScanTimings: Timings
+  )
+
+  case class NoVirusFound(
+    checksum        : String,
+    virusScanTimings: Timings
+  )
+
+type VirusScanResult = Either[VirusScanResult.FileInfected, VirusScanResult.NoVirusFound]
+
+case class FileAllowed(
+  mimeType       : MimeType,
+  fileTypeTimings: Timings
 )
 
-case class FileInfected(
-  details         : String,
-  checksum        : String,
-  virusScanTimings: Timings
-)
-
-enum FileTypeError:
+enum FileTypeError(
+  val consumingService: Option[String],
+  val fileTypeTimings : Timings
+):
   case NotAllowedMimeType(
-    typeFound       : MimeType,
-    consumingService: Option[String],
-    fileTypeTimings : Timings
-  ) extends FileTypeError
+    typeFound                    : MimeType,
+    override val consumingService: Option[String],
+    override val fileTypeTimings : Timings
+  ) extends FileTypeError(consumingService, fileTypeTimings)
 
   case NotAllowedFileExtension(
-    typeFound       : MimeType,
-    fileExtension   : String,
-    consumingService: Option[String],
-    fileTypeTimings : Timings
-  ) extends FileTypeError
+    typeFound                    : MimeType,
+    fileExtension                : String,
+    override val consumingService: Option[String],
+    override val fileTypeTimings : Timings
+  ) extends FileTypeError(consumingService, fileTypeTimings)
 
-case class FileRejected(
-  virusScanResult  : Either[FileInfected, NoVirusFound],
-  fileTypeResultOpt: Option[FileTypeError]             = None
-)
+type FileTypeCheckResult = Either[FileTypeError, FileAllowed]
+
+object VerifyResult:
+  enum FileRejected:
+    case VirusScanFailure(
+      virusScanResult: VirusScanResult.FileInfected
+    ) extends FileRejected
+
+    case FileTypeFailure(
+      virusScanResult: VirusScanResult.NoVirusFound,
+      fileTypeResult : FileTypeError
+    ) extends FileRejected
+
+  case class FileValidationSuccess(
+    virusScanResult: VirusScanResult.NoVirusFound,
+    fileTypeResult : FileAllowed
+  )
+
+type VerifyResult = Either[VerifyResult.FileRejected, VerifyResult.FileValidationSuccess]
+
 
 enum FileCheckingError(val value: String):
   case Quarantine extends FileCheckingError("QUARANTINE")

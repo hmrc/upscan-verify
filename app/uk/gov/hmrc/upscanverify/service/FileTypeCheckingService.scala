@@ -17,31 +17,25 @@
 package uk.gov.hmrc.upscanverify.service
 
 import cats.syntax.either._
+import com.codahale.metrics.MetricRegistry
 import play.api.Logging
-import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import uk.gov.hmrc.upscanverify.config.ServiceConfiguration
 import uk.gov.hmrc.upscanverify.model._
 import uk.gov.hmrc.upscanverify.model.Timings.{Timer, timer}
 import uk.gov.hmrc.upscanverify.service.tika.FileNameValidator
-import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
 
 import java.time.Clock
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-import scala.concurrent.Future
-
-case class FileAllowed(
-  mimeType: MimeType,
-  fileTypeTimings: Timings
-)
+import scala.concurrent.{ExecutionContext, Future}
 
 class FileTypeCheckingService @Inject()(
   mimeTypeDetector    : MimeTypeDetector,
   fileNameValidator   : FileNameValidator,
   serviceConfiguration: ServiceConfiguration,
-  metrics             : Metrics
+  metricRegistry      : MetricRegistry
 )(using
+  ExecutionContext,
   Clock
 ) extends Logging:
 
@@ -49,47 +43,39 @@ class FileTypeCheckingService @Inject()(
     location      : S3ObjectLocation,
     objectContent : ObjectContent,
     objectMetadata: InboundObjectMetadata
-  )(using
-    LoggingDetails
-  ): Future[Either[FileTypeError, FileAllowed]] =
+  ): Future[FileTypeCheckResult] =
+    Future:
+      given endTimer: Timer = timer()
 
-    given endTimer: Timer = timer()
+      val consumingService = objectMetadata.consumingService
+      val filename         = objectMetadata.originalFilename
 
-    val consumingService = objectMetadata.consumingService
-    val maybeFilename    = objectMetadata.originalFilename
-    val mimeType         = mimeTypeDetector.detect(objectContent.inputStream, maybeFilename)
+      val mimeType         = mimeTypeDetector.detect(objectContent.inputStream, filename)
+      addCheckingTimeMetrics()
+      logZeroLengthFiles(objectMetadata, location, consumingService)
 
-    addCheckingTimeMetrics()
-    logZeroLengthFiles(objectMetadata, location, consumingService)
-
-    val result = for
-      _ <- validateMimeType(mimeType, consumingService, location)
-      _ <- validateFileExtension(mimeType, consumingService, location, maybeFilename)
-    yield
-      metrics.defaultRegistry.counter("validTypeFileUpload").inc()
-      FileAllowed(mimeType, endTimer())
-
-    Future.successful(result)
+      for
+        _ <- validateMimeType(mimeType, consumingService, location)
+        _ <- validateFileExtension(mimeType, consumingService, location, filename)
+      yield
+        metricRegistry.counter("validTypeFileUpload").inc()
+        FileAllowed(mimeType, endTimer())
 
   private def logZeroLengthFiles(
     objectMetadata  : InboundObjectMetadata,
     location        : S3ObjectLocation,
     consumingService: Option[String]
-  )(using
-    ld              : LoggingDetails
   ): Unit =
     if objectMetadata.fileSize == 0 then
-      withLoggingDetails(ld):
-        logger.info(
-          s"File with key=[${location.objectKey}] was uploaded with 0 bytes for consuming service [$consumingService]"
-        )
+      logger.info(
+        s"File with key=[${location.objectKey}] was uploaded with 0 bytes for consuming service [$consumingService]"
+      )
 
   private def validateMimeType(
     mimeType        : MimeType,
     consumingService: Option[String],
     location        : S3ObjectLocation
   )(using
-    ld              : LoggingDetails,
     timer           : Timer
   ): Either[FileTypeError, Unit] =
     val allowedMimeTypes =
@@ -100,11 +86,10 @@ class FileTypeCheckingService @Inject()(
     if allowedMimeTypes.contains(mimeType.value) then
       Right(())
     else
-      withLoggingDetails(ld):
-        logger.warn(
-          s"File with Key=[${location.objectKey}] is not allowed by [$consumingService] - service does not allow MIME type: [${mimeType.value}]"
-        )
-      metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
+      logger.warn(
+        s"File with Key=[${location.objectKey}] is not allowed by [$consumingService] - service does not allow MIME type: [${mimeType.value}]"
+      )
+      metricRegistry.counter("invalidTypeFileUpload").inc()
       Left(FileTypeError.NotAllowedMimeType(mimeType, consumingService, timer()))
 
   private def validateFileExtension(
@@ -113,21 +98,19 @@ class FileTypeCheckingService @Inject()(
     location        : S3ObjectLocation,
     maybeFilename   : Option[String]
   )(using
-    ld   : LoggingDetails,
-    timer: Timer
+    timer           : Timer
   ): Either[FileTypeError, Unit] =
     maybeFilename
       .map: filename =>
         fileNameValidator
           .validate(mimeType, filename)
           .leftMap: extension =>
-            withLoggingDetails(ld):
-              logger.warn(
-                s"File with extension=[$extension] is not allowed for MIME type=[$mimeType]. consumingService=[$consumingService], key=[${location.objectKey}]"
-              )
-            metrics.defaultRegistry.counter("invalidTypeFileUpload").inc()
+            logger.warn(
+              s"File with extension=[$extension] is not allowed for MIME type=[$mimeType]. consumingService=[$consumingService], key=[${location.objectKey}]"
+            )
+            metricRegistry.counter("invalidTypeFileUpload").inc()
             FileTypeError.NotAllowedFileExtension(mimeType, extension, consumingService, timer())
       .getOrElse(Right(()))
 
   private def addCheckingTimeMetrics()(using timer: Timer): Unit =
-    metrics.defaultRegistry.timer("fileTypeCheckingTime").update(timer().difference, TimeUnit.MILLISECONDS)
+    metricRegistry.timer("fileTypeCheckingTime").update(timer().difference, TimeUnit.MILLISECONDS)

@@ -22,8 +22,6 @@ import play.api.libs.json._
 import play.api.libs.json.Reads._
 import uk.gov.hmrc.upscanverify.model.{FileUploadEvent, Message, S3ObjectLocation}
 import uk.gov.hmrc.upscanverify.service._
-import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
-import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
 
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
@@ -79,7 +77,7 @@ class S3EventParser @Inject() ()(using ExecutionContext) extends MessageParser w
 
   private def asFuture[T](input: JsResult[T]): Future[T] =
     input.fold(
-      errors => Future.failed(Exception(s"Cannot parse the message: [${errors.toString()}].")),
+      errors => Future.failed(Exception(s"Cannot parse the message: [$errors].")),
       result => Future.successful(result)
     )
 
@@ -88,14 +86,13 @@ class S3EventParser @Inject() ()(using ExecutionContext) extends MessageParser w
   private def interpretS3EventMessage(result: S3EventNotification): Future[FileUploadEvent] =
     result.records match
       case Seq(S3EventNotificationRecord(_, "aws:s3", _, _, ObjectCreatedEventPattern(), requestParameters, s3Details)) =>
-        val event = FileUploadEvent(
-          S3ObjectLocation(s3Details.bucketName, s3Details.objectKey, s3Details.versionId),
-          requestParameters.sourceIPAddress)
-
-        withLoggingDetails(LoggingDetails.fromMessageContext(MessageContext(event.location.objectKey))):
-          logger.info(s"Created FileUploadEvent for Key=[${event.location.objectKey}].")
+        val event =
+          FileUploadEvent(
+            S3ObjectLocation(s3Details.bucketName, s3Details.objectKey, s3Details.versionId),
+            requestParameters.sourceIPAddress
+          )
 
         Future.successful(event)
 
       case _ =>
-        Future.failed(Exception(s"Unexpected records in event: [${result.records.toString}]."))
+        Future.failed(Exception(s"Unexpected records in event: [${result.records}]."))

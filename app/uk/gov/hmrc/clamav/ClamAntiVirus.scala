@@ -17,26 +17,19 @@
 package uk.gov.hmrc.clamav
 
 import uk.gov.hmrc.clamav.model._
-import uk.gov.hmrc.http.logging.LoggingDetails
 
 import java.io.{ByteArrayInputStream, InputStream}
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 trait ClamAntiVirus:
   def sendAndCheck(
     objectKey  : String,
     inputStream: InputStream,
     length     : Int
-  )(using
-    LoggingDetails,
-    ExecutionContext
   ): Future[ScanningResult]
 
   def sendAndCheck(
     objectKey: String,
     bytes    : Array[Byte]
-  )(using
-    LoggingDetails,
-    ExecutionContext
   ): Future[ScanningResult] =
     sendAndCheck(objectKey, ByteArrayInputStream(bytes), bytes.length)

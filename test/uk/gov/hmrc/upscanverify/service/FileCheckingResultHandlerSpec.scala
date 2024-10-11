@@ -247,7 +247,7 @@ class FileCheckingResultHandlerSpec
 
       when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]]))
         .thenReturn(Future.unit)
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata]))
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[Long], any[OutboundObjectMetadata]))
         .thenReturn(Future.unit)
       when(fileManager.delete(file))
         .thenReturn(Future.unit)
@@ -274,6 +274,7 @@ class FileCheckingResultHandlerSpec
           eqTo(file),
           locationCaptor.capture(),
           contentCaptor.capture(),
+          any[Long], // TODO eqTo(fileSize)
           eqTo(outboundObjectMetadata)
         )
       IOUtils.toString(contentCaptor.getValue, UTF_8) shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
@@ -333,7 +334,7 @@ class FileCheckingResultHandlerSpec
 
       when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]]))
         .thenReturn(Future.unit)
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata])).
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[Long], any[OutboundObjectMetadata])).
         thenReturn(Future.unit)
       when(fileManager.delete(file))
         .thenReturn(Future.failed(RuntimeException("Expected failure")))
@@ -368,7 +369,7 @@ class FileCheckingResultHandlerSpec
 
       when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]]))
         .thenReturn(Future.unit)
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata]))
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[Long], any[OutboundObjectMetadata]))
         .thenReturn(Future.unit)
       when(fileManager.delete(file))
         .thenReturn(Future.unit)
@@ -399,6 +400,7 @@ class FileCheckingResultHandlerSpec
           eqTo(file),
           locationCaptor.capture(),
           streamCaptor.capture(),
+          any[Long], // TODO eqTo(fileSize)
           eqTo(outboundObjectMetadata)
         )
       IOUtils.toString(streamCaptor.getValue, UTF_8) shouldBe
@@ -425,7 +427,7 @@ class FileCheckingResultHandlerSpec
 
       when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]]))
         .thenReturn(Future.unit)
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata]))
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[Long], any[OutboundObjectMetadata]))
         .thenReturn(Future.unit)
       when(fileManager.delete(file))
         .thenReturn(Future.unit)
@@ -456,6 +458,7 @@ class FileCheckingResultHandlerSpec
           eqTo(file),
           locationCaptor.capture(),
           streamCaptor.capture(),
+          any[Long], // TODO eqTo(fileSize)
           eqTo(outboundObjectMetadata)
         )
       IOUtils.toString(streamCaptor.getValue, UTF_8) shouldBe
@@ -479,7 +482,7 @@ class FileCheckingResultHandlerSpec
       val handler = FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
 
       When("copying the file to outbound bucket succeeds")
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[OutboundObjectMetadata]))
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[Long], any[OutboundObjectMetadata]))
         .thenReturn(Future.unit)
 
       And("a file manager that fails to delete correctly")

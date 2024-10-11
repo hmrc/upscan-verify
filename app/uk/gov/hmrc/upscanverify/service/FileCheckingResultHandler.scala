@@ -107,21 +107,23 @@ class FileCheckingResultHandler @Inject()(
     ExecutionContext
   ): Future[Unit] =
     for
-      _ <- rejectionNotifier.notifyRejection(
-             fileProperties      = details.location,
-             checksum            = checksum,
-             fileSize            = details.metadata.fileSize,
-             fileUploadDatetime  = details.metadata.uploadedTimestamp,
-             errorMessage        = errorMessage,
-             serviceName         = serviceName
-           )
-      _ <- fileManager.writeObject(
-             sourceLocation = details.location,
-             targetLocation = S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None),
-             content        = ByteArrayInputStream(Json.toJson(errorMessage).toString.getBytes),
-             metadata       = OutboundObjectMetadata.invalid(details, metadata)
-           )
-      _ <- fileManager.delete(details.location)
+      _            <- rejectionNotifier.notifyRejection(
+                        fileProperties      = details.location,
+                        checksum            = checksum,
+                        fileSize            = details.metadata.fileSize,
+                        fileUploadDatetime  = details.metadata.uploadedTimestamp,
+                        errorMessage        = errorMessage,
+                        serviceName         = serviceName
+                      )
+      contentBytes =  Json.toJson(errorMessage).toString.getBytes
+      _            <- fileManager.writeObject(
+                        sourceLocation = details.location,
+                        targetLocation = S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None),
+                        content        = ByteArrayInputStream(contentBytes),
+                        contentLength  = contentBytes.length,
+                        metadata       = OutboundObjectMetadata.invalid(details, metadata)
+                      )
+      _            <- fileManager.delete(details.location)
     yield ()
 
   def metadata(

@@ -45,7 +45,7 @@ class FileTypeCheckingServiceSpec
       val allowedMimeTypes = List("application/pdf")
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
-      val content  = ObjectContent(null, 1200)
+      val content  = null
       val filename = "some-file"
       val metadata = InboundObjectMetadata(Map("consuming-service" -> serviceName, "original-filename" -> filename), Instant.now(), 0)
       val mimeType = MimeType("application/pdf")
@@ -85,7 +85,7 @@ class FileTypeCheckingServiceSpec
       val allowedMimeTypes = List("application/pdf")
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
-      val content = ObjectContent(null, 1200)
+      val content  = null
       val metadata = InboundObjectMetadata(Map("consuming-service" -> "valid-test-service", "original-filename" -> "some-file"), Instant.now(), 0)
 
       val fileMimeType = MimeType("image/jpeg")
@@ -125,7 +125,7 @@ class FileTypeCheckingServiceSpec
       val allowedMimeTypes = List("application/pdf")
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
-      val content  = ObjectContent(null, 1200)
+      val content  = null
       val filename = "file.foo"
       val metadata = InboundObjectMetadata(Map("consuming-service" -> "valid-test-service", "original-filename" -> filename), Instant.now(), 0)
       val mimeType = MimeType("application/pdf")
@@ -167,7 +167,7 @@ class FileTypeCheckingServiceSpec
       val defaultAllowedMimeTypes = List("application/pdf")
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
-      val content  = ObjectContent(null, 1200)
+      val content  = null
       val filename = "some-file"
       val metadata = InboundObjectMetadata(Map("consuming-service" -> serviceName, "original-filename" -> filename), Instant.now(), 0)
 
@@ -208,7 +208,7 @@ class FileTypeCheckingServiceSpec
       val defaultAllowedMimeTypes = List("application/pdf")
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
-      val content  = ObjectContent(null, 1200)
+      val content  = null
       val metadata = InboundObjectMetadata(Map("consuming-service" -> serviceName), Instant.now(), 0)
 
       val fileMimeType = MimeType("application/pdf")
@@ -248,7 +248,7 @@ class FileTypeCheckingServiceSpec
       val allowedMimeTypes = List("application/pdf")
 
       val location = S3ObjectLocation("inbound-bucket", "valid-file", None)
-      val content  = ObjectContent(ByteArrayInputStream(Array.emptyByteArray), 0)
+      val content  = ByteArrayInputStream(Array.emptyByteArray)
       val metadata = InboundObjectMetadata(Map("consuming-service" -> serviceName), Instant.now(), 0)
 
       val fileMimeType = MimeType("application/octet-stream")

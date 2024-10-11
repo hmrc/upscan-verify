@@ -81,11 +81,6 @@ object OutboundObjectMetadata:
         ++ additionalOutboundMetadata
     )
 
-case class ObjectContent(
-  inputStream: InputStream,
-  length     : Long
-)
-
 trait FileManager:
   def copyObject(
     sourceLocation: S3ObjectLocation,
@@ -97,6 +92,7 @@ trait FileManager:
     sourceLocation: S3ObjectLocation,
     targetLocation: S3ObjectLocation,
     content       : InputStream,
+    contentLength : Long,
     metadata      : OutboundObjectMetadata
   ): Future[Unit]
 
@@ -111,5 +107,5 @@ trait FileManager:
   def withObjectContent[T](
     objectLocation: S3ObjectLocation
   )(
-    function: ObjectContent => Future[T]
+    function: InputStream => Future[T]
   ): Future[T]

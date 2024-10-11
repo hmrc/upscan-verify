@@ -19,7 +19,7 @@ package uk.gov.hmrc.upscanverify.connector.aws
 import play.api.Logging
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, DeleteObjectRequest, GetObjectAttributesRequest, GetObjectAttributesResponse, GetObjectRequest, GetObjectTaggingRequest, PutObjectRequest}
+import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, DeleteObjectRequest, GetObjectAttributesRequest, GetObjectAttributesResponse, GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, PutObjectRequest}
 import uk.gov.hmrc.upscanverify.model.S3ObjectLocation
 import uk.gov.hmrc.upscanverify.service.{FileManager, InboundObjectMetadata, OutboundObjectMetadata}
 
@@ -117,14 +117,21 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
     s3Client
       .getObject(request.build(), AsyncResponseTransformer.toBlockingInputStream())
       .asScala
+      .map: x =>
+        val response: GetObjectResponse = x.response
+        logger.info(s"getObject: response.contentLength = ${response.contentLength}")
+        logger.info(s"getObject: response.checksumSHA256 = ${response.checksumSHA256}")
+        logger.info(s"getObject: response.lastModified() = ${response.lastModified}")
+        logger.info(s"getObject: response.metadata = ${response.metadata.asScala}")
+        x
 
   override def getObjectMetadata(objectLocation: S3ObjectLocation): Future[InboundObjectMetadata] =
     for
-      tags       <- getObjectTags(objectLocation)
+      //tags       <- getObjectTags(objectLocation) // not authorized to perform: s3:GetObjectVersionTagging
       attributes <- getObjectAttributes(objectLocation)
     yield
       logger.debug(s"Fetched metadata for Key=[${objectLocation.objectKey}].")
-      logger.info(s"getObjectMetadata: tags = $tags")
+      //logger.info(s"getObjectMetadata: tags = $tags")
       logger.info(s"getObjectMetadata: attributes = $attributes")
       logger.info(s"getObjectMetadata: attributes.lastModified = ${attributes.lastModified}")
       logger.info(s"getObjectMetadata: attributes.objectSize = ${attributes.objectSize}")
@@ -136,7 +143,7 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         logger.info(s"getObjectMetadata: part.checksumSHA256 = ${part.checksumSHA256}")
         logger.info(s"getObjectMetadata: part.size = ${part.size}")
       InboundObjectMetadata(
-        tags, // TODO was metadata.getUserMetadata.asScala.toMap, help? Should we use s3Client.getObjectTagging?
+        Map.empty, // TODO was metadata.getUserMetadata.asScala.toMap, help? Should we use s3Client.getObjectTagging?
         attributes.lastModified,
         attributes.objectSize // TODO same as getContentLength or need to check the parts?
       )

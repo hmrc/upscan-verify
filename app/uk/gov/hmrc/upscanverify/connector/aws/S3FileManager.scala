@@ -19,7 +19,7 @@ package uk.gov.hmrc.upscanverify.connector.aws
 import play.api.Logging
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, DeleteObjectRequest, GetObjectAttributesRequest, GetObjectAttributesResponse, GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, PutObjectRequest}
+import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, DeleteObjectRequest, GetObjectAttributesRequest, GetObjectAttributesResponse, GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, HeadObjectRequest, PutObjectRequest}
 import uk.gov.hmrc.upscanverify.model.S3ObjectLocation
 import uk.gov.hmrc.upscanverify.service.{FileManager, InboundObjectMetadata, OutboundObjectMetadata}
 
@@ -126,9 +126,55 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         x
 
   override def getObjectMetadata(objectLocation: S3ObjectLocation): Future[InboundObjectMetadata] =
-    for
+    // ideally we'd only request the content once, and get the metadata at the same time
+    val request =
+      HeadObjectRequest
+        .builder()
+        .bucket(objectLocation.bucket)
+        .key(objectLocation.objectKey)
+    objectLocation.objectVersion.foreach(request.versionId  )
+
+    s3Client
+      .headObject(request.build())
+      .asScala
+      .map: response =>
+        logger.info(s"getObject: response.contentLength = ${response.contentLength}")
+        logger.info(s"getObject: response.checksumSHA256 = ${response.checksumSHA256}")
+        logger.info(s"getObject: response.lastModified() = ${response.lastModified}")
+        logger.info(s"getObject: response.metadata = ${response.metadata.asScala}")
+        InboundObjectMetadata(
+          response.metadata.asScala.toMap, // TODO was metadata.getUserMetadata.asScala.toMap, help? Should we use s3Client.getObjectTagging?
+          response.lastModified,
+          response.contentLength
+        )
+    /*val request =
+      GetObjectRequest
+        .builder()
+        .bucket(objectLocation.bucket)
+        .key(objectLocation.objectKey)
+    objectLocation.objectVersion.foreach(request.versionId)
+
+    // Don't seem to have permissions to call getObjectAttributes (or getObjectTags)
+    // desired metadata is available on getObject - how to get this without the content?
+    s3Client
+      .getObject(request.build(), AsyncResponseTransformer.toBlockingInputStream())
+      .asScala
+      .map: x =>
+        val response: GetObjectResponse = x.response
+        logger.info(s"getObject: response.contentLength = ${response.contentLength}")
+        logger.info(s"getObject: response.checksumSHA256 = ${response.checksumSHA256}")
+        logger.info(s"getObject: response.lastModified() = ${response.lastModified}")
+        logger.info(s"getObject: response.metadata = ${response.metadata.asScala}")
+        x.close()
+        InboundObjectMetadata(
+          response.metadata.asScala.toMap, // TODO was metadata.getUserMetadata.asScala.toMap, help? Should we use s3Client.getObjectTagging?
+          response.lastModified,
+          response.contentLength
+        )*/
+
+/*    for
       //tags       <- getObjectTags(objectLocation) // not authorized to perform: s3:GetObjectVersionTagging
-      attributes <- getObjectAttributes(objectLocation)
+      attributes <- getObjectAttributes(objectLocation) // not authorized to perform: s3:GetObjectVersionAttributes
     yield
       logger.debug(s"Fetched metadata for Key=[${objectLocation.objectKey}].")
       //logger.info(s"getObjectMetadata: tags = $tags")
@@ -146,7 +192,7 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         Map.empty, // TODO was metadata.getUserMetadata.asScala.toMap, help? Should we use s3Client.getObjectTagging?
         attributes.lastModified,
         attributes.objectSize // TODO same as getContentLength or need to check the parts?
-      )
+      )*/
 
   private def getObjectAttributes(objectLocation: S3ObjectLocation): Future[GetObjectAttributesResponse] =
     val request =

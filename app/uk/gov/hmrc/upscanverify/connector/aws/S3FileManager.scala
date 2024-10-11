@@ -19,7 +19,8 @@ package uk.gov.hmrc.upscanverify.connector.aws
 import play.api.Logging
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, DeleteObjectRequest, GetObjectAttributesRequest, GetObjectAttributesResponse, GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, HeadObjectRequest, PutObjectRequest}
+import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, DeleteObjectRequest, GetObjectRequest, GetObjectResponse, HeadObjectRequest, PutObjectRequest}
+import uk.gov.hmrc.play.http.logging.Mdc
 import uk.gov.hmrc.upscanverify.model.S3ObjectLocation
 import uk.gov.hmrc.upscanverify.service.{FileManager, InboundObjectMetadata, OutboundObjectMetadata}
 
@@ -47,9 +48,16 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .metadata(metadata.items.asJava)
     sourceLocation.objectVersion.foreach(request.sourceVersionId)
 
-    s3Client
-      .copyObject(request.build())
-      .asScala
+    val r = request.build()
+
+    logger.debug:
+      s"Copying Key=[${sourceLocation.objectKey}] with metadata: ${metadata.items}, ${r.metadataDirectiveAsString}"
+
+    Mdc
+      .preservingMdc:
+        s3Client
+          .copyObject(r)
+          .asScala
       .map: _ =>
         logger.debug:
           s"Copied object with Key=[${sourceLocation.objectKey}] from [$sourceLocation] to [$targetLocation]."
@@ -72,12 +80,14 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
     // TODO
     import java.util.concurrent.{ExecutorService, Executors}
     val e: ExecutorService = Executors.newFixedThreadPool(2) // possible create one from ExecutionContext? Move config to application.conf. Shutdown when finished
-    s3Client
-      .putObject(
-        request.build(),
-        AsyncRequestBody.fromInputStream(content, contentLength, e)
-      )
-      .asScala
+    Mdc
+      .preservingMdc:
+        s3Client
+          .putObject(
+            request.build(),
+            AsyncRequestBody.fromInputStream(content, contentLength, e)
+          )
+          .asScala
       .map: _ =>
         logger.debug(s"Wrote object with Key=[${sourceLocation.objectKey}] to location [$targetLocation].")
 
@@ -89,9 +99,11 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .key(objectLocation.objectKey)
     objectLocation.objectVersion.foreach(request.versionId)
 
-    s3Client
-      .deleteObject(request.build())
-      .asScala
+    Mdc
+      .preservingMdc:
+        s3Client
+          .deleteObject(request.build())
+          .asScala
       .map: _ =>
         logger.debug(s"Deleted object with Key=[${objectLocation.objectKey}] from [$objectLocation].")
 
@@ -114,9 +126,11 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .key(objectLocation.objectKey)
     objectLocation.objectVersion.foreach(request.versionId)
 
-    s3Client
-      .getObject(request.build(), AsyncResponseTransformer.toBlockingInputStream())
-      .asScala
+    Mdc
+      .preservingMdc:
+        s3Client
+          .getObject(request.build(), AsyncResponseTransformer.toBlockingInputStream())
+          .asScala
       .map: x =>
         val response: GetObjectResponse = x.response
         logger.info(s"getObject: response.contentLength = ${response.contentLength}")
@@ -134,88 +148,14 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .key(objectLocation.objectKey)
     objectLocation.objectVersion.foreach(request.versionId  )
 
-    s3Client
-      .headObject(request.build())
-      .asScala
+    Mdc
+      .preservingMdc:
+        s3Client
+          .headObject(request.build())
+          .asScala
       .map: response =>
-        logger.info(s"getObject: response.contentLength = ${response.contentLength}")
-        logger.info(s"getObject: response.checksumSHA256 = ${response.checksumSHA256}")
-        logger.info(s"getObject: response.lastModified() = ${response.lastModified}")
-        logger.info(s"getObject: response.metadata = ${response.metadata.asScala}")
         InboundObjectMetadata(
-          response.metadata.asScala.toMap, // TODO was metadata.getUserMetadata.asScala.toMap, help? Should we use s3Client.getObjectTagging?
+          response.metadata.asScala.toMap,
           response.lastModified,
           response.contentLength
         )
-    /*val request =
-      GetObjectRequest
-        .builder()
-        .bucket(objectLocation.bucket)
-        .key(objectLocation.objectKey)
-    objectLocation.objectVersion.foreach(request.versionId)
-
-    // Don't seem to have permissions to call getObjectAttributes (or getObjectTags)
-    // desired metadata is available on getObject - how to get this without the content?
-    s3Client
-      .getObject(request.build(), AsyncResponseTransformer.toBlockingInputStream())
-      .asScala
-      .map: x =>
-        val response: GetObjectResponse = x.response
-        logger.info(s"getObject: response.contentLength = ${response.contentLength}")
-        logger.info(s"getObject: response.checksumSHA256 = ${response.checksumSHA256}")
-        logger.info(s"getObject: response.lastModified() = ${response.lastModified}")
-        logger.info(s"getObject: response.metadata = ${response.metadata.asScala}")
-        x.close()
-        InboundObjectMetadata(
-          response.metadata.asScala.toMap, // TODO was metadata.getUserMetadata.asScala.toMap, help? Should we use s3Client.getObjectTagging?
-          response.lastModified,
-          response.contentLength
-        )*/
-
-/*    for
-      //tags       <- getObjectTags(objectLocation) // not authorized to perform: s3:GetObjectVersionTagging
-      attributes <- getObjectAttributes(objectLocation) // not authorized to perform: s3:GetObjectVersionAttributes
-    yield
-      logger.debug(s"Fetched metadata for Key=[${objectLocation.objectKey}].")
-      //logger.info(s"getObjectMetadata: tags = $tags")
-      logger.info(s"getObjectMetadata: attributes = $attributes")
-      logger.info(s"getObjectMetadata: attributes.lastModified = ${attributes.lastModified}")
-      logger.info(s"getObjectMetadata: attributes.objectSize = ${attributes.objectSize}")
-      logger.info(s"getObjectMetadata: attributes.checksum = ${attributes.checksum}")
-      logger.info(s"getObjectMetadata: attributes.objectParts.hasParts = ${attributes.objectParts.hasParts}")
-      logger.info(s"getObjectMetadata: attributes.objectParts.totalPartsCount = ${attributes.objectParts.totalPartsCount}")
-      attributes.objectParts.parts.asScala.foreach: part =>
-        logger.info(s"getObjectMetadata: part.partNumber = ${part.partNumber}")
-        logger.info(s"getObjectMetadata: part.checksumSHA256 = ${part.checksumSHA256}")
-        logger.info(s"getObjectMetadata: part.size = ${part.size}")
-      InboundObjectMetadata(
-        Map.empty, // TODO was metadata.getUserMetadata.asScala.toMap, help? Should we use s3Client.getObjectTagging?
-        attributes.lastModified,
-        attributes.objectSize // TODO same as getContentLength or need to check the parts?
-      )*/
-
-  private def getObjectAttributes(objectLocation: S3ObjectLocation): Future[GetObjectAttributesResponse] =
-    val request =
-      GetObjectAttributesRequest
-        .builder()
-        .bucket(objectLocation.bucket)
-        .key(objectLocation.objectKey)
-    objectLocation.objectVersion.foreach(request.versionId)
-
-    s3Client
-      .getObjectAttributes(request.build())
-      .asScala
-
-  private def getObjectTags(objectLocation: S3ObjectLocation): Future[Map[String, String]] =
-    val request =
-      GetObjectTaggingRequest
-        .builder()
-        .bucket(objectLocation.bucket)
-        .key(objectLocation.objectKey)
-    objectLocation.objectVersion.foreach(request.versionId)
-
-    s3Client
-      .getObjectTagging(request.build())
-      .asScala
-      .map: metadata =>
-        metadata.tagSet.asScala.map(t => t.key -> t.value).toMap

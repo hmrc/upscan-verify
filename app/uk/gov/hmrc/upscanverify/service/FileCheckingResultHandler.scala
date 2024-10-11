@@ -47,7 +47,7 @@ class FileCheckingResultHandler @Inject()(
           objectDetails,
           noVirusFound.checksum,
           fileAllowed.mimeType,
-          metadata = metadata(objectDetails, "x-amz-meta-upscan-verify-outbound-queued", messageReceivedAt, noVirusFound.virusScanTimings, Some(fileAllowed.fileTypeTimings))
+          metadata = metadata(objectDetails, "upscan-verify-outbound-queued", messageReceivedAt, noVirusFound.virusScanTimings, Some(fileAllowed.fileTypeTimings))
         )
 
       case Left(VerifyResult.FileRejected.VirusScanFailure(virusFound)) =>
@@ -56,7 +56,7 @@ class FileCheckingResultHandler @Inject()(
           virusFound.checksum,
           ErrorMessage(FileCheckingError.Quarantine, virusFound.details),
           serviceName         = None,
-          metadata            = metadata(objectDetails, "x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, virusFound.virusScanTimings, fileTypeTimings = None)
+          metadata            = metadata(objectDetails, "upscan-verify-rejected-queued", messageReceivedAt, virusFound.virusScanTimings, fileTypeTimings = None)
         )
 
       case Left(VerifyResult.FileRejected.FileTypeFailure(noVirusFound, fileTypeError)) =>
@@ -72,7 +72,7 @@ class FileCheckingResultHandler @Inject()(
           noVirusFound.checksum,
           ErrorMessage(FileCheckingError.Rejected, errorMessage),
           serviceName         = fileTypeError.consumingService,
-          metadata            = metadata(objectDetails, "x-amz-meta-upscan-verify-rejected-queued", messageReceivedAt, noVirusFound.virusScanTimings, Some(fileTypeError.fileTypeTimings))
+          metadata            = metadata(objectDetails, "upscan-verify-rejected-queued", messageReceivedAt, noVirusFound.virusScanTimings, Some(fileTypeError.fileTypeTimings))
         )
 
   private def handleValid(
@@ -134,8 +134,8 @@ class FileCheckingResultHandler @Inject()(
     fileTypeTimings  : Option[Timings]
   ): Map[String, String] =
     timingsMetadata(queueMetadataKey, messageReceivedAt, virusScanTimings, fileTypeTimings)
-      ++ details.metadata.items.get("upscan-initiate-received").map("x-amz-meta-upscan-initiate-received" -> _)
-      ++ details.metadata.items.get("upscan-initiate-response").map("x-amz-meta-upscan-initiate-response" -> _)
+      ++ details.metadata.items.get("upscan-initiate-received").map("upscan-initiate-received" -> _)
+      ++ details.metadata.items.get("upscan-initiate-response").map("upscan-initiate-response" -> _)
 
   private def timingsMetadata(
     queueMetadataKey : String,
@@ -146,6 +146,6 @@ class FileCheckingResultHandler @Inject()(
     virusScanTimings.asMetadata("virusscan")
       ++ fileTypeTimings.fold(Map.empty)(_.asMetadata("filetype"))
       ++ Map(
-           "x-amz-meta-upscan-verify-received" -> messageReceivedAt.toString,
+           "upscan-verify-received" -> messageReceivedAt.toString,
            queueMetadataKey                    -> clock.instant().toString
          )

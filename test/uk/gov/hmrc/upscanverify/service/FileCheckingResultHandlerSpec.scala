@@ -58,57 +58,36 @@ class FileCheckingResultHandlerSpec
 
 
   val allExpectedCheckpoints = Map(
-    "x-amz-meta-upscan-verify-received"          -> receivedAt.toString,
-    "x-amz-meta-upscan-verify-virusscan-started" -> virusScanStart.toString,
-    "x-amz-meta-upscan-verify-virusscan-ended"   -> virusScanEnd.toString,
-    "x-amz-meta-upscan-verify-filetype-started"  -> fileTypeStart.toString,
-    "x-amz-meta-upscan-verify-filetype-ended"    -> fileTypeEnd.toString,
-    "x-amz-meta-upscan-verify-outbound-queued"   -> "2018-12-04T17:48:35Z"
+    "upscan-verify-received"          -> receivedAt.toString,
+    "upscan-verify-virusscan-started" -> virusScanStart.toString,
+    "upscan-verify-virusscan-ended"   -> virusScanEnd.toString,
+    "upscan-verify-filetype-started"  -> fileTypeStart.toString,
+    "upscan-verify-filetype-ended"    -> fileTypeEnd.toString,
+    "upscan-verify-outbound-queued"   -> "2018-12-04T17:48:35Z"
   )
 
   val virusFoundExpectedCheckpoints = Map(
-    "x-amz-meta-upscan-verify-received"          -> receivedAt.toString,
-    "x-amz-meta-upscan-verify-virusscan-started" -> virusScanStart.toString,
-    "x-amz-meta-upscan-verify-virusscan-ended"   -> virusScanEnd.toString,
-    "x-amz-meta-upscan-verify-rejected-queued"   -> "2018-12-04T17:48:35Z"
+    "upscan-verify-received"          -> receivedAt.toString,
+    "upscan-verify-virusscan-started" -> virusScanStart.toString,
+    "upscan-verify-virusscan-ended"   -> virusScanEnd.toString,
+    "upscan-verify-rejected-queued"   -> "2018-12-04T17:48:35Z"
   )
 
   val fileTypeRejectedExpectedCheckpoints = Map(
-    "x-amz-meta-upscan-verify-received"          -> receivedAt.toString,
-    "x-amz-meta-upscan-verify-virusscan-started" -> virusScanStart.toString,
-    "x-amz-meta-upscan-verify-virusscan-ended"   -> virusScanEnd.toString,
-    "x-amz-meta-upscan-verify-filetype-started"  -> fileTypeStart.toString,
-    "x-amz-meta-upscan-verify-filetype-ended"    -> fileTypeEnd.toString,
-    "x-amz-meta-upscan-verify-rejected-queued"   -> "2018-12-04T17:48:35Z"
+    "upscan-verify-received"          -> receivedAt.toString,
+    "upscan-verify-virusscan-started" -> virusScanStart.toString,
+    "upscan-verify-virusscan-ended"   -> virusScanEnd.toString,
+    "upscan-verify-filetype-started"  -> fileTypeStart.toString,
+    "upscan-verify-filetype-ended"    -> fileTypeEnd.toString,
+    "upscan-verify-rejected-queued"   -> "2018-12-04T17:48:35Z"
   )
 
   "FileCheckingResultHandler" should:
-    val configuration = new ServiceConfiguration:
-      override def quarantineBucket: String = "quarantine-bucket"
-
-      override def retryInterval: FiniteDuration = ???
-
-      override def inboundQueueUrl: String = ???
-
-      override def accessKeyId: String = ???
-
-      override def secretAccessKey: String = ???
-
-      override def sessionToken: Option[String] = ???
-
-      override def outboundBucket: String = "outbound-bucket"
-
-      override def awsRegion: String = ???
-
-      override def useContainerCredentials: Boolean = ???
-
-      override def processingBatchSize: Int = ???
-
-      override def allowedMimeTypes(serviceName: String): Option[List[String]] = ???
-
-      override def defaultAllowedMimeTypes: List[String] = ???
-
-      override def inboundQueueVisibilityTimeout: Duration = ???
+    val configuration = mock[ServiceConfiguration]
+    when(configuration.quarantineBucket)
+      .thenReturn("quarantine-bucket")
+    when(configuration.outboundBucket)
+      .thenReturn("outbound-bucket")
 
     "Move clean file from inbound bucket to outbound bucket" in:
       val fileManager: FileManager             = mock[FileManager]

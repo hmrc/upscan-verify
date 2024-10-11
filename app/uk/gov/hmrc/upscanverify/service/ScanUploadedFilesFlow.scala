@@ -16,48 +16,33 @@
 
 package uk.gov.hmrc.upscanverify.service
 
-import cats.implicits._
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
-import uk.gov.hmrc.upscanverify.model.Message
-import uk.gov.hmrc.upscanverify.util.MonadicUtils._
-import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
+import com.codahale.metrics.MetricRegistry
+import uk.gov.hmrc.upscanverify.model.{FileUploadEvent, Message}
 
 import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import scala.concurrent.ExecutionContext
+import javax.inject.{Inject, Singleton}
+import scala.concurrent.{ExecutionContext, Future}
 
-case class MessageContext(
-  fileReference: String
-)
-
-case class ExceptionWithContext(
-  e      : Exception,
-  context: Option[MessageContext]
-)
-
+@Singleton
 class ScanUploadedFilesFlow @Inject()(
-  parser               : MessageParser,
   fileManager          : FileManager,
   fileCheckingService  : FileCheckingService,
   scanningResultHandler: FileCheckingResultHandler,
-  metrics              : Metrics,
+  metricRegistry       : MetricRegistry,
   clock                : Clock
 )(using
   ExecutionContext
 ) extends MessageProcessor:
 
-  def processMessage(message: Message): FutureEitherWithContext[MessageContext] =
+  def processMessage(fileUploadEvent: FileUploadEvent, message: Message): Future[Unit] =
     for
-      parsedMessage        <- withoutContext(parser.parse(message))
-      context              =  MessageContext(parsedMessage.location.objectKey)
-      ld                   =  LoggingDetails.fromMessageContext(context)
-      metadata             <- withContext(fileManager.getObjectMetadata(parsedMessage.location)(using ld), context)
-      inboundObjectDetails =  InboundObjectDetails(metadata, parsedMessage.clientIp, parsedMessage.location)
-      scanningResult       <- withContext(fileCheckingService.check(parsedMessage.location, metadata)(using ld), context)
-      _                    <- withContext(scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult, message.receivedAt)(using ld), context)
+      metadata             <- fileManager.getObjectMetadata(fileUploadEvent.location)
+      inboundObjectDetails =  InboundObjectDetails(metadata, fileUploadEvent.clientIp, fileUploadEvent.location)
+      scanningResult       <- fileCheckingService.check(fileUploadEvent.location, metadata)
+      _                    <- scanningResultHandler.handleCheckingResult(inboundObjectDetails, scanningResult, message.receivedAt)
       _                    =  addMetrics(metadata.uploadedTimestamp, message)
-    yield context
+    yield ()
 
   private def addMetrics(uploadedTimestamp: Instant, message: Message): Unit =
     val endTime = clock.instant()
@@ -69,16 +54,16 @@ class ScanUploadedFilesFlow @Inject()(
 
   private def addUploadToStartProcessMetrics(uploadedTimestamp: Instant, startTime: Instant): Unit =
     val interval = startTime.toEpochMilli - uploadedTimestamp.toEpochMilli
-    metrics.defaultRegistry.timer("uploadToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
+    metricRegistry.timer("uploadToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
 
   private def addQueueSentToStartProcessMetrics(queueTimestamp: Instant, startTime: Instant): Unit =
     val interval = startTime.toEpochMilli - queueTimestamp.toEpochMilli
-    metrics.defaultRegistry.timer("queueSentToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
+    metricRegistry.timer("queueSentToStartProcessing").update(interval, TimeUnit.MILLISECONDS)
 
   private def addUploadToEndScanMetrics(uploadedTimestamp: Instant, endTime: Instant): Unit =
     val interval = endTime.toEpochMilli - uploadedTimestamp.toEpochMilli
-    metrics.defaultRegistry.timer("uploadToScanComplete").update(interval, TimeUnit.MILLISECONDS)
+    metricRegistry.timer("uploadToScanComplete").update(interval, TimeUnit.MILLISECONDS)
 
   private def addInternalProcessMetrics(startTime: Instant, endTime: Instant): Unit =
     val interval = endTime.toEpochMilli - startTime.toEpochMilli
-    metrics.defaultRegistry.timer("upscanVerifyProcessing").update(interval, TimeUnit.MILLISECONDS)
+    metricRegistry.timer("upscanVerifyProcessing").update(interval, TimeUnit.MILLISECONDS)

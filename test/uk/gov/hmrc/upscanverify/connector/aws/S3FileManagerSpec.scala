@@ -25,11 +25,9 @@ import org.mockito.ArgumentMatchers.{any, eq => eqTo}
 import org.mockito.Mockito.{verify, verifyNoMoreInteractions, when, doThrow}
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.{Assertions, GivenWhenThen}
-import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.upscanverify.model.S3ObjectLocation
 import uk.gov.hmrc.upscanverify.service._
 import uk.gov.hmrc.upscanverify.test.UnitSpec
-import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
 
 import java.io.{ByteArrayInputStream, InputStream}
 import java.nio.charset.StandardCharsets.UTF_8
@@ -48,8 +46,6 @@ class S3FileManagerSpec
 
   private val awsLastModified      = GregorianCalendar(2018, Calendar.JANUARY, 27).getTime
   private val metadataLastModified = awsLastModified.toInstant
-
-  given HeaderCarrier = LoggingDetails.fromMessageContext(MessageContext("TEST"))
 
   "S3FileManager" should:
     "allow to copy file from inbound bucket to outbound bucket" in:
@@ -146,7 +142,8 @@ class S3FileManagerSpec
       fileMetadata.setUserMetadata(userMetadata)
       fileMetadata.setLastModified(awsLastModified)
 
-      when(s3client.getObjectMetadata(any[GetObjectMetadataRequest])).thenReturn(fileMetadata)
+      when(s3client.getObjectMetadata(any[GetObjectMetadataRequest]))
+        .thenReturn(fileMetadata)
 
       When("fetching objects metadata")
       val metadata =
@@ -196,7 +193,8 @@ class S3FileManagerSpec
       s3Object.setObjectMetadata(fileMetadata)
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      when(s3client.getObject(any[GetObjectRequest])).thenReturn(s3Object)
+      when(s3client.getObject(any[GetObjectRequest]))
+        .thenReturn(s3Object)
 
       Given("a valid file location")
       val fileManager = S3FileManager(s3client)
@@ -240,7 +238,8 @@ class S3FileManagerSpec
       s3Object.setObjectMetadata(fileMetadata)
 
       val s3client: AmazonS3 = mock[AmazonS3]
-      when(s3client.getObject(any[GetObjectRequest])).thenReturn(s3Object)
+      when(s3client.getObject(any[GetObjectRequest]))
+        .thenReturn(s3Object)
 
       Given("a valid file location")
       val fileManager = S3FileManager(s3client)

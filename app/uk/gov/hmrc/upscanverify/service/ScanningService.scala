@@ -19,10 +19,8 @@ package uk.gov.hmrc.upscanverify.service
 import play.api.Logging
 import uk.gov.hmrc.clamav.ClamAntiVirusFactory
 import uk.gov.hmrc.clamav.model.ScanningResult
-import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
+import com.codahale.metrics.MetricRegistry
 import uk.gov.hmrc.upscanverify.model._
-import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
 
 import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
@@ -30,24 +28,17 @@ import javax.inject.Inject
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
-case class NoVirusFound(
-  checksum        : String,
-  virusScanTimings: Timings
-)
-
 trait ScanningService:
   def scan(
     location      : S3ObjectLocation,
     objectContent : ObjectContent,
     objectMetadata: InboundObjectMetadata
-  )(using
-    LoggingDetails
-  ): Future[Either[FileInfected, NoVirusFound]]
+  ): Future[VirusScanResult]
 
 class ClamAvScanningService @Inject()(
   clamClientFactory                       : ClamAntiVirusFactory,
   messageDigestComputingInputStreamFactory: ChecksumComputingInputStreamFactory,
-  metrics                                 : Metrics,
+  metricRegistry                          : MetricRegistry,
   clock                                   : Clock
 )(using
   ExecutionContext
@@ -58,9 +49,7 @@ class ClamAvScanningService @Inject()(
     location   : S3ObjectLocation,
     fileContent: ObjectContent,
     metadata   : InboundObjectMetadata
-  )(using
-    ld         : LoggingDetails
-  ): Future[Either[FileInfected, NoVirusFound]] =
+  ): Future[VirusScanResult] =
 
     val startTime       = clock.instant()
     val antivirusClient = clamClientFactory.getClient()
@@ -72,18 +61,17 @@ class ClamAvScanningService @Inject()(
                       .sendAndCheck(location.objectKey, inputStream, fileContent.length.toInt)
                       .map:
                         case ScanningResult.Clean =>
-                          metrics.defaultRegistry.counter("cleanFileUpload").inc()
-                          Right(NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
+                          metricRegistry.counter("cleanFileUpload").inc()
+                          Right(VirusScanResult.NoVirusFound(inputStream.getChecksum(), Timings(startTime, clock.instant())))
                         case ScanningResult.Infected(message) =>
-                          withLoggingDetails(ld):
-                            logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
-                          metrics.defaultRegistry.counter("quarantineFileUpload").inc()
-                          Left(FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant())))
+                          logger.warn(s"File with Key=[${location.objectKey}] is infected: [$message].")
+                          metricRegistry.counter("quarantineFileUpload").inc()
+                          Left(VirusScanResult.FileInfected(message, inputStream.getChecksum(), Timings(startTime, clock.instant())))
     yield
       addScanningTimeMetrics(startTime, clock.instant())
       scanResult
 
   private def addScanningTimeMetrics(startTime: Instant, endTime: Instant): Unit =
-    metrics.defaultRegistry
+    metricRegistry
       .timer("scanningTime")
       .update(endTime.toEpochMilli - startTime.toEpochMilli, TimeUnit.MILLISECONDS)

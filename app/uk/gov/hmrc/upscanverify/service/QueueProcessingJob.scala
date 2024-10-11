@@ -16,55 +16,58 @@
 
 package uk.gov.hmrc.upscanverify.service
 
-import cats.implicits._
+import com.amazonaws.services.sqs.model.Message
+import com.codahale.metrics.MetricRegistry
 import play.api.Logging
-import uk.gov.hmrc.play.bootstrap.metrics.Metrics
-import uk.gov.hmrc.upscanverify.model.Message
-import uk.gov.hmrc.upscanverify.util.MonadicUtils
-import uk.gov.hmrc.upscanverify.util.logging.LoggingDetails
-import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
+import uk.gov.hmrc.upscanverify.connector.aws.PollingJob
+import uk.gov.hmrc.upscanverify.util.logging.LoggingUtils
 
+import java.time.{Clock, Instant}
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters._
 
 class QueueProcessingJob @Inject()(
-  consumer        : QueueConsumer,
   messageProcessor: MessageProcessor,
-  metrics         : Metrics
+  messageParser   : MessageParser,
+  metricRegistry  : MetricRegistry,
+  clock           : Clock
 )(using
   ExecutionContext
 ) extends PollingJob
      with Logging:
 
-  private val queueThroughput =
-    metrics.defaultRegistry.meter("verifyThroughput")
+  private def toUpscanMessage(sqsMessage: Message): uk.gov.hmrc.upscanverify.model.Message =
+    val receivedAt = clock.instant()
 
-  def run(): Future[Unit] =
-    val outcomes =
-      for
-        messages        <- consumer.poll()
-        messageOutcomes <- Future.traverse(messages)(processMessage)
-      yield messageOutcomes
+    if logger.isDebugEnabled then
+      logger.debug:
+        s"Received message with id: [${sqsMessage.getMessageId}] and receiptHandle: [${sqsMessage.getReceiptHandle}], message details:\n "
+          + sqsMessage.toString
 
-    outcomes.map(_ => ())
+    val queueTimestamp = sqsMessage.getAttributes.asScala.get("SentTimestamp").map(s => Instant.ofEpochMilli(s.toLong))
 
-  private def processMessage(message: Message): Future[Unit] =
+    if queueTimestamp.isEmpty then
+      logger.warn(s"SentTimestamp is missing from the message attribute. Message id = ${sqsMessage.getMessageId}")
 
-    val outcome =
-      for
-        context <- messageProcessor.processMessage(message)
-        _       <- MonadicUtils.withContext(consumer.confirm(message), context)
-        _       =  queueThroughput.mark()
-      yield ()
+    uk.gov.hmrc.upscanverify.model.Message(
+      sqsMessage.getMessageId,
+      sqsMessage.getBody,
+      sqsMessage.getReceiptHandle,
+      receivedAt,
+      queueTimestamp
+    )
 
-    outcome.value.map:
-      case Right(_) =>
-        ()
-      case Left(ExceptionWithContext(exception, Some(context))) =>
-        withLoggingDetails(LoggingDetails.fromMessageContext(context)):
-          logger.error(
-            s"Failed to process message '${message.id}' for Key=[${context.fileReference}], cause ${exception.getMessage}",
-            exception
-          )
-      case Left(ExceptionWithContext(exception, None)) =>
-        logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)
+  override def processMessage(sqsMessage: Message): Future[Unit] =
+    val message = toUpscanMessage(sqsMessage)
+    messageParser.parse(message)
+      .flatMap: parsedMessage =>
+        val fileReference = parsedMessage.location.objectKey
+        LoggingUtils.withMdc(Map("file-reference" -> fileReference)):
+          logger.info(s"Created FileUploadEvent for Key=[$fileReference].")
+          messageProcessor.processMessage(parsedMessage, message)
+            .map: _ =>
+              metricRegistry.meter("verifyThroughput").mark()
+            .recover:
+              case exception =>
+                logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)

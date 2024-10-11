@@ -17,9 +17,7 @@
 package uk.gov.hmrc.upscanverify.service
 
 import play.api.Logging
-import uk.gov.hmrc.http.logging.LoggingDetails
-import uk.gov.hmrc.upscanverify.model.S3ObjectLocation
-import uk.gov.hmrc.upscanverify.util.logging.WithLoggingDetails.withLoggingDetails
+import uk.gov.hmrc.upscanverify.model.{ErrorMessage, FileCheckingError, S3ObjectLocation}
 
 import java.time.Instant
 import scala.concurrent.Future
@@ -31,37 +29,9 @@ trait RejectionNotifier:
     checksum           : String,
     fileSize           : Long,
     fileUploadDatetime : Instant,
-    details            : String,
-    serviceName        : Option[String],
-    customMessagePrefix: String
-  )(using
-    LoggingDetails
+    errorMessage       : ErrorMessage,
+    serviceName        : Option[String]
   ): Future[Unit]
-
-  def notifyFileInfected(
-    fileProperties    : S3ObjectLocation,
-    checksum          : String,
-    fileSize          : Long,
-    fileUploadDatetime: Instant,
-    details           : String,
-    serviceName       : Option[String]
-  )(using
-    LoggingDetails
-  ): Future[Unit] =
-    notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "Virus detected in file.")
-
-  def notifyInvalidFileType(
-    fileProperties    : S3ObjectLocation,
-    checksum          : String,
-    fileSize          : Long,
-    fileUploadDatetime: Instant,
-    details           : String,
-    serviceName       : Option[String]
-  )(using
-    LoggingDetails
-  ): Future[Unit] =
-    notifyRejection(fileProperties, checksum, fileSize, fileUploadDatetime, details, serviceName, "File type is not allowed for this service.")
-
 
 object LoggingRejectionNotifier
   extends RejectionNotifier
@@ -72,22 +42,22 @@ object LoggingRejectionNotifier
     checksum           : String,
     fileSize           : Long,
     fileUploadDatetime : Instant,
-    details            : String,
-    serviceName        : Option[String],
-    customMessagePrefix: String
-  )(using
-    ld: LoggingDetails
+    errorMessage       : ErrorMessage,
+    serviceName        : Option[String]
   ): Future[Unit] =
+    val customMessagePrefix =
+      errorMessage.failureReason match
+        case FileCheckingError.Quarantine => "Virus detected in file."
+        case FileCheckingError.Rejected   => "File type is not allowed for this service."
 
-    withLoggingDetails(ld):
-      logger.warn(
-        s"""$customMessagePrefix${serviceName.fold("")(service => s"\nService name: [$service]")}
-           |Key: [${fileProperties.objectKey}]${fileProperties.objectVersion.fold("")(version => s"\nVersion: [$version]")}
-           |Checksum: [$checksum]
-           |File size: [$fileSize B]
-           |File upload datetime: [$fileUploadDatetime]
-           |Bucket: [${fileProperties.bucket}]
-           |Details: [$details].
-         """.stripMargin
-      )
+    logger.warn(
+      s"""$customMessagePrefix${serviceName.fold("")(service => s"\nService name: [$service]")}
+          |Key: [${fileProperties.objectKey}]${fileProperties.objectVersion.fold("")(version => s"\nVersion: [$version]")}
+          |Checksum: [$checksum]
+          |File size: [$fileSize B]
+          |File upload datetime: [$fileUploadDatetime]
+          |Bucket: [${fileProperties.bucket}]
+          |Details: [${errorMessage.message}].
+        """.stripMargin
+    )
     Future.unit

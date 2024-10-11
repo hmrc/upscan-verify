@@ -16,10 +16,10 @@
 
 package uk.gov.hmrc.upscanverify.connector.aws
 
-import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import com.amazonaws.services.sqs.{AmazonSQS, AmazonSQSClientBuilder}
 import play.api.{Configuration, Environment}
 import play.api.inject.{Binding, Module}
+import software.amazon.awssdk.services.s3.S3AsyncClient
 
 import javax.inject.{Inject, Provider}
 
@@ -28,13 +28,13 @@ class AWSClientModule extends Module:
   override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
     Seq(
       bind[AmazonSQS].toProvider[SqsClientProvider],
-      bind[AmazonS3 ].toProvider[S3ClientProvider]
+      bind[S3AsyncClient].toProvider[S3ClientProvider]
     )
 
 class SqsClientProvider @Inject()() extends Provider[AmazonSQS]:
   override def get(): AmazonSQS =
     AmazonSQSClientBuilder.defaultClient()
 
-class S3ClientProvider @Inject()() extends Provider[AmazonS3]:
-  override def get(): AmazonS3 =
-    AmazonS3ClientBuilder.defaultClient()
+class S3ClientProvider @Inject()() extends Provider[S3AsyncClient]:
+  override def get(): S3AsyncClient =
+    S3AsyncClient.builder().build()

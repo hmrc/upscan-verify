@@ -22,6 +22,7 @@ import uk.gov.hmrc.clamav.model.ScanningResult
 import com.codahale.metrics.MetricRegistry
 import uk.gov.hmrc.upscanverify.model._
 
+import java.io.InputStream
 import java.time.{Clock, Instant}
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -31,7 +32,7 @@ import scala.concurrent.Future
 trait ScanningService:
   def scan(
     location      : S3ObjectLocation,
-    objectContent : ObjectContent,
+    content       : InputStream,
     objectMetadata: InboundObjectMetadata
   ): Future[VirusScanResult]
 
@@ -47,18 +48,18 @@ class ClamAvScanningService @Inject()(
 
   override def scan(
     location   : S3ObjectLocation,
-    fileContent: ObjectContent,
+    content    : InputStream,
     metadata   : InboundObjectMetadata
   ): Future[VirusScanResult] =
 
     val startTime       = clock.instant()
     val antivirusClient = clamClientFactory.getClient()
 
-    val inputStream = messageDigestComputingInputStreamFactory.create(fileContent.inputStream)
+    val inputStream = messageDigestComputingInputStreamFactory.create(content)
 
     for
       scanResult <- antivirusClient
-                      .sendAndCheck(location.objectKey, inputStream, fileContent.length.toInt)
+                      .sendAndCheck(location.objectKey, inputStream, metadata.fileSize.toInt)
                       .map:
                         case ScanningResult.Clean =>
                           metricRegistry.counter("cleanFileUpload").inc()

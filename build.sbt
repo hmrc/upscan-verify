@@ -4,8 +4,9 @@ import sbt.Keys.*
 import sbt.*
 import uk.gov.hmrc.DefaultBuildSettings
 
-ThisBuild / majorVersion := 1
-ThisBuild / scalaVersion := "3.3.4"
+ThisBuild / majorVersion  := 1
+ThisBuild / scalaVersion  := "3.3.4"
+ThisBuild / scalacOptions += "-Wconf:msg=Flag.*repeatedly:s"
 
 lazy val microservice = Project("upscan-verify", file("."))
   .enablePlugins(PlayScala, SbtDistributablesPlugin)
@@ -14,10 +15,7 @@ lazy val microservice = Project("upscan-verify", file("."))
       libraryDependencies ++= AppDependencies(),
       playDefaultPort := 9578,
   )
-  .settings(scalacOptions ++= Seq(
-    "-Wconf:src=routes/.*:s" //silence warnings in generated routes
-  , "-Wconf:msg=Flag.*repeatedly:s"
-  ))
+  .settings(scalacOptions +=  "-Wconf:src=routes/.*:s") // silence warnings in generated routes
   .settings(resolvers += Resolver.jcenterRepo)
   .settings(Test / parallelExecution := false)
   .settings(

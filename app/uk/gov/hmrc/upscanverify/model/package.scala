@@ -46,8 +46,8 @@ case class Timings(
 ):
   def asMetadata(checkpoint: String): Map[String, String] =
     Map(
-      s"x-amz-meta-upscan-verify-$checkpoint-started" -> start.toString,
-      s"x-amz-meta-upscan-verify-$checkpoint-ended"   -> end.toString
+      s"upscan-verify-$checkpoint-started" -> start.toString,
+      s"upscan-verify-$checkpoint-ended"   -> end.toString
     )
 
   lazy val difference: Long =

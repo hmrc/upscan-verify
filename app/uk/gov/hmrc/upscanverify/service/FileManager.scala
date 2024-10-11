@@ -91,8 +91,7 @@ trait FileManager:
   def writeObject(
     sourceLocation: S3ObjectLocation,
     targetLocation: S3ObjectLocation,
-    content       : InputStream,
-    contentLength : Long,
+    content       : String,
     metadata      : OutboundObjectMetadata
   ): Future[Unit]
 

@@ -19,7 +19,7 @@ package uk.gov.hmrc.upscanverify.connector.aws
 import play.api.Logging
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, DeleteObjectRequest, GetObjectRequest, GetObjectResponse, HeadObjectRequest, PutObjectRequest}
+import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, DeleteObjectRequest, GetObjectRequest, HeadObjectRequest, MetadataDirective, PutObjectRequest}
 import uk.gov.hmrc.play.http.logging.Mdc
 import uk.gov.hmrc.upscanverify.model.S3ObjectLocation
 import uk.gov.hmrc.upscanverify.service.{FileManager, InboundObjectMetadata, OutboundObjectMetadata}
@@ -46,29 +46,22 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .destinationBucket(targetLocation.bucket)
         .destinationKey(targetLocation.objectKey)
         .metadata(metadata.items.asJava)
+        .metadataDirective(MetadataDirective.REPLACE)
     sourceLocation.objectVersion.foreach(request.sourceVersionId)
-
-    val r = request.build()
-
-    logger.debug:
-      s"Copying Key=[${sourceLocation.objectKey}] with metadata: ${metadata.items}, ${r.metadataDirectiveAsString}"
 
     Mdc
       .preservingMdc:
         s3Client
-          .copyObject(r)
+          .copyObject(request.build())
           .asScala
       .map: _ =>
         logger.debug:
           s"Copied object with Key=[${sourceLocation.objectKey}] from [$sourceLocation] to [$targetLocation]."
 
-  // TODO writeObject is only ever used for error messages
-  // we don't require to write an inputstream (then avoids contentLength and executorService requirement)
   override def writeObject(
     sourceLocation: S3ObjectLocation,
     targetLocation: S3ObjectLocation,
-    content       : InputStream,
-    contentLength : Long,
+    content       : String,
     metadata      : OutboundObjectMetadata
   ): Future[Unit] =
     val request =
@@ -77,15 +70,12 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .bucket(targetLocation.bucket)
         .key(targetLocation.objectKey)
         .metadata(metadata.items.asJava)
-    // TODO
-    import java.util.concurrent.{ExecutorService, Executors}
-    val e: ExecutorService = Executors.newFixedThreadPool(2) // possible create one from ExecutionContext? Move config to application.conf. Shutdown when finished
     Mdc
       .preservingMdc:
         s3Client
           .putObject(
             request.build(),
-            AsyncRequestBody.fromInputStream(content, contentLength, e)
+            AsyncRequestBody.fromBytes(content.getBytes)
           )
           .asScala
       .map: _ =>
@@ -131,13 +121,13 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         s3Client
           .getObject(request.build(), AsyncResponseTransformer.toBlockingInputStream())
           .asScala
-      .map: x =>
-        val response: GetObjectResponse = x.response
-        logger.info(s"getObject: response.contentLength = ${response.contentLength}")
-        logger.info(s"getObject: response.checksumSHA256 = ${response.checksumSHA256}")
-        logger.info(s"getObject: response.lastModified() = ${response.lastModified}")
-        logger.info(s"getObject: response.metadata = ${response.metadata.asScala}")
-        x
+      .map: in =>
+        //InboundObjectMetadata(
+        //  in.response.metadata.asScala.toMap,
+        //  in.response.lastModified,
+        //  in.response.contentLength
+        //)
+        in
 
   override def getObjectMetadata(objectLocation: S3ObjectLocation): Future[InboundObjectMetadata] =
     // ideally we'd only request the content once, and get the metadata at the same time
@@ -148,6 +138,7 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .key(objectLocation.objectKey)
     objectLocation.objectVersion.foreach(request.versionId  )
 
+    logger.info(s"getObjectMetadata($objectLocation)")
     Mdc
       .preservingMdc:
         s3Client

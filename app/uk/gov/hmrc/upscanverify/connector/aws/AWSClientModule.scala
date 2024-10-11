@@ -28,7 +28,6 @@ class AWSClientModule extends Module:
   override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] =
     Seq(
       bind[AmazonSQS].toProvider[SqsClientProvider],
-      //bind[AmazonS3 ].toProvider[S3ClientProvider]
       bind[S3AsyncClient].toProvider[S3ClientProvider]
     )
 

@@ -21,7 +21,6 @@ import play.api.libs.json.Json
 import uk.gov.hmrc.upscanverify.config.ServiceConfiguration
 import uk.gov.hmrc.upscanverify.model._
 
-import java.io.ByteArrayInputStream
 import java.time.{Clock, Instant}
 import java.util.UUID
 import javax.inject.Inject
@@ -107,23 +106,21 @@ class FileCheckingResultHandler @Inject()(
     ExecutionContext
   ): Future[Unit] =
     for
-      _            <- rejectionNotifier.notifyRejection(
-                        fileProperties      = details.location,
-                        checksum            = checksum,
-                        fileSize            = details.metadata.fileSize,
-                        fileUploadDatetime  = details.metadata.uploadedTimestamp,
-                        errorMessage        = errorMessage,
-                        serviceName         = serviceName
-                      )
-      contentBytes =  Json.toJson(errorMessage).toString.getBytes
-      _            <- fileManager.writeObject(
-                        sourceLocation = details.location,
-                        targetLocation = S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None),
-                        content        = ByteArrayInputStream(contentBytes),
-                        contentLength  = contentBytes.length,
-                        metadata       = OutboundObjectMetadata.invalid(details, metadata)
-                      )
-      _            <- fileManager.delete(details.location)
+      _ <- rejectionNotifier.notifyRejection(
+             fileProperties      = details.location,
+             checksum            = checksum,
+             fileSize            = details.metadata.fileSize,
+             fileUploadDatetime  = details.metadata.uploadedTimestamp,
+             errorMessage        = errorMessage,
+             serviceName         = serviceName
+           )
+      _ <- fileManager.writeObject(
+             sourceLocation = details.location,
+             targetLocation = S3ObjectLocation(configuration.quarantineBucket, UUID.randomUUID().toString, objectVersion = None),
+             content        = Json.toJson(errorMessage).toString,
+             metadata       = OutboundObjectMetadata.invalid(details, metadata)
+           )
+      _ <- fileManager.delete(details.location)
     yield ()
 
   def metadata(

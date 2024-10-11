@@ -19,7 +19,7 @@ package uk.gov.hmrc.upscanverify.connector.aws
 import play.api.Logging
 import software.amazon.awssdk.core.async.{AsyncRequestBody, AsyncResponseTransformer}
 import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, DeleteObjectRequest, GetObjectRequest, GetObjectResponse, HeadObjectRequest, PutObjectRequest}
+import software.amazon.awssdk.services.s3.model.{CopyObjectRequest, DeleteObjectRequest, GetObjectRequest, GetObjectResponse, HeadObjectRequest, MetadataDirective, PutObjectRequest}
 import uk.gov.hmrc.play.http.logging.Mdc
 import uk.gov.hmrc.upscanverify.model.S3ObjectLocation
 import uk.gov.hmrc.upscanverify.service.{FileManager, InboundObjectMetadata, OutboundObjectMetadata}
@@ -46,6 +46,7 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .destinationBucket(targetLocation.bucket)
         .destinationKey(targetLocation.objectKey)
         .metadata(metadata.items.asJava)
+        .metadataDirective(MetadataDirective.REPLACE)
     sourceLocation.objectVersion.foreach(request.sourceVersionId)
 
     val r = request.build()
@@ -62,13 +63,10 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         logger.debug:
           s"Copied object with Key=[${sourceLocation.objectKey}] from [$sourceLocation] to [$targetLocation]."
 
-  // TODO writeObject is only ever used for error messages
-  // we don't require to write an inputstream (then avoids contentLength and executorService requirement)
   override def writeObject(
     sourceLocation: S3ObjectLocation,
     targetLocation: S3ObjectLocation,
-    content       : InputStream,
-    contentLength : Long,
+    content       : String,
     metadata      : OutboundObjectMetadata
   ): Future[Unit] =
     val request =
@@ -77,15 +75,12 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .bucket(targetLocation.bucket)
         .key(targetLocation.objectKey)
         .metadata(metadata.items.asJava)
-    // TODO
-    import java.util.concurrent.{ExecutorService, Executors}
-    val e: ExecutorService = Executors.newFixedThreadPool(2) // possible create one from ExecutionContext? Move config to application.conf. Shutdown when finished
     Mdc
       .preservingMdc:
         s3Client
           .putObject(
             request.build(),
-            AsyncRequestBody.fromInputStream(content, contentLength, e)
+            AsyncRequestBody.fromBytes(content.getBytes)
           )
           .asScala
       .map: _ =>

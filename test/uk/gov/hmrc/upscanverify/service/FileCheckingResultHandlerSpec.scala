@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.upscanverify.service
 
-import org.apache.commons.io.IOUtils
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.{any, eq => eqTo}
 import org.mockito.Mockito.{when, verify, verifyNoMoreInteractions, verifyNoInteractions}
@@ -26,12 +25,9 @@ import uk.gov.hmrc.upscanverify.config.ServiceConfiguration
 import uk.gov.hmrc.upscanverify.model._
 import uk.gov.hmrc.upscanverify.test.{UnitSpec, WithIncrementingClock}
 
-import java.io.InputStream
-import java.nio.charset.StandardCharsets.UTF_8
 import java.time.Instant
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.concurrent.duration.{Duration, FiniteDuration}
 
 class FileCheckingResultHandlerSpec
   extends UnitSpec
@@ -226,7 +222,7 @@ class FileCheckingResultHandlerSpec
 
       when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]]))
         .thenReturn(Future.unit)
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[Long], any[OutboundObjectMetadata]))
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[String], any[OutboundObjectMetadata]))
         .thenReturn(Future.unit)
       when(fileManager.delete(file))
         .thenReturn(Future.unit)
@@ -247,16 +243,15 @@ class FileCheckingResultHandlerSpec
 
       And("file metadata and error details are stored in the quarantine bucket")
       val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
-      val contentCaptor  = ArgumentCaptor.forClass(classOf[InputStream])
+      val contentCaptor  = ArgumentCaptor.forClass(classOf[String])
       verify(fileManager)
         .writeObject(
           eqTo(file),
           locationCaptor.capture(),
           contentCaptor.capture(),
-          any[Long], // TODO eqTo(fileSize)
           eqTo(outboundObjectMetadata)
         )
-      IOUtils.toString(contentCaptor.getValue, UTF_8) shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
+      contentCaptor.getValue shouldBe """{"failureReason":"QUARANTINE","message":"There is a virus"}"""
 
       locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 
@@ -313,7 +308,7 @@ class FileCheckingResultHandlerSpec
 
       when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]]))
         .thenReturn(Future.unit)
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[Long], any[OutboundObjectMetadata])).
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[String], any[OutboundObjectMetadata])).
         thenReturn(Future.unit)
       when(fileManager.delete(file))
         .thenReturn(Future.failed(RuntimeException("Expected failure")))
@@ -348,7 +343,7 @@ class FileCheckingResultHandlerSpec
 
       when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]]))
         .thenReturn(Future.unit)
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[Long], any[OutboundObjectMetadata]))
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[String], any[OutboundObjectMetadata]))
         .thenReturn(Future.unit)
       when(fileManager.delete(file))
         .thenReturn(Future.unit)
@@ -373,16 +368,15 @@ class FileCheckingResultHandlerSpec
       And("file metadata and error details are stored in the quarantine bucket")
 
       val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
-      val streamCaptor = ArgumentCaptor.forClass(classOf[InputStream])
+      val contentCaptor = ArgumentCaptor.forClass(classOf[String])
       verify(fileManager)
         .writeObject(
           eqTo(file),
           locationCaptor.capture(),
-          streamCaptor.capture(),
-          any[Long], // TODO eqTo(fileSize)
+          contentCaptor.capture(),
           eqTo(outboundObjectMetadata)
         )
-      IOUtils.toString(streamCaptor.getValue, UTF_8) shouldBe
+      contentCaptor.getValue shouldBe
         """{"failureReason":"REJECTED","message":"MIME type [application/pdf] is not allowed for service: [valid-test-service]"}"""
       locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 
@@ -406,7 +400,7 @@ class FileCheckingResultHandlerSpec
 
       when(rejectionNotifier.notifyRejection(any[S3ObjectLocation], any[String], any[Long], any[Instant], any[ErrorMessage], any[Option[String]]))
         .thenReturn(Future.unit)
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[Long], any[OutboundObjectMetadata]))
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[String], any[OutboundObjectMetadata]))
         .thenReturn(Future.unit)
       when(fileManager.delete(file))
         .thenReturn(Future.unit)
@@ -431,16 +425,15 @@ class FileCheckingResultHandlerSpec
       And("file metadata and error details are stored in the quarantine bucket")
 
       val locationCaptor = ArgumentCaptor.forClass(classOf[S3ObjectLocation])
-      val streamCaptor = ArgumentCaptor.forClass(classOf[InputStream])
+      val contentCaptor = ArgumentCaptor.forClass(classOf[String])
       verify(fileManager)
         .writeObject(
           eqTo(file),
           locationCaptor.capture(),
-          streamCaptor.capture(),
-          any[Long], // TODO eqTo(fileSize)
+          contentCaptor.capture(),
           eqTo(outboundObjectMetadata)
         )
-      IOUtils.toString(streamCaptor.getValue, UTF_8) shouldBe
+      contentCaptor.getValue shouldBe
         """{"failureReason":"REJECTED","message":"File extension [foo] is not allowed for mime-type [text/plain], service: [valid-test-service]"}"""
       locationCaptor.getValue.bucket shouldBe configuration.quarantineBucket
 
@@ -461,7 +454,7 @@ class FileCheckingResultHandlerSpec
       val handler = FileCheckingResultHandler(fileManager, rejectionNotifier, configuration, clock)
 
       When("copying the file to outbound bucket succeeds")
-      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[InputStream], any[Long], any[OutboundObjectMetadata]))
+      when(fileManager.writeObject(eqTo(file), any[S3ObjectLocation], any[String], any[OutboundObjectMetadata]))
         .thenReturn(Future.unit)
 
       And("a file manager that fails to delete correctly")

@@ -46,6 +46,8 @@ trait ServiceConfiguration:
 
   def processingBatchSize: Int
 
+  def waitTime: Duration
+
   def allowedMimeTypes(serviceName: String): Option[List[String]]
 
   def defaultAllowedMimeTypes: List[String]
@@ -62,7 +64,7 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
     configuration.get[String]("aws.s3.region")
 
   override def useContainerCredentials: Boolean =
-    configuration.getOptional[Boolean]("aws.useContainerCredentials").getOrElse(true) // TODO move default to application.conf
+    configuration.get[Boolean]("aws.useContainerCredentials")
 
   override def accessKeyId: String =
     configuration.get[String]("aws.accessKeyId")
@@ -85,15 +87,17 @@ class PlayBasedServiceConfiguration @Inject()(configuration: Configuration) exte
   override def processingBatchSize: Int =
     configuration.get[Int]("processingBatchSize")
 
+  override def waitTime: Duration =
+    configuration.get[FiniteDuration]("aws.sqs.waitTime")
+
   override def allowedMimeTypes(serviceName: String): Option[List[String]] =
     consumingServicesConfiguration.serviceConfigurations
       .find(_.serviceName == serviceName)
       .map(_.allowedMimeTypes)
 
   override def defaultAllowedMimeTypes: List[String] =
-    configuration.getOptional[String]("fileTypesFilter.defaultAllowedMimeTypes")
-      .map(_.split(",").toList)
-      .getOrElse(Nil) // TODO move default to application.conf
+    configuration.get[String]("fileTypesFilter.defaultAllowedMimeTypes")
+      .split(",").toList
 
   private case class AllowedMimeTypes(
     serviceName     : String,

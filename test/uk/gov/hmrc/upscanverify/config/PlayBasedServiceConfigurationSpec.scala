@@ -27,6 +27,15 @@ class PlayBasedServiceConfigurationSpec
      with GivenWhenThen:
 
   "PlayBasedServiceConfiguration" should:
+    "parse defaultAllowedMimeTypes" in:
+      val config = parseConfig(
+        """
+          |fileTypesFilter.defaultAllowedMimeTypes = "docx,odt"
+          |""".stripMargin
+      )
+
+      config.defaultAllowedMimeTypes shouldBe List("docx", "odt")
+
     "parse consuming service configuration" in:
       val config = parseConfig(
         """
@@ -44,31 +53,6 @@ class PlayBasedServiceConfigurationSpec
     "parse empty consuming service configuration" in:
       val config = parseConfig("fileTypesFilter.allowedMimeTypes = []")
       config.allowedMimeTypes("anything") shouldBe None
-
-    "parse missing consuming service configuration" in:
-      parseConfig("").allowedMimeTypes("anything") shouldBe None
-
-    /*
-     * This is a change of behaviour introduced during the Play 2.6 upgrade.
-     * Previously we would have thrown the exception:
-     * 'Configuration error[String: 1: Configuration key 'fileTypesFilter.allowedMimeTypes' is set to null but expected LIST]'.
-     * We now interpret 'null' the same as 'empty' or 'missing'.
-     */
-    "parse null consuming service configuration" in:
-      parseConfig("fileTypesFilter.allowedMimeTypes = null").allowedMimeTypes("anything") shouldBe None
-
-    "parse defaultAllowedMimeTypes if specified" in:
-      val config = parseConfig(
-        """
-          |fileTypesFilter.defaultAllowedMimeTypes = "docx,odt"
-          |""".stripMargin
-      )
-
-      config.defaultAllowedMimeTypes shouldBe List("docx", "odt")
-
-    "parse empty defaultAllowedMimeTypes" in:
-      val config = parseConfig("")
-      config.defaultAllowedMimeTypes shouldBe Nil
 
     "throw an error for badly formatted consuming service configuration (upon initialisation of the class)" in:
       val config = Configuration(ConfigFactory.parseString(

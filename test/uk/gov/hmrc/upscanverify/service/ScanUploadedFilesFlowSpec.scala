@@ -16,12 +16,12 @@
 
 package uk.gov.hmrc.upscanverify.service
 
-import com.amazonaws.AmazonServiceException
 import com.codahale.metrics.MetricRegistry
 import org.mockito.ArgumentMatchers.{any, eq => eqTo}
 import org.mockito.Mockito.{verify, verifyNoInteractions, verifyNoMoreInteractions, when}
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
+import software.amazon.awssdk.services.sqs.model.SqsException
 import uk.gov.hmrc.upscanverify.model._
 import uk.gov.hmrc.upscanverify.test.{UnitSpec, WithIncrementingClock}
 
@@ -116,7 +116,7 @@ class ScanUploadedFilesFlowSpec
       And("the fileManager fails to return file metadata for the message")
 
       when(fileManager.getObjectMetadata(eqTo(location)))
-        .thenReturn(Future.failed(AmazonServiceException("Expected exception")))
+        .thenReturn(Future.failed(SqsException.builder().message("Expected exception").build()))
 
       When("message is processed")
       val result = flow.processMessage(fileUploadEvent, message)

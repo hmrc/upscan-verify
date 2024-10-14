@@ -16,19 +16,20 @@
 
 package uk.gov.hmrc.upscanverify.connector.aws
 
-import com.amazonaws.services.sqs.AmazonSQS
-import com.amazonaws.services.sqs.model.{ChangeMessageVisibilityRequest, DeleteMessageRequest, Message, ReceiveMessageRequest, ReceiveMessageResult}
 import org.apache.pekko.actor.ActorSystem
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.{atLeast => atLeastTimes, times, when, verify}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import software.amazon.awssdk.services.sqs.SqsAsyncClient
+import software.amazon.awssdk.services.sqs.model.{ChangeMessageVisibilityRequest, ChangeMessageVisibilityResponse, DeleteMessageRequest, DeleteMessageResponse, Message, ReceiveMessageRequest, ReceiveMessageResponse}
 import uk.gov.hmrc.upscanverify.config.ServiceConfiguration
 import uk.gov.hmrc.upscanverify.test.UnitSpec
 
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
+import scala.jdk.FutureConverters._
 
 class SqsConsumerSpec
   extends UnitSpec
@@ -47,6 +48,8 @@ class SqsConsumerSpec
     .thenReturn(20.seconds)
   when(serviceConfiguration.retryInterval)
     .thenReturn(2.seconds)
+  when(serviceConfiguration.waitTime)
+    .thenReturn(20.seconds)
 
   "SqsConsumer" should:
     "continuously poll the queue" in:
@@ -60,9 +63,15 @@ class SqsConsumerSpec
             callCount.incrementAndGet()
             Future.unit
 
-      val sqsClient = mock[AmazonSQS]
+      val sqsClient = mock[SqsAsyncClient]
+      when(sqsClient.deleteMessage(any[DeleteMessageRequest]))
+        .thenReturn(Future.successful(DeleteMessageResponse.builder().build()).asJava)
       when(sqsClient.receiveMessage(any[ReceiveMessageRequest]))
-        .thenReturn(ReceiveMessageResult().withMessages(Message()))
+        .thenReturn:
+          Future
+            .successful:
+              ReceiveMessageResponse.builder().messages(Message.builder().build()).build()
+            .asJava
 
       SqsConsumer(sqsClient, pollingJob, serviceConfiguration)
 
@@ -82,15 +91,30 @@ class SqsConsumerSpec
         new PollingJob:
           override def processMessage(message: Message): Future[Unit] =
             callCount.incrementAndGet()
-            if message.getReceiptHandle == "2" then
+            if message.receiptHandle == "2" then
               Future.failed(RuntimeException("Planned failure"))
             else
               Future.unit
 
-      val sqsClient = mock[AmazonSQS]
+      val sqsClient = mock[SqsAsyncClient]
+      when(sqsClient.deleteMessage(any[DeleteMessageRequest]))
+        .thenReturn(Future.successful(DeleteMessageResponse.builder().build()).asJava)
+      when(sqsClient.changeMessageVisibility(any[ChangeMessageVisibilityRequest]))
+        .thenReturn(Future.successful(ChangeMessageVisibilityResponse.builder().build()).asJava)
       when(sqsClient.receiveMessage(any[ReceiveMessageRequest]))
         .thenAnswer: _ =>
-          ReceiveMessageResult().withMessages(Message().withReceiptHandle(genId.incrementAndGet().toString))
+          Future
+            .successful:
+              ReceiveMessageResponse
+                .builder()
+                .messages:
+                  Message
+                    .builder()
+                    .receiptHandle(genId.incrementAndGet().toString)
+                    .build()
+                .build()
+            .asJava
+
 
       SqsConsumer(sqsClient, pollingJob, serviceConfiguration)
 
@@ -101,12 +125,12 @@ class SqsConsumerSpec
       verify(sqsClient, atLeastTimes(3)).deleteMessage(any[DeleteMessageRequest])
 
       //specifically
-      verify(sqsClient).deleteMessage(DeleteMessageRequest(queueUrl, "1"))
-      verify(sqsClient).deleteMessage(DeleteMessageRequest(queueUrl, "3"))
+      verify(sqsClient).deleteMessage(DeleteMessageRequest.builder().queueUrl(queueUrl).receiptHandle("1").build())
+      verify(sqsClient).deleteMessage(DeleteMessageRequest.builder().queueUrl(queueUrl).receiptHandle("3").build())
       // but not
-      verify(sqsClient, times(0)).deleteMessage(DeleteMessageRequest(queueUrl, "2"))
+      verify(sqsClient, times(0)).deleteMessage(DeleteMessageRequest.builder().queueUrl(queueUrl).receiptHandle("2").build())
       // instead
-      verify(sqsClient).changeMessageVisibility(ChangeMessageVisibilityRequest(queueUrl, "2", serviceConfiguration.retryInterval.toSeconds.toInt))
+      verify(sqsClient).changeMessageVisibility(ChangeMessageVisibilityRequest.builder().queueUrl(queueUrl).receiptHandle("2").visibilityTimeout(serviceConfiguration.retryInterval.toSeconds.toInt).build())
 
 
   override def beforeEach(): Unit =

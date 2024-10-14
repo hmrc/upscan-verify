@@ -16,9 +16,9 @@
 
 package uk.gov.hmrc.upscanverify.service
 
-import com.amazonaws.services.sqs.model.Message
 import com.codahale.metrics.MetricRegistry
 import play.api.Logging
+import software.amazon.awssdk.services.sqs.model.{Message, MessageSystemAttributeName}
 import uk.gov.hmrc.upscanverify.connector.aws.PollingJob
 import uk.gov.hmrc.upscanverify.util.logging.LoggingUtils
 
@@ -42,18 +42,18 @@ class QueueProcessingJob @Inject()(
 
     if logger.isDebugEnabled then
       logger.debug:
-        s"Received message with id: [${sqsMessage.getMessageId}] and receiptHandle: [${sqsMessage.getReceiptHandle}], message details:\n "
+        s"Received message with id: [${sqsMessage.messageId}] and receiptHandle: [${sqsMessage.receiptHandle}], message details:\n "
           + sqsMessage.toString
 
-    val queueTimestamp = sqsMessage.getAttributes.asScala.get("SentTimestamp").map(s => Instant.ofEpochMilli(s.toLong))
+    val queueTimestamp = sqsMessage.attributes.asScala.get(MessageSystemAttributeName.SENT_TIMESTAMP).map(s => Instant.ofEpochMilli(s.toLong))
 
     if queueTimestamp.isEmpty then
-      logger.warn(s"SentTimestamp is missing from the message attribute. Message id = ${sqsMessage.getMessageId}")
+      logger.warn(s"SentTimestamp is missing from the message attribute. Message id = ${sqsMessage.messageId}")
 
     uk.gov.hmrc.upscanverify.model.Message(
-      sqsMessage.getMessageId,
-      sqsMessage.getBody,
-      sqsMessage.getReceiptHandle,
+      sqsMessage.messageId,
+      sqsMessage.body,
+      sqsMessage.receiptHandle,
       receivedAt,
       queueTimestamp
     )

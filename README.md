@@ -15,15 +15,18 @@ Detailed documentation of the *Upscan* can be found here: https://github.com/hmr
 
 Here is the list of service's configuration properties:
 
-- *aws.useContainerCredentials* - if true, the service will use credentials of hosting EC2 instance to access SQS and SNS (default setting: false)
-- *aws.accessKeyId* - AWS key id, not needed when using credentials of hosting EC2 instance
-- *aws.secretAccessKey* - AWS secret key, not needed when using credentials of hosting EC2 instance
-- *aws.sessionToken* - AWS session token, needed only when service is running locally and uses MFA authentication. Proper value
+- `aws.useContainerCredentials` - if true, the service will use credentials of hosting EC2 instance to access SQS and SNS (default setting: false)
+- `aws.accessKeyId` - AWS key id, not needed when using credentials of hosting EC2 instance
+- `aws.secretAccessKey` - AWS secret key, not needed when using credentials of hosting EC2 instance
+- `aws.sessionToken` - AWS session token, needed only when service is running locally and uses MFA authentication. Proper value
 of the token is set automatically when using aws-profile script
-- *aws.sqs.queue.inbound* - address of SQS queue that contains notifications regarding uploads of files to inbound bucket
-- *aws.s3.region* - AWS region on which outbound AWS bucket is located (default value is *eu-west-2*)
-- *aws.s3.bucket.outbound* - name of the outbound AWS S3 bucket, this bucket will be used to store clean files
-- *aws.sqs.retry.interval* - retry period between failed attempts to poll messages from inbound SQS queue
+- `aws.sqs.queue.inbound` - address of SQS queue that contains notifications regarding uploads of files to inbound bucket
+- `aws.s3.region` - AWS region on which outbound AWS bucket is located (default value is *eu-west-2*)
+- `aws.s3.bucket.outbound` - name of the outbound AWS S3 bucket, this bucket will be used to store clean files
+- `aws.sqs.queue.visibilityTimeout` - The timeout before an unacknowledged message is retried (See [aws docs](https://sdk.amazonaws.com/java/api/latest/software/amazon/awssdk/services/sqs/model/ReceiveMessageRequest.Builder.html#visibilityTimeout(java.lang.Integer))). Note, it should be greater than the expected time to process the largest supported message size to avoid parallel processing.
+- `aws.sqs.retry.interval` - If a message fails to be processed, it will be returned to the queue with this visibility timeout. This means it will be retried sooner than the global visilibity timeout (see `aws.sqs.queue.visibilityTimeout`)
+- `aws.sqs.waitTime` - See [aws docs](https://sdk.amazonaws.com/java/api/latest/software/amazon/awssdk/services/sqs/model/ReceiveMessageRequest.Builder.html#waitTimeSeconds(java.lang.Integer))
+- `processingBatchSize` - Number of messages to take off the queue at a time - note the messages are still processed sequentially.
 
 # Running locally
 

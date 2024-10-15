@@ -16,8 +16,8 @@
 
 package uk.gov.hmrc.upscanverify.connector.aws
 
-import com.amazonaws.services.sqs.AmazonSQS
-import com.amazonaws.services.sqs.model.{ChangeMessageVisibilityRequest, DeleteMessageRequest, Message, ReceiveMessageRequest}
+import software.amazon.awssdk.services.sqs.SqsAsyncClient
+import software.amazon.awssdk.services.sqs.model.{ChangeMessageVisibilityRequest, DeleteMessageRequest, Message, MessageSystemAttributeName, ReceiveMessageRequest}
 import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Source
@@ -37,7 +37,7 @@ trait PollingJob:
   def jobName: String = this.getClass.getName
 
 class SqsConsumer @Inject()(
-  sqsClient           : AmazonSQS,
+  sqsClient           : SqsAsyncClient,
   job                 : PollingJob, // QueueProcessingJob
   serviceConfiguration: ServiceConfiguration
 )(using
@@ -50,11 +50,13 @@ class SqsConsumer @Inject()(
   def runQueue(): Future[Done] =
     Source
       .repeat:
-        ReceiveMessageRequest(serviceConfiguration.inboundQueueUrl)
-          .withMaxNumberOfMessages(serviceConfiguration.processingBatchSize)
-          .withWaitTimeSeconds(20)
-          .withVisibilityTimeout(serviceConfiguration.inboundQueueVisibilityTimeout.toSeconds.toInt)
-          .withAttributeNames("All")
+        ReceiveMessageRequest.builder()
+          .queueUrl(serviceConfiguration.inboundQueueUrl)
+          .maxNumberOfMessages(serviceConfiguration.processingBatchSize)
+          .waitTimeSeconds(serviceConfiguration.waitTime.toSeconds.toInt)
+          .visibilityTimeout(serviceConfiguration.inboundQueueVisibilityTimeout.toSeconds.toInt)
+          .messageSystemAttributeNames(MessageSystemAttributeName.SENT_TIMESTAMP)
+          .build()
       .mapAsync(parallelism = 1)(getMessages)
       .mapConcat(xs => xs)
       .mapAsync(parallelism = 1): message =>
@@ -76,33 +78,36 @@ class SqsConsumer @Inject()(
 
   private def getMessages(req: ReceiveMessageRequest): Future[Seq[Message]] =
     logger.info("receiving messages")
-    Future
-      .apply:
-        sqsClient.receiveMessage(req)
-      .map(_.getMessages.asScala.toSeq)
+    sqsClient.receiveMessage(req).asScala
+      .map(_.messages.asScala.toSeq)
       .map: res =>
         logger.info(s"received ${res.size} messages")
         res
 
   private def deleteMessage(message: Message): Future[Unit] =
-    Future
-      .apply:
-        sqsClient
-          .deleteMessage:
-            DeleteMessageRequest(serviceConfiguration.inboundQueueUrl, message.getReceiptHandle)
+    sqsClient
+      .deleteMessage:
+        DeleteMessageRequest.builder()
+          .queueUrl(serviceConfiguration.inboundQueueUrl)
+          .receiptHandle(message.receiptHandle)
+          .build()
+      .asScala
       .map: _ =>
         logger.debug:
-          s"Deleted message from Queue: [${serviceConfiguration.inboundQueueUrl}], for receiptHandle: [${message.getReceiptHandle}]."
+          s"Deleted message from Queue: [${serviceConfiguration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}]."
 
   private def returnMessage(message: Message): Future[Unit] =
-    Future
-      .apply:
-        sqsClient
-          .changeMessageVisibility:
-            ChangeMessageVisibilityRequest(serviceConfiguration.inboundQueueUrl, message.getReceiptHandle, serviceConfiguration.retryInterval.toSeconds.toInt)
+    sqsClient
+      .changeMessageVisibility:
+        ChangeMessageVisibilityRequest.builder()
+          .queueUrl(serviceConfiguration.inboundQueueUrl)
+          .receiptHandle(message.receiptHandle)
+          .visibilityTimeout(serviceConfiguration.retryInterval.toSeconds.toInt)
+          .build()
+      .asScala
       .map: _ =>
         logger.debug:
-          s"Returned message back to the queue (after ${serviceConfiguration.retryInterval}): [${serviceConfiguration.inboundQueueUrl}], for receiptHandle: [${message.getReceiptHandle}]."
+          s"Returned message back to the queue (after ${serviceConfiguration.retryInterval}): [${serviceConfiguration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}]."
 
   def processMessage(message: Message): Future[MessageAction] =
     logger.debug(s"Polling for job: [${job.jobName}].")

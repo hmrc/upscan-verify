@@ -24,6 +24,7 @@ import uk.gov.hmrc.upscanverify.model._
 import uk.gov.hmrc.upscanverify.model.Timings.{Timer, timer}
 import uk.gov.hmrc.upscanverify.service.tika.FileNameValidator
 
+import java.io.InputStream
 import java.time.Clock
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -41,7 +42,7 @@ class FileTypeCheckingService @Inject()(
 
   def scan(
     location      : S3ObjectLocation,
-    objectContent : ObjectContent,
+    objectContent : InputStream,
     objectMetadata: InboundObjectMetadata
   ): Future[FileTypeCheckResult] =
     Future:
@@ -50,7 +51,7 @@ class FileTypeCheckingService @Inject()(
       val consumingService = objectMetadata.consumingService
       val filename         = objectMetadata.originalFilename
 
-      val mimeType         = mimeTypeDetector.detect(objectContent.inputStream, filename)
+      val mimeType         = mimeTypeDetector.detect(objectContent, filename)
       addCheckingTimeMetrics()
       logZeroLengthFiles(objectMetadata, location, consumingService)
 

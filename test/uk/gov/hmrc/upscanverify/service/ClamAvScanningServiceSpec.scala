@@ -63,7 +63,7 @@ class ClamAvScanningServiceSpec
 
       And("file content with metadata")
       val content      = "Hello World".getBytes
-      val fileContent  = ObjectContent(ByteArrayInputStream(content), content.length)
+      val fileContent  = ByteArrayInputStream(content)
       val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
       val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified, content.length)
 
@@ -95,7 +95,7 @@ class ClamAvScanningServiceSpec
 
       And("file content with metadata")
       val content      = "Hello World".getBytes
-      val fileContent  = ObjectContent(ByteArrayInputStream(content), content.length)
+      val fileContent  = ByteArrayInputStream(content)
       val lastModified = LocalDateTime.of(2018, 1, 27, 0, 0).toInstant(ZoneOffset.UTC)
       val fileMetadata = InboundObjectMetadata(Map("consuming-service" -> "ClamAvScanningServiceSpec"), lastModified, content.length)
 

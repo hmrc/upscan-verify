@@ -26,6 +26,9 @@ import scala.concurrent.{ExecutionContext, Future}
 object LoggingUtils:
   def withMdc[T](mdcData: Map[String, String])(block: => Future[T])(using ExecutionContext): Future[T] =
     val previous = Option(MDC.getCopyOfContextMap)
+    mdcData.foreach {
+      case (k, v) => MDC.put(k, v)
+    }
     val f = Future.unit.flatMap(_ => block) // flatMap to ensure exceptions initialising block are handled by onComplete
     f.onComplete: _ =>
       MDC.clear()

@@ -25,7 +25,7 @@ import org.scalatestplus.mockito.MockitoSugar.mock
 import uk.gov.hmrc.upscanverify.model._
 import uk.gov.hmrc.upscanverify.test.{UnitSpec, WithIncrementingClock}
 
-import java.io.ByteArrayInputStream
+import java.io.{ByteArrayInputStream, InputStream}
 import java.time.Instant
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -77,14 +77,14 @@ class FileCheckingServiceSpec
         Left(VerifyResult.FileRejected.FileTypeFailure(noVirusFound, notAllowedMimeType))
 
   trait Setup:
-    val content = ObjectContent(ByteArrayInputStream("TEST".getBytes), "TEST".length)
+    val content = ByteArrayInputStream("TEST".getBytes)
 
     val fileManager    = mock[FileManager]
-    val functionCaptor = ArgumentCaptor.forClass(classOf[ObjectContent => Future[Nothing]]) // using argument capture since it can match the function param
+    val functionCaptor = ArgumentCaptor.forClass(classOf[InputStream => Future[Nothing]]) // using argument capture since it can match the function param
     when(fileManager.withObjectContent(any[S3ObjectLocation])(functionCaptor.capture()))
       .thenAnswer { i =>
         val objectLocation = i.getArgument[S3ObjectLocation](0)
-        val function       = i.getArgument[ObjectContent => Future[Nothing]](1) // same as functionCaptor.getValue
+        val function       = i.getArgument[InputStream => Future[Nothing]](1) // same as functionCaptor.getValue
         if objectLocation.objectKey.contains("exception") then
           Future.failed(RuntimeException("Expected exception"))
         else

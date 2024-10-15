@@ -43,6 +43,9 @@ class FileCheckingService @Inject()(
     (for
        noVirusFound <- EitherT
                          .apply:
+                           // TODO can we only interact with fileManager in one place, getting both inboundObjectMetadata and
+                           // content (as a Stream). We can broadcast the stream to both clam and tika (which may also avoid the
+                           //  warning where tika does not consume the whole stream)
                            fileManager.withObjectContent(location): objectContent =>
                              virusScanningService.scan(location, objectContent, objectMetadata)
                          .leftMap(VerifyResult.FileRejected.VirusScanFailure.apply)

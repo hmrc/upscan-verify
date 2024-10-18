@@ -58,7 +58,7 @@ class QueueProcessingJob @Inject()(
       queueTimestamp
     )
 
-  override def processMessage(sqsMessage: Message): Future[Unit] =
+  override def processMessage(sqsMessage: Message): Future[Boolean] =
     val message = toUpscanMessage(sqsMessage)
     messageParser.parse(message)
       .flatMap: parsedMessage =>
@@ -68,6 +68,8 @@ class QueueProcessingJob @Inject()(
           messageProcessor.processMessage(parsedMessage, message)
             .map: _ =>
               metricRegistry.meter("verifyThroughput").mark()
+              true
             .recover:
               case exception =>
                 logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)
+                false

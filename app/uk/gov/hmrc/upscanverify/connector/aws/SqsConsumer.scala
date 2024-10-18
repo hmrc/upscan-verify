@@ -32,7 +32,7 @@ import scala.jdk.FutureConverters._
 import scala.util.control.NonFatal
 
 trait PollingJob:
-  def processMessage(message: Message): Future[Unit]
+  def processMessage(message: Message): Future[Boolean]
 
   def jobName: String = this.getClass.getName
 
@@ -58,17 +58,24 @@ class SqsConsumer @Inject()(
           .messageSystemAttributeNames(MessageSystemAttributeName.SENT_TIMESTAMP)
           .build()
       .mapAsync(parallelism = 1)(getMessages)
-      .mapConcat(xs => xs)
+      .mapConcat(identity)
       .mapAsync(parallelism = 1): message =>
-        processMessage(message).flatMap:
-          case MessageAction.Delete(message) => deleteMessage(message)
-          case MessageAction.Ignore(_)       => // message will return to queue after retryInterval
-                                                // Note, we previously stopped processing *all* messages on this instance until the retryInterval
-                                                // We probably only need to do this for exceptions that are known to affect all messages
-                                                // This could be done by completing Future.unit after a timeout (e.g. complete a promise with `context.system.scheduler.scheduleOnce`)
-                                                returnMessage(message)
-        .recover:
-          case NonFatal(e)                   => logger.error(s"Failed to process messages", e)
+        job.processMessage(message)
+          .flatMap: isHandled =>
+            if isHandled then
+              logger.debug(s"Message ${message.messageId} was processed")
+              deleteMessage(message)
+            else
+              // message will return to queue after retryInterval
+              // Note, we previously stopped processing *all* messages on this instance until the retryInterval
+              // We probably only need to do this for exceptions that are known to affect all messages
+              // This could be done by completing Future.unit after a timeout (e.g. complete a promise with `context.system.scheduler.scheduleOnce`)
+              logger.debug(s"Failed to process ${message.messageId}")
+              returnMessage(message)
+          .recover:
+            case NonFatal(e) =>
+              logger.error(s"Failed to process message", e)
+              returnMessage(message)
       .run()
       .andThen: res =>
         logger.info(s"Queue terminated: $res - restarting")
@@ -108,18 +115,3 @@ class SqsConsumer @Inject()(
       .map: _ =>
         logger.debug:
           s"Returned message back to the queue (after ${serviceConfiguration.retryInterval}): [${serviceConfiguration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}]."
-
-  def processMessage(message: Message): Future[MessageAction] =
-    logger.debug(s"Polling for job: [${job.jobName}].")
-    job.processMessage(message)
-      .map: _ =>
-        logger.debug(s"Polling succeeded for job: [${job.jobName}].")
-        MessageAction.Delete(message) // proceed to next one
-      .recover: e =>
-        logger.error(s"Polling failed for job: [${job.jobName}].", e)
-        MessageAction.Ignore(message)
-
-
-enum MessageAction:
-  case Delete(message: Message)
-  case Ignore(message: Message)

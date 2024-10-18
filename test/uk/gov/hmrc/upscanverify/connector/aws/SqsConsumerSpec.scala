@@ -52,16 +52,16 @@ class SqsConsumerSpec
     .thenReturn(20.seconds)
 
   "SqsConsumer" should:
-    "continuously poll the queue" in:
+    "continuously process messages on the queue" in:
       given ActorSystem = actorSystem
 
       val callCount = AtomicInteger(0)
 
       val pollingJob: PollingJob =
         new PollingJob:
-          override def processMessage(message: Message): Future[Unit] =
+          override def processMessage(message: Message): Future[Boolean] =
             callCount.incrementAndGet()
-            Future.unit
+            Future.successful(true)
 
       val sqsClient = mock[SqsAsyncClient]
       when(sqsClient.deleteMessage(any[DeleteMessageRequest]))
@@ -81,6 +81,57 @@ class SqsConsumerSpec
       // just assert > 4 - the final one may not have been deleted yet
       verify(sqsClient, atLeastTimes(4)).deleteMessage(any[DeleteMessageRequest])
 
+    "not delete a message if it was not handled" in:
+      given ActorSystem = actorSystem
+
+      val genId     = AtomicInteger(0)
+      val callCount = AtomicInteger(0)
+
+      val pollingJob: PollingJob =
+        new PollingJob:
+          override def processMessage(message: Message): Future[Boolean] =
+            callCount.incrementAndGet()
+            if message.receiptHandle == "2" then
+              Future.successful(false)
+            else
+              Future.successful(true)
+
+      val sqsClient = mock[SqsAsyncClient]
+      when(sqsClient.deleteMessage(any[DeleteMessageRequest]))
+        .thenReturn(Future.successful(DeleteMessageResponse.builder().build()).asJava)
+      when(sqsClient.changeMessageVisibility(any[ChangeMessageVisibilityRequest]))
+        .thenReturn(Future.successful(ChangeMessageVisibilityResponse.builder().build()).asJava)
+      when(sqsClient.receiveMessage(any[ReceiveMessageRequest]))
+        .thenAnswer: _ =>
+          Future
+            .successful:
+              ReceiveMessageResponse
+                .builder()
+                .messages:
+                  Message
+                    .builder()
+                    .receiptHandle(genId.incrementAndGet().toString)
+                    .build()
+                .build()
+            .asJava
+
+
+      SqsConsumer(sqsClient, pollingJob, serviceConfiguration)
+
+      eventually:
+        callCount.get() should be > 5
+
+      // final one may not have been deleted yet
+      verify(sqsClient, atLeastTimes(3)).deleteMessage(any[DeleteMessageRequest])
+
+      //specifically
+      verify(sqsClient).deleteMessage(DeleteMessageRequest.builder().queueUrl(queueUrl).receiptHandle("1").build())
+      verify(sqsClient).deleteMessage(DeleteMessageRequest.builder().queueUrl(queueUrl).receiptHandle("3").build())
+      // but not
+      verify(sqsClient, times(0)).deleteMessage(DeleteMessageRequest.builder().queueUrl(queueUrl).receiptHandle("2").build())
+      // instead
+      verify(sqsClient).changeMessageVisibility(ChangeMessageVisibilityRequest.builder().queueUrl(queueUrl).receiptHandle("2").visibilityTimeout(serviceConfiguration.retryInterval.toSeconds.toInt).build())
+
     "recover from failure" in:
       given ActorSystem = actorSystem
 
@@ -89,12 +140,12 @@ class SqsConsumerSpec
 
       val pollingJob: PollingJob =
         new PollingJob:
-          override def processMessage(message: Message): Future[Unit] =
+          override def processMessage(message: Message): Future[Boolean] =
             callCount.incrementAndGet()
             if message.receiptHandle == "2" then
               Future.failed(RuntimeException("Planned failure"))
             else
-              Future.unit
+              Future.successful(true)
 
       val sqsClient = mock[SqsAsyncClient]
       when(sqsClient.deleteMessage(any[DeleteMessageRequest]))

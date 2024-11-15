@@ -18,14 +18,16 @@ package uk.gov.hmrc.upscanverify.service
 
 import com.codahale.metrics.MetricRegistry
 import play.api.Logging
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.sqs.model.{Message, MessageSystemAttributeName}
 import uk.gov.hmrc.upscanverify.connector.aws.PollingJob
 import uk.gov.hmrc.upscanverify.util.logging.LoggingUtils
 
 import java.time.{Clock, Instant}
+import java.util.concurrent.CompletionException
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 class QueueProcessingJob @Inject()(
   messageProcessor: MessageProcessor,
@@ -70,6 +72,9 @@ class QueueProcessingJob @Inject()(
               metricRegistry.meter("verifyThroughput").mark()
               true
             .recover:
+              case exception: CompletionException if exception.getCause.isInstanceOf[NoSuchKeyException] =>
+                logger.warn(s"Skipped processing message '${message.id}', because it was not found in the inbound bucket (already processed)")
+                true
               case exception =>
                 logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)
                 false

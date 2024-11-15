@@ -28,7 +28,6 @@ import uk.gov.hmrc.upscanverify.model.{FileUploadEvent, S3ObjectLocation, Messag
 import uk.gov.hmrc.upscanverify.test.UnitSpec
 
 import java.time.Clock
-import java.util.concurrent.CompletionException
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
@@ -91,12 +90,12 @@ class QueueProcessingJobSpec
 
     "return a success if the S3 object cannot be found on the inbound bucket" in new Test():
       Given("a valid message is retrieved from the queue")
-      val exception = CompletionException(
+      private val exception =
         NoSuchKeyException
           .builder()
           .message("not found")
           .build()
-      )
+
       when(messageProcessor.processMessage(any[FileUploadEvent], any[UpscanMessage]))
         .thenReturn(Future.failed(exception))
 

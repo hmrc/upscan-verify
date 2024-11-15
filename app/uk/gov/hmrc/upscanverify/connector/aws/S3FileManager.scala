@@ -25,13 +25,21 @@ import uk.gov.hmrc.upscanverify.model.S3ObjectLocation
 import uk.gov.hmrc.upscanverify.service.{FileManager, InboundObjectMetadata, OutboundObjectMetadata}
 
 import java.io.InputStream
+import java.util.concurrent.{CompletableFuture, CompletionException}
 import javax.inject.{Inject, Singleton}
-import scala.jdk.CollectionConverters._
-import scala.jdk.FutureConverters._
+import scala.jdk.CollectionConverters.*
+import scala.jdk.FutureConverters.*
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) extends FileManager with Logging:
+
+  private def toScala[A](f: CompletableFuture[A]): Future[A] =
+    Mdc
+      .preservingMdc:
+        f.asScala
+      .recoverWith:
+        case e: CompletionException => Future.failed(e.getCause)
 
   override def copyObject(
     sourceLocation: S3ObjectLocation,
@@ -49,14 +57,12 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .metadataDirective(MetadataDirective.REPLACE)
     sourceLocation.objectVersion.foreach(request.sourceVersionId)
 
-    Mdc
-      .preservingMdc:
-        s3Client
-          .copyObject(request.build())
-          .asScala
-      .map: _ =>
-        logger.debug:
-          s"Copied object with Key=[${sourceLocation.objectKey}] from [$sourceLocation] to [$targetLocation]."
+    toScala:
+      s3Client
+        .copyObject(request.build())
+    .map: _ =>
+      logger.debug:
+        s"Copied object with Key=[${sourceLocation.objectKey}] from [$sourceLocation] to [$targetLocation]."
 
   override def writeObject(
     sourceLocation: S3ObjectLocation,
@@ -70,16 +76,16 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .bucket(targetLocation.bucket)
         .key(targetLocation.objectKey)
         .metadata(metadata.items.asJava)
-    Mdc
-      .preservingMdc:
-        s3Client
-          .putObject(
-            request.build(),
-            AsyncRequestBody.fromBytes(content.getBytes)
-          )
-          .asScala
-      .map: _ =>
-        logger.debug(s"Wrote object with Key=[${sourceLocation.objectKey}] to location [$targetLocation].")
+        .build()
+
+    toScala:
+      s3Client
+        .putObject(
+          request,
+          AsyncRequestBody.fromBytes(content.getBytes)
+        )
+    .map: _ =>
+      logger.debug(s"Wrote object with Key=[${sourceLocation.objectKey}] to location [$targetLocation].")
 
   override def delete(objectLocation: S3ObjectLocation): Future[Unit] =
     val request =
@@ -89,13 +95,11 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .key(objectLocation.objectKey)
     objectLocation.objectVersion.foreach(request.versionId)
 
-    Mdc
-      .preservingMdc:
-        s3Client
-          .deleteObject(request.build())
-          .asScala
-      .map: _ =>
-        logger.debug(s"Deleted object with Key=[${objectLocation.objectKey}] from [$objectLocation].")
+    toScala:
+      s3Client
+        .deleteObject(request.build())
+    .map: _ =>
+      logger.debug(s"Deleted object with Key=[${objectLocation.objectKey}] from [$objectLocation].")
 
   override def withObjectContent[T](
     objectLocation: S3ObjectLocation
@@ -116,18 +120,19 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
         .key(objectLocation.objectKey)
     objectLocation.objectVersion.foreach(request.versionId)
 
-    Mdc
-      .preservingMdc:
-        s3Client
-          .getObject(request.build(), AsyncResponseTransformer.toBlockingInputStream())
-          .asScala
-      .map: in =>
-        //InboundObjectMetadata(
-        //  in.response.metadata.asScala.toMap,
-        //  in.response.lastModified,
-        //  in.response.contentLength
-        //)
-        in
+    toScala:
+      s3Client
+        .getObject(
+          request.build(),
+          AsyncResponseTransformer.toBlockingInputStream()
+        )
+    .map: in =>
+      //InboundObjectMetadata(
+      //  in.response.metadata.asScala.toMap,
+      //  in.response.lastModified,
+      //  in.response.contentLength
+      //)
+      in
 
   override def getObjectMetadata(objectLocation: S3ObjectLocation): Future[InboundObjectMetadata] =
     // ideally we'd only request the content once, and get the metadata at the same time
@@ -139,14 +144,13 @@ class S3FileManager @Inject()(s3Client: S3AsyncClient)(using ExecutionContext) e
     objectLocation.objectVersion.foreach(request.versionId  )
 
     logger.info(s"getObjectMetadata($objectLocation)")
-    Mdc
-      .preservingMdc:
-        s3Client
-          .headObject(request.build())
-          .asScala
-      .map: response =>
-        InboundObjectMetadata(
-          response.metadata.asScala.toMap,
-          response.lastModified,
-          response.contentLength
-        )
+
+    toScala:
+      s3Client
+        .headObject(request.build())
+    .map: response =>
+      InboundObjectMetadata(
+        response.metadata.asScala.toMap,
+        response.lastModified,
+        response.contentLength
+      )

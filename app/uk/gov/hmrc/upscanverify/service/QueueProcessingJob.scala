@@ -18,7 +18,7 @@ package uk.gov.hmrc.upscanverify.service
 
 import com.codahale.metrics.MetricRegistry
 import play.api.Logging
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException
+import software.amazon.awssdk.services.s3.model.{NoSuchKeyException, S3Exception}
 import software.amazon.awssdk.services.sqs.model.{Message, MessageSystemAttributeName}
 import uk.gov.hmrc.upscanverify.connector.aws.PollingJob
 import uk.gov.hmrc.upscanverify.util.logging.LoggingUtils
@@ -73,6 +73,12 @@ class QueueProcessingJob @Inject()(
             .recover:
               case _: NoSuchKeyException =>
                 logger.warn(s"Skipped processing message '${message.id}', because it was not found in the inbound bucket (already processed)")
+                true
+              case ex: S3Exception if ex.statusCode() == 404 =>
+                logger.warn(
+                  s"Skipped processing message '${message.id}', because it was not found in the inbound bucket (already processed)",
+                  ex
+                )
                 true
               case exception =>
                 logger.error(s"Failed to process message '${message.id}', cause ${exception.getMessage}", exception)

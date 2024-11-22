@@ -17,18 +17,20 @@
 package uk.gov.hmrc.upscanverify.connector.aws
 
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
-import software.amazon.awssdk.services.sqs.model.{ChangeMessageVisibilityRequest, DeleteMessageRequest, Message, MessageSystemAttributeName, ReceiveMessageRequest}
+import software.amazon.awssdk.services.sqs.model.{ChangeMessageVisibilityRequest, DeleteMessageRequest, Message, MessageSystemAttributeName, ReceiveMessageRequest, SqsException}
 import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Source
 import play.api.Logging
+import uk.gov.hmrc.play.http.logging.Mdc
 import uk.gov.hmrc.upscanverify.config.ServiceConfiguration
 
+import java.util.concurrent.{CompletableFuture, CompletionException}
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
-import scala.jdk.CollectionConverters._
-import scala.jdk.FutureConverters._
+import scala.jdk.CollectionConverters.*
+import scala.jdk.FutureConverters.*
 import scala.util.control.NonFatal
 
 trait PollingJob:
@@ -83,35 +85,49 @@ class SqsConsumer @Inject()(
 
   runQueue()
 
+  private def toScala[A](f: CompletableFuture[A]): Future[A] =
+    Mdc
+      .preservingMdc:
+        f.asScala
+      .recoverWith:
+        case e: CompletionException => Future.failed(e.getCause)
+
   private def getMessages(req: ReceiveMessageRequest): Future[Seq[Message]] =
     logger.info("receiving messages")
-    sqsClient.receiveMessage(req).asScala
-      .map(_.messages.asScala.toSeq)
-      .map: res =>
-        logger.info(s"received ${res.size} messages")
-        res
+    toScala:
+      sqsClient.receiveMessage(req)
+    .map(_.messages.asScala.toSeq)
+    .map: res =>
+      logger.info(s"received ${res.size} messages")
+      res
 
   private def deleteMessage(message: Message): Future[Unit] =
-    sqsClient
-      .deleteMessage:
-        DeleteMessageRequest.builder()
-          .queueUrl(serviceConfiguration.inboundQueueUrl)
-          .receiptHandle(message.receiptHandle)
-          .build()
-      .asScala
-      .map: _ =>
-        logger.debug:
-          s"Deleted message from Queue: [${serviceConfiguration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}]."
+    toScala:
+      sqsClient
+        .deleteMessage:
+          DeleteMessageRequest.builder()
+            .queueUrl(serviceConfiguration.inboundQueueUrl)
+            .receiptHandle(message.receiptHandle)
+            .build()
+    .map: _ =>
+      logger.debug:
+        s"Deleted message '${message.messageId()}' from Queue: [${serviceConfiguration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}]."
+    .recover:
+      case ex: SqsException if ex.statusCode() == 404 =>
+        logger.warn(
+          s"Unable to deleted message '${message.messageId()}' from Queue: [${serviceConfiguration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}] (already processed)",
+          ex
+        )
 
   private def returnMessage(message: Message): Future[Unit] =
-    sqsClient
-      .changeMessageVisibility:
-        ChangeMessageVisibilityRequest.builder()
-          .queueUrl(serviceConfiguration.inboundQueueUrl)
-          .receiptHandle(message.receiptHandle)
-          .visibilityTimeout(serviceConfiguration.retryInterval.toSeconds.toInt)
-          .build()
-      .asScala
-      .map: _ =>
-        logger.debug:
-          s"Returned message back to the queue (after ${serviceConfiguration.retryInterval}): [${serviceConfiguration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}]."
+    toScala:
+      sqsClient
+        .changeMessageVisibility:
+          ChangeMessageVisibilityRequest.builder()
+            .queueUrl(serviceConfiguration.inboundQueueUrl)
+            .receiptHandle(message.receiptHandle)
+            .visibilityTimeout(serviceConfiguration.retryInterval.toSeconds.toInt)
+            .build()
+    .map: _ =>
+      logger.debug:
+        s"Returned message back to the queue (after ${serviceConfiguration.retryInterval}): [${serviceConfiguration.inboundQueueUrl}], for receiptHandle: [${message.receiptHandle}]."

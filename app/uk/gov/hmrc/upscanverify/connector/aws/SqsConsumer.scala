@@ -16,19 +16,20 @@
 
 package uk.gov.hmrc.upscanverify.connector.aws
 
-import software.amazon.awssdk.services.sqs.SqsAsyncClient
-import software.amazon.awssdk.services.sqs.model.{ChangeMessageVisibilityRequest, DeleteMessageRequest, Message, MessageSystemAttributeName, ReceiveMessageRequest, SqsException}
+import cats.implicits.*
 import org.apache.pekko.Done
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Source
 import play.api.Logging
+import software.amazon.awssdk.services.sqs.SqsAsyncClient
+import software.amazon.awssdk.services.sqs.model.*
 import uk.gov.hmrc.play.http.logging.Mdc
 import uk.gov.hmrc.upscanverify.config.ServiceConfiguration
 
 import java.util.concurrent.{CompletableFuture, CompletionException}
 import javax.inject.Inject
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.util.control.NonFatal
@@ -49,7 +50,7 @@ class SqsConsumer @Inject()(
 
   logger.info(s"Starting SQS consumption for PollingJob: [${job.jobName}].")
 
-  def runQueue(): Future[Done] =
+  private def runQueue(): Future[Done] =
     Source
       .repeat:
         ReceiveMessageRequest.builder()
@@ -59,25 +60,27 @@ class SqsConsumer @Inject()(
           .visibilityTimeout(serviceConfiguration.inboundQueueVisibilityTimeout.toSeconds.toInt)
           .messageSystemAttributeNames(MessageSystemAttributeName.SENT_TIMESTAMP)
           .build()
-      .mapAsync(parallelism = 1)(getMessages)
-      .mapConcat(identity)
-      .mapAsync(parallelism = 1): message =>
-        job.processMessage(message)
-          .flatMap: isHandled =>
-            if isHandled then
-              logger.debug(s"Message ${message.messageId} was processed")
-              deleteMessage(message)
-            else
-              // message will return to queue after retryInterval
-              // Note, we previously stopped processing *all* messages on this instance until the retryInterval
-              // We probably only need to do this for exceptions that are known to affect all messages
-              // This could be done by completing Future.unit after a timeout (e.g. complete a promise with `context.system.scheduler.scheduleOnce`)
-              logger.debug(s"Failed to process ${message.messageId}")
-              returnMessage(message)
-          .recover:
-            case NonFatal(e) =>
-              logger.error(s"Failed to process message", e)
-              returnMessage(message)
+      .mapAsync(parallelism = 1): request =>
+        getMessages(request)
+          .map:
+            _.foldLeftM[Future, Unit](()): (_, message) =>
+              job
+                .processMessage(message)
+                .flatMap: isHandled =>
+                  if isHandled then
+                    logger.debug(s"Message ${message.messageId} was processed")
+                    deleteMessage(message)
+                  else
+                    // message will return to queue after retryInterval
+                    // Note, we previously stopped processing *all* messages on this instance until the retryInterval
+                    // We probably only need to do this for exceptions that are known to affect all messages
+                    // This could be done by completing Future.unit after a timeout (e.g. complete a promise with `context.system.scheduler.scheduleOnce`)
+                    logger.debug(s"Failed to process ${message.messageId}")
+                    returnMessage(message)
+                .recover:
+                  case NonFatal(e) =>
+                    logger.error(s"Failed to process message", e)
+                    returnMessage(message)
       .run()
       .andThen: res =>
         logger.info(s"Queue terminated: $res - restarting")

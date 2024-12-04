@@ -18,6 +18,7 @@ package uk.gov.hmrc.upscanverify.config
 
 import play.api.Configuration
 import uk.gov.hmrc.upscanverify.test.UnitSpec
+import scala.concurrent.duration.DurationInt
 
 class PlayClamAvConfigSpec extends UnitSpec:
 
@@ -27,19 +28,19 @@ class PlayClamAvConfigSpec extends UnitSpec:
         Configuration.from(Map(
           "clam.antivirus.host"    -> "avscan",
           "clam.antivirus.port"    -> 3310,
-          "clam.antivirus.timeout" -> 5000
+          "clam.antivirus.timeout" -> "5.seconds"
         ))
 
       val clamAvConfig = PlayClamAvConfig(configuration)
       clamAvConfig.host    shouldBe "avscan"
       clamAvConfig.port    shouldBe 3310
-      clamAvConfig.timeout shouldBe 5000
+      clamAvConfig.timeout shouldBe 5.seconds
 
     "throw an exception if there is no clam host" in:
       val configuration: Configuration =
         Configuration.from(Map(
           "clam.antivirus.port"    -> 3310,
-          "clam.antivirus.timeout" -> 5000
+          "clam.antivirus.timeout" -> "5.seconds"
         ))
 
       intercept[Exception]:
@@ -49,7 +50,7 @@ class PlayClamAvConfigSpec extends UnitSpec:
       val configuration: Configuration =
         Configuration.from(Map(
           "clam.antivirus.host"    -> "avscan",
-          "clam.antivirus.timeout" -> 5000
+          "clam.antivirus.timeout" -> "5.seconds"
         ))
 
       intercept[Exception]:

@@ -20,8 +20,9 @@ import play.api.Configuration
 import uk.gov.hmrc.clamav.config.ClamAvConfig
 
 import javax.inject.Inject
+import scala.concurrent.duration.Duration
 
 class PlayClamAvConfig @Inject()(configuration: Configuration) extends ClamAvConfig:
-  val host   : String = configuration.get[String]("clam.antivirus.host")
-  val port   : Int    = configuration.get[Int]("clam.antivirus.port")
-  val timeout: Int    = configuration.get[Int]("clam.antivirus.timeout")
+  val host   : String   = configuration.get[String]("clam.antivirus.host")
+  val port   : Int      = configuration.get[Int]("clam.antivirus.port")
+  val timeout: Duration = configuration.get[Duration]("clam.antivirus.timeout")

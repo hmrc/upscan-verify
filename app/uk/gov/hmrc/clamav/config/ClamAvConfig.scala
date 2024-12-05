@@ -16,7 +16,9 @@
 
 package uk.gov.hmrc.clamav.config
 
+import scala.concurrent.duration.Duration
+
 trait ClamAvConfig:
   val host   : String
   val port   : Int
-  val timeout: Int
+  val timeout: Duration

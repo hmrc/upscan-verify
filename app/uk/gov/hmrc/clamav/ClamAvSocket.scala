@@ -52,7 +52,7 @@ private[clamav] object ClamAvSocket:
   ): Future[ClamAvSocket] =
     Future:
       val sock = Socket()
-      sock.setSoTimeout(config.timeout)
+      sock.setSoTimeout(config.timeout.toMillis.toInt)
       sock.setKeepAlive(true)
 
       val address: InetSocketAddress = InetSocketAddress(config.host, config.port)
